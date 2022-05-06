@@ -1,0 +1,4 @@
+*.config.js
+*.eslintrc.js
+*.min.js
+plugins/*.js

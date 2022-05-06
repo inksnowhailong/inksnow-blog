@@ -12,10 +12,16 @@ export default defineConfig({
   plugins: [
     vue(),
     AutoImport({
-      resolvers: [ElementPlusResolver()],
+      resolvers: [ElementPlusResolver({
+        importStyle: "sass",
+
+      })],
     }),
     Components({
-      resolvers: [ElementPlusResolver()],
+      resolvers: [ElementPlusResolver({
+        importStyle: "sass",
+
+      })],
     }),
   ],
   server: {
@@ -25,13 +31,15 @@ export default defineConfig({
   resolve: {
     // 配置路径别名
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, 'src'),
+      'views':  path.resolve(__dirname, 'src/views'),
+      'components':  path.resolve(__dirname, 'src/components'),
     },
   },
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@import "@/assets/style/index.scss";`
+        additionalData: `@use "@/assets/style/index.scss" as *;`
       }
     }
   }

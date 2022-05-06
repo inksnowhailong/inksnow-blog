@@ -1,2 +1,17 @@
+// styles/element/index.scss
+/* 只需要重写你需要的即可 */
+@forward "element-plus/theme-chalk/src/common/var.scss" with (
+  $colors: (
+    "primary": (
+      "base": #2073eb,
+    ),
+    "success": (
+      "base": #3eaf7c,
+    ),
+  )
+);
 
-$red: #f00000;
+// 2月7号 web
+$theme: #2073eb;
+// vue色
+$vcolor: #3eaf7c;
