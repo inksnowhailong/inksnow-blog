@@ -25,7 +25,7 @@ const activeIndex = ref<string>('/');
   display: flex;
   align-items: center;
   line-height: 60px;
-  box-shadow: var(--el-box-shadow);
+  box-shadow: var(--el-box-shadow-light);
 }
 .el-menu{
   flex: 1;
