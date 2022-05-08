@@ -17,11 +17,11 @@ import { ref, reactive } from "vue";
 const list = reactive([
   {
     is: "dt",
-    text: "vue3相关",
+    text: "开发本博客遇到的坑",
   },
   {
     is: "dd",
-    text: "开发博客期间遇到的问题",
+    text: "关于代码高亮",
   },
 ]);
 const activeIndex = ref(1);

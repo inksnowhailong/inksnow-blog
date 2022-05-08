@@ -14,9 +14,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watchEffect } from "vue";
+import { useRoute } from "vue-router";
+// 获取route
+const route = useRoute();
+// 设置当前的默认导航
+const activeIndex = ref<string>('');
+console.log(activeIndex);
 
-const activeIndex = ref<string>('/');
+watchEffect(() => {
+  // 页面更改时，同步更新默认导航，以防止一刷新，导航的值就变成默认的'/'
+  activeIndex.value = route.path
+});
 </script>
 
 <style scoped lang="scss">
@@ -27,7 +36,7 @@ const activeIndex = ref<string>('/');
   line-height: 60px;
   box-shadow: var(--el-box-shadow-light);
 }
-.el-menu{
+.el-menu {
   flex: 1;
 }
 .logoText {

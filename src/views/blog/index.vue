@@ -3,7 +3,9 @@
     <el-aside>
     <asideList></asideList>
     </el-aside>
-    <el-main>Main</el-main>
+    <el-main>
+      <pre v-highlightjs><code class="javascript">const s = new Date().toString()</code></pre>
+    </el-main>
   </el-container>
 </template>
 
