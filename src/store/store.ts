@@ -10,7 +10,7 @@ export const store = createStore<State>({
   state() {
     return {
       // 博客页内容组件名称
-      liPage: "",
+      liPage: "AboutHighlightCode",
     };
   },
   mutations: {

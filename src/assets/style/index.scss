@@ -10,7 +10,6 @@
     ),
   )
 );
-
 // 2月7号 web  主题色
 $theme: #2073eb;
 // vue色  副色
@@ -19,3 +18,19 @@ $vcolor: #3eaf7c;
 $asideBoxColor:#eef5ff;
 // 侧边栏宽度
 $asideWidth:250px;
+
+
+
+.el-container{
+  height: 100%;
+}
+// 引用标记
+.cite{
+  color: #555666;
+  background: #eef0f4;
+  font-size: 16px;
+  padding: 5px;
+  margin: 0 5px;
+  border-left: 4px solid #dddfe4;
+  border-right: 4px solid #dddfe4;
+}

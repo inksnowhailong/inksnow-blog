@@ -5,9 +5,6 @@ import path from 'path'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-
-// const resolve = (dir: string) => path.join(__dirname, dir)
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
@@ -34,6 +31,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
       'views':  path.resolve(__dirname, 'src/views'),
       'components':  path.resolve(__dirname, 'src/components'),
+      'store':  path.resolve(__dirname, 'src/store'),
     },
   },
   css: {

@@ -20,7 +20,6 @@ import { useRoute } from "vue-router";
 const route = useRoute();
 // 设置当前的默认导航
 const activeIndex = ref<string>('');
-console.log(activeIndex);
 
 watchEffect(() => {
   // 页面更改时，同步更新默认导航，以防止一刷新，导航的值就变成默认的'/'

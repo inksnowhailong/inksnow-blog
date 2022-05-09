@@ -14,7 +14,11 @@
     "skipLibCheck": true,
     "types": ["element-plus/global"],
     "noImplicitAny": false,
-    "allowJs": true
+    "allowJs": true,
+    "paths": {
+      "@": ["./src"],
+      "@/*": ["./src/*"],
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]
