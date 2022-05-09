@@ -14,7 +14,6 @@
 </template>
 
 <script setup lang="ts">
-import Header from "./header.vue";
 import { SwitchButton } from "@element-plus/icons-vue";
 </script>
 
