@@ -13,13 +13,19 @@
     "lib": ["esnext", "dom"],
     "skipLibCheck": true,
     "types": ["element-plus/global"],
-    "noImplicitAny": false,
-    "allowJs": true,
     "paths": {
       "@": ["./src"],
-      "@/*": ["./src/*"],
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "env.d.ts",
+    "index.d.ts"
+  ],
+  "exclude": ["node_modules"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

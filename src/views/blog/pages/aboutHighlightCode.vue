@@ -35,8 +35,7 @@
       (如果存在)，或者添加一个包含 `declare module 'vue3-highlightjs';`
       的新声明(.d.ts)文件
     </el-tag>
-    <p>我按照他的方式去添加d.ts文件后，没有效果，依然报错</p>
-    <strong class="success"> 解决办法：我直接修改了tsconfig.json </strong>
+    <strong class="success"> 解决办法：1、直接修改了tsconfig.json </strong>
     <pre v-highlightjs>
     <code class="javascript">
     {
@@ -46,6 +45,19 @@
         "allowJs": true,
       }
     }
+    </code></pre>
+      <strong class="success"> 解决办法：2、按提示所说的，设置d.ts文件 </strong>
+  
+        <pre v-highlightjs>
+    <code class="javascript">
+    // 根目录建立一个index.d.ts文件，然后写入这行代码
+        declare module "vue3-highlightjs";
+    // 然后在tsconfig.json里面的include引用它
+      {
+          "include": [
+          "index.d.ts"
+        ],
+      }
     </code></pre>
   </div>
 </template>
