@@ -9,10 +9,15 @@
 
 <script setup lang="ts">
 import Header from "components/layout/header.vue";
+
 </script>
 
 <style lang="scss">
 .el-header {
   padding: 0;
+}
+.el-container{
+  height: 100%;
+  overflow: hidden;
 }
 </style>

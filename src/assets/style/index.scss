@@ -15,17 +15,21 @@ $theme: #2073eb;
 // vue色  副色
 $vcolor: #3eaf7c;
 // 侧边栏背景色
-$asideBoxColor:#eef5ff;
+$asideBoxColor: #eef5ff;
 // 侧边栏宽度
-$asideWidth:250px;
+$asideWidth: 250px;
+// element颜色
+$el-success:#67c23a;
+$el-primary:#409eff;
+$el-warning:#e6a23c;
+$el-danger:#f56c6c;
+$el-info:#909399;
 
-
-
-.el-container{
+.el-container {
   height: 100%;
 }
 // 引用标记
-.cite{
+.cite {
   color: #555666;
   background: #eef0f4;
   font-size: 16px;
@@ -33,4 +37,16 @@ $asideWidth:250px;
   margin: 0 5px;
   border-left: 4px solid #dddfe4;
   border-right: 4px solid #dddfe4;
+}
+.error {
+  display: block;
+  color: $el-danger;
+  font-size: 24px;
+  margin: 8px 0 12px;
+}
+.success{
+  display: block;
+  color: $el-success;
+  font-size: 24px;
+  margin: 8px 0 12px;
 }

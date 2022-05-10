@@ -32,6 +32,7 @@ watchEffect(() => {
   width: 100%;
   display: flex;
   align-items: center;
+  height: 60px;
   line-height: 60px;
   box-shadow: var(--el-box-shadow-light);
 }

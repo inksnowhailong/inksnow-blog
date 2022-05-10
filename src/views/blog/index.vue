@@ -4,9 +4,11 @@
       <asideList></asideList>
     </el-aside>
     <el-main>
-      <keep-alive>
-        <component :is="page"></component>
-      </keep-alive>
+      <el-scrollbar>
+        <keep-alive>
+          <component :is="page"></component>
+        </keep-alive>
+      </el-scrollbar>
     </el-main>
   </el-container>
 </template>
@@ -24,12 +26,13 @@ const page = computed(() => {
   const comp = defineAsyncComponent(() => import(`./pages/${pagestr}.vue`));
   return comp;
 });
-
 </script>
-
 
 <style scoped lang="scss">
 .el-aside {
   width: $asideWidth;
+}
+.el-main {
+  padding-right: 5px;
 }
 </style>
