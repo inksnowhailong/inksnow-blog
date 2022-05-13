@@ -8,7 +8,7 @@ import router from "./router/router";
 import { store,key } from "./store/store";
 // 语法高亮
 import VueHighlightJS from "vue3-highlightjs";
-import "highlight.js/styles/obsidian.css";
+import "highlight.js/scss/atom-one-dark.scss";
 
 const app = createApp(App)
     .use(router)

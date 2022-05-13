@@ -1,20 +1,22 @@
 <template>
   <el-container>
     <el-aside>
-      <asideList></asideList>
+      <blogAsideNav></blogAsideNav>
     </el-aside>
     <el-main>
       <el-scrollbar>
-        <keep-alive>
-          <component :is="page"></component>
-        </keep-alive>
+        <div class="page-box">
+          <keep-alive>
+            <component :is="page"></component>
+          </keep-alive>
+        </div>
       </el-scrollbar>
     </el-main>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import asideList from "./asideList.vue";
+import blogAsideNav from "./blog-aside-nav.vue";
 import { useStore } from "@/store/store";
 import { computed, defineAsyncComponent } from "vue";
 
@@ -23,7 +25,9 @@ import { computed, defineAsyncComponent } from "vue";
 const page = computed(() => {
   const pagestr = useStore().state.liPage;
   // 异步引入组件需要这么个函数包裹  实现组件懒加载
-  const comp = defineAsyncComponent(() => import(`./pages/${pagestr}.vue`));
+  const comp = defineAsyncComponent(
+    () => import(`./blog-pages/${pagestr}.vue`)
+  );
   return comp;
 });
 </script>
@@ -34,5 +38,13 @@ const page = computed(() => {
 }
 .el-main {
   padding-right: 5px;
+}
+.el-scrollbar {
+  width: 100%;
+}
+.page-box{
+  width: 1000px;
+  padding-bottom: 50px;
+  margin: 0 auto;
 }
 </style>

@@ -19,34 +19,40 @@ $asideBoxColor: #eef5ff;
 // 侧边栏宽度
 $asideWidth: 250px;
 // element颜色
-$el-success:#67c23a;
-$el-primary:#409eff;
-$el-warning:#e6a23c;
-$el-danger:#f56c6c;
-$el-info:#909399;
-
+$el-success: #67c23a;
+$el-primary: #409eff;
+$el-warning: #e6a23c;
+$el-danger: #f56c6c;
+$el-info: #909399;
+// 引用标记颜色
+$cite-color: #555666;
+$cite-background: #eef0f4;
+$cite-border: #dddfe4;
 .el-container {
   height: 100%;
 }
+
 // 引用标记
 .cite {
-  color: #555666;
-  background: #eef0f4;
-  font-size: 16px;
   padding: 5px;
   margin: 0 5px;
-  border-left: 4px solid #dddfe4;
-  border-right: 4px solid #dddfe4;
+  border-left: 4px solid $cite-border;
+  border-right: 4px solid $cite-border;
+  color: $cite-color;
+  background: $cite-background;
+  font-size: 16px;
 }
+// 错误/坑标题
 .error {
   display: block;
+  margin: 8px 0 12px;
   color: $el-danger;
   font-size: 24px;
-  margin: 8px 0 12px;
 }
-.success{
+// 成功/解决方法标题
+.success {
   display: block;
+  margin: 8px 0 12px;
   color: $el-success;
   font-size: 24px;
-  margin: 8px 0 12px;
 }

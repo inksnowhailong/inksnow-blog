@@ -29,12 +29,14 @@
     </pre>
 
     <strong class="error">坑：在我引入这个库的js文件时候</strong>
-    <el-tag type="danger">
-      无法找到模块“vue3-highlightjs”的声明文件。“/node_modules/vue3-highlightjs/dist/vue3-highlight.js”隐式拥有
-      "any" 类型。 尝试使用 `npm i --save-dev @types/vue3-highlightjs`
-      (如果存在)，或者添加一个包含 `declare module 'vue3-highlightjs';`
-      的新声明(.d.ts)文件
-    </el-tag>
+    <el-alert type="error" :closable="false">
+      <span slot="title"  >
+        无法找到模块“vue3-highlightjs”的声明文件。“/node_modules/vue3-highlightjs/dist/vue3-highlight.js”隐式拥有
+        "any" 类型。 尝试使用 `npm i --save-dev @types/vue3-highlightjs`
+        (如果存在)，或者添加一个包含 `declare module 'vue3-highlightjs';`
+        的新声明(.d.ts)文件
+      </span>
+    </el-alert>
     <strong class="success"> 解决办法：1、直接修改了tsconfig.json </strong>
     <pre v-highlightjs>
     <code class="javascript">
@@ -46,13 +48,13 @@
       }
     }
     </code></pre>
-      <strong class="success"> 解决办法：2、按提示所说的，设置d.ts文件 </strong>
-  
-        <pre v-highlightjs>
+    <strong class="success"> 解决办法：2、按提示所说的，设置d.ts文件 </strong>
+
+    <pre v-highlightjs>
     <code class="javascript">
-    // 根目录建立一个index.d.ts文件，然后写入这行代码
-        declare module "vue3-highlightjs";
-    // 然后在tsconfig.json里面的include引用它
+      // 根目录建立一个index.d.ts文件，然后写入这行代码
+          declare module "vue3-highlightjs";
+      // 然后在tsconfig.json里面的include引用它
       {
           "include": [
           "index.d.ts"
