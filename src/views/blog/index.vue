@@ -3,7 +3,7 @@
     <el-aside>
       <blogAsideNav></blogAsideNav>
     </el-aside>
-    <el-main>
+    <el-main class="page-component__scroll">
       <el-scrollbar>
         <div class="page-box">
           <keep-alive>
@@ -11,6 +11,9 @@
           </keep-alive>
         </div>
       </el-scrollbar>
+      <el-backtop
+        target=".page-component__scroll .el-scrollbar__wrap"
+      ></el-backtop>
     </el-main>
   </el-container>
 </template>
@@ -42,9 +45,12 @@ const page = computed(() => {
 .el-scrollbar {
   width: 100%;
 }
-.page-box{
+.page-box {
   width: 1000px;
   padding-bottom: 50px;
   margin: 0 auto;
+}
+.el-main {
+  background: $baseBgColor;
 }
 </style>

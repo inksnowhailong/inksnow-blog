@@ -22,6 +22,7 @@ dd {
   padding: 0px;
   font-size: 16px;
   font-weight: normal;
+
 }
 
 ul {
@@ -39,7 +40,7 @@ th, td /* table elements 表格元素 */ {
   margin: 0;
   padding: 0;
   // 基础不为纯黑
-  color: #2d2b3a;
+  color: $baseColor;
 }
 /** 设置默认字体 **/
 body,
@@ -192,7 +193,7 @@ h2 {
   margin-bottom: 1rem;
   color: $vcolor;
   font-size: 26px;
-  border-bottom: 1px solid #eaecef;
+  border-bottom: 1px solid #d0d4d1;
 }
 h1 {
   padding: 15px 15px 15px 0;

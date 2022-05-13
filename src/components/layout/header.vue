@@ -19,25 +19,30 @@ import { useRoute } from "vue-router";
 // 获取route
 const route = useRoute();
 // 设置当前的默认导航
-const activeIndex = ref<string>('');
+const activeIndex = ref<string>("");
 
 watchEffect(() => {
   // 页面更改时，同步更新默认导航，以防止一刷新，导航的值就变成默认的'/'
-  activeIndex.value = route.path
+  activeIndex.value = route.path;
 });
 </script>
 
 <style scoped lang="scss">
 .box-card {
-  width: 100%;
+  position: absolute;
+  z-index: 1;
   display: flex;
   align-items: center;
+  width: 100%;
   height: 60px;
   line-height: 60px;
+  background: $baseBgColor;
   box-shadow: var(--el-box-shadow-light);
+  
 }
 .el-menu {
   flex: 1;
+   background: $baseBgColor;
 }
 .logoText {
   font-size: 20px;
