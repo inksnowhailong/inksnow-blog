@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 
-const routes:Array<RouteRecordRaw> = [
+const routes: Array<RouteRecordRaw> = [
+  {
+    path: '/inksnow-blog',
+    redirect:'/'
+  },
   {
     path: "/",
     component: () => import("views/home/index.vue"),
