@@ -6,11 +6,11 @@ import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 export default defineConfig(({ command }) => {
-  // let base = command === "serve" ? "/" : "/inksnow-blog/";
+  let base = command === "serve" ? "/" : "/inksnow-blog/";
   // console.log(base);
   
   return {
-    // base,
+    base,
     plugins: [
       vue(),
       AutoImport({
