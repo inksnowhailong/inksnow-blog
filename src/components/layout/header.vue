@@ -14,19 +14,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from "vue";
+import {ref, watchEffect } from "vue";
 import { useRoute } from "vue-router";
 // 获取route
 const route = useRoute();
-// 设置当前的默认导航
-const activeIndex = ref<string>("");
 
+// 设置当前的默认导航
+
+// 通过path得到一级路由path
+function getRouteIndex():string {
+  const routePathArr: string[] = route.path.split("/");
+
+  return "/" + routePathArr[1];
+}
+const activeIndex = ref<string>('');
 watchEffect(() => {
   // 页面更改时，同步更新默认导航，以防止一刷新，导航的值就变成默认的'/'
-  activeIndex.value = route.path;
-});
-</script>
+  activeIndex.value = getRouteIndex()
+})
 
+</script>
 <style scoped lang="scss">
 .box-card {
   position: absolute;
@@ -38,11 +45,10 @@ watchEffect(() => {
   line-height: 60px;
   background: $baseBgColor;
   box-shadow: var(--el-box-shadow-light);
-  
 }
 .el-menu {
   flex: 1;
-   background: $baseBgColor;
+  background: $baseBgColor;
 }
 .logoText {
   font-size: 20px;

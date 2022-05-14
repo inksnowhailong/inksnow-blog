@@ -22,7 +22,6 @@ dd {
   padding: 0px;
   font-size: 16px;
   font-weight: normal;
-
 }
 
 ul {
@@ -39,30 +38,45 @@ form, fieldset, legend, button, input, textarea, /* form elements 表单元素 *
 th, td /* table elements 表格元素 */ {
   margin: 0;
   padding: 0;
-  // 基础不为纯黑
-  color: $baseColor;
 }
 /** 设置默认字体 **/
 body,
-button, input, select, textarea /* for ie */ {
-  font: 14px/1.5 tahoma, \5b8b\4f53, sans-serif;
-}
+button,
+input,
+select,
+textarea,
 h1,
 h2,
 h3,
 h4,
 h5,
-h6 {
-  font-size: 100%;
-  font-weight: normal;
-}
+h6,
 address,
 cite,
 dfn,
 em,
-var {
+var,
+dl,
+dt,
+dd,
+ul,
+ol,
+li,
+form,
+fieldset,
+legend,
+button,
+input,
+textarea,
+th,
+td {
+  /* 将斜体扶正 */
   font-style: normal;
-} /* 将斜体扶正 */
+  // 没有默认变粗
+  font-weight: normal;
+  // 基础不为纯黑
+  @include font-large();
+}
 code,
 kbd,
 pre,
@@ -185,7 +199,6 @@ img {
 h3 {
   padding-top: 1rem;
   margin-bottom: 5px;
-  color: #000;
   font-size: 20px;
 }
 h2 {

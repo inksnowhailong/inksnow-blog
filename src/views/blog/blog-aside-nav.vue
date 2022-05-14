@@ -6,8 +6,8 @@
         v-text="item.text"
         v-for="(item, index) in list"
         :key="index"
-        :class="{ active: activeIndex === index }"
-        @click="fnChangePage(item.comp as string, index)"
+        :class="{ active: activePath === item.comp }"
+        @click="fnChangePage(item.comp as string)"
       ></component>
     </dl>
   </el-scrollbar>
@@ -15,8 +15,7 @@
 
 <script setup lang="ts">
 import { ref, reactive} from "vue";
-// 引入封装过的useStore
-import { useStore } from "@/store/store";
+import { useRoute, useRouter } from "vue-router";
 
 interface navListInterface {
   [index: number]: {
@@ -47,16 +46,16 @@ const list: navListInterface = reactive([
     comp: "TSConfigExplain",
   },
 ]);
-// 活跃的导航下标
-let activeIndex= ref<number>(1);
+// 初始化路由状态时候，找到侧边导航对应的函数
+const route = useRoute()
+let activePath= ref<string>(route.path.slice(6));
 
-const store = useStore();
-
+const router = useRouter()
 // 切换博客页面
-const fnChangePage = (comp: string, targetIndex: number): void => {
- 
-    store.commit("changePage", comp);
-    activeIndex.value = targetIndex
+const fnChangePage = (comp: string): void => {
+    // 跳转路由
+    router.push(comp)
+    activePath.value  = comp
 };
 </script>
 

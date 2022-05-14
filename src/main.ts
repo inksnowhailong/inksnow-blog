@@ -10,6 +10,7 @@ import { store,key } from "./store/store";
 import VueHighlightJS from "vue3-highlightjs";
 import "highlight.js/scss/atom-one-dark.scss";
 
+
 const app = createApp(App)
     .use(router)
     .use(VueHighlightJS)

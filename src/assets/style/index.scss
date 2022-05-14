@@ -14,6 +14,26 @@
 //   --el-color-primary: #2073eb;
 //   --el-color-success: #3eaf7c;
 // }
+
+// 字体
+$font-normal-color : #222222; // 字体颜色
+$font-light-color : #333333;
+$font-family-medium : 'PingFang-SC-medium', Helveti   ca, Tahoma, Arial, 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
+$font-family-regular : 'PingFang-SC-regular', Helvetica, Tahoma, Arial, 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
+@mixin font-class($fontFamily, $fontSize, $fontColor) {
+    font-family: $fontFamily;
+    font-size: $fontSize;
+    color: $fontColor;
+}
+
+@mixin font-large($size: 14px, $color: $font-normal-color) {
+    @include font-class($font-family-medium, $size, $color);
+}
+
+@mixin font-normal($size: 14px, $color: $font-light-color) {
+    @include font-class($font-family-regular, $size, $color);
+}
+
 // 2月7号 web  主题色
 $theme: #2073eb;
 // vue色  副色
@@ -24,8 +44,6 @@ $asideBoxColor: #e2ebff;
 $asideWidth: 250px;
 // 基础背景色
 $baseBgColor: #ebf4ff;
-// 基础背景色
-$baseColor: #46484d;
 // element颜色
 $el-success: #67c23a;
 $el-primary: #409eff;
