@@ -5,10 +5,14 @@ import path from "path";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
+
+// 性能分析
+
+import { visualizer } from "rollup-plugin-visualizer";
+
 export default defineConfig(({ command }) => {
+  //区分环境改base 否则gitee pages 无法显示内容
   let base = command === "serve" ? "/" : "/inksnow-blog/";
-  // console.log(base);
-  
   return {
     base,
     plugins: [
@@ -27,6 +31,8 @@ export default defineConfig(({ command }) => {
           }),
         ],
       }),
+      // 性能分析
+      visualizer({ open: true }),
     ],
     server: {
       host: true,

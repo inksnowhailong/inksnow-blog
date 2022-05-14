@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist-ssr
 *.local
+# 性能分析文件
+stats.html
 
 # Editor directories and files
 .vscode/*
