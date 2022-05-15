@@ -1,5 +1,5 @@
 // styles/element/index.scss
-/* 只需要重写你需要的即可 */
+/* 改element基础样式*/
 @forward "element-plus/theme-chalk/src/common/var.scss" with (
   $colors: (
     "primary": (
@@ -10,28 +10,37 @@
     ),
   )
 );
+.el-container {
+  height: 100%;
+}
+.el-tag {
+  margin: 0 2px;
+}
+
 // :root {
 //   --el-color-primary: #2073eb;
 //   --el-color-success: #3eaf7c;
 // }
 
 // 字体
-$font-normal-color : #222222; // 字体颜色
-$font-light-color : #333333;
-$font-family-medium : 'PingFang-SC-medium', Helveti   ca, Tahoma, Arial, 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
-$font-family-regular : 'PingFang-SC-regular', Helvetica, Tahoma, Arial, 'Microsoft YaHei', 'Hiragino Sans GB', 'WenQuanYi Micro Hei', sans-serif;
+$font-normal-color: #222222; // 字体颜色
+$font-light-color: #333333;
+$font-family-medium: "PingFang-SC-medium", Helveti ca, Tahoma, Arial, "Microsoft YaHei", "Hiragino Sans GB",
+  "WenQuanYi Micro Hei", sans-serif;
+$font-family-regular: "PingFang-SC-regular", Helvetica, Tahoma, Arial, "Microsoft YaHei", "Hiragino Sans GB",
+  "WenQuanYi Micro Hei", sans-serif;
 @mixin font-class($fontFamily, $fontSize, $fontColor) {
-    font-family: $fontFamily;
-    font-size: $fontSize;
-    color: $fontColor;
+  font-family: $fontFamily;
+  font-size: $fontSize;
+  color: $fontColor;
 }
 
 @mixin font-large($size: 14px, $color: $font-normal-color) {
-    @include font-class($font-family-medium, $size, $color);
+  @include font-class($font-family-medium, $size, $color);
 }
 
 @mixin font-normal($size: 14px, $color: $font-light-color) {
-    @include font-class($font-family-regular, $size, $color);
+  @include font-class($font-family-regular, $size, $color);
 }
 
 // 2月7号 web  主题色
@@ -39,11 +48,15 @@ $theme: #2073eb;
 // vue色  副色
 $vcolor: #3eaf7c;
 // 侧边栏背景色
-$asideBoxColor: #e2ebff;
+$aside-box-color: #e2ebff;
 // 侧边栏宽度
-$asideWidth: 250px;
+$aside-width: 250px;
 // 基础背景色
-$baseBgColor: #ebf4ff;
+$base-bg-color: #ebf4ff;
+
+//圆角
+
+
 // element颜色
 $el-success: #67c23a;
 $el-primary: #409eff;
@@ -54,9 +67,9 @@ $el-info: #909399;
 $cite-color: #555666;
 $cite-background: #eef0f4;
 $cite-border: #dddfe4;
-.el-container {
-  height: 100%;
-}
+
+// 解析的背景颜色
+$parse-bg-color: #dae9ff;
 
 // 引用标记
 .cite {
@@ -82,3 +95,12 @@ $cite-border: #dddfe4;
   color: $el-success;
   font-size: 24px;
 }
+// 解析
+.parse {
+  display: inline-block;
+  padding: 4px 4px 4px 10px;
+  margin: 4px;
+  border-radius: var(--el-border-radius-small);
+  background: $parse-bg-color;
+}
+

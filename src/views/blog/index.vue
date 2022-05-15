@@ -35,7 +35,7 @@ import blogAsideNav from "./blog-aside-nav.vue";
 
 <style scoped lang="scss">
 .el-aside {
-  width: $asideWidth;
+  width: $aside-width;
 }
 .el-main {
   padding-right: 5px;
@@ -49,6 +49,6 @@ import blogAsideNav from "./blog-aside-nav.vue";
   margin: 0 auto;
 }
 .el-main {
-  background: $baseBgColor;
+  background: $base-bg-color;
 }
 </style>

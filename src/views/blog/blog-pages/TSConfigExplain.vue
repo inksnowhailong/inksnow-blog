@@ -277,8 +277,5 @@
 </script>
 
 <style scoped>
-.parse{
-  background: #eef5ff;
-  padding: 4px 4px 4px 10px;
-}
+
 </style>

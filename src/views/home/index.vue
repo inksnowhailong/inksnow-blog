@@ -26,7 +26,7 @@ import { SwitchButton } from "@element-plus/icons-vue";
   width: 100vw;
   height: calc(100vh - 60px);
   padding-bottom: 40px;
-  background: $baseBgColor;
+  background: $base-bg-color;
   box-sizing: border-box;
   .title {
     font-size: 400%;

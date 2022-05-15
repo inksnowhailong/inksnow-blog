@@ -29,12 +29,17 @@ interface navListInterface {
 const list: navListInterface = reactive([
   {
     is: "dt",
-    text: "开发本博客遇到的坑",
+    text: "本博客遇到的以及好库推荐",
   },
   {
     is: "dd",
-    text: "关于代码高亮",
+    text: "输出代码高亮的库，专为vue3",
     comp: "AboutHighlightCode",
+  },
+  {
+    is: "dd",
+    text: "关于js插件的隐式any类型报错",
+    comp: "AboutJsAny",
   },
   {
     is: "dt",
@@ -44,6 +49,15 @@ const list: navListInterface = reactive([
     is: "dd",
     text: "tsconfig.json常用配置解析",
     comp: "TSConfigExplain",
+  },
+  {
+    is: "dt",
+    text: "vue",
+  },
+  {
+    is: "dd",
+    text: "vue和nuxt的请求封装方案",
+    comp: "ApiPackage",
   },
 ]);
 // 初始化路由状态时候，找到侧边导航对应的函数
@@ -64,9 +78,9 @@ const fnChangePage = (comp: string): void => {
   height: 100%;
   padding: 20px 10px;
   box-sizing: border-box;
-  background: $asideBoxColor;
+  background: $aside-box-color;
   dt {
-    font-size: 18px;
+    @include font-normal(18px,#666);
     margin-bottom: 10px;
     cursor: default;
     pointer-events: none;

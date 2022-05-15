@@ -21,9 +21,18 @@ const routes: Array<RouteRecordRaw> = [
         component:()=>import('views/blog/blog-pages/AboutHighlightCode.vue')
       },
       {
+        path: 'AboutJsAny',
+        component:()=>import('views/blog/blog-pages/AboutJsAny.vue')
+      },
+      {
         path: 'TSConfigExplain',
         component:()=>import('views/blog/blog-pages/TSConfigExplain.vue')
       },
+      {
+        path: 'ApiPackage',
+        component:()=>import('views/blog/blog-pages/ApiPackage.vue')
+      },
+      
     ]
   },
 ];
