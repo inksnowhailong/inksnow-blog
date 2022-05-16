@@ -1,0 +1,81 @@
+{
+  "_args": [
+    [
+      "vue3-highlightjs@1.0.5",
+      "C:\\Users\\Administrator\\Desktop\\demo\\v3tsvite"
+    ]
+  ],
+  "_from": "vue3-highlightjs@1.0.5",
+  "_id": "vue3-highlightjs@1.0.5",
+  "_inBundle": false,
+  "_integrity": "sha512-Q4YNPXu0X5VMBnwPVOk+IQf1Ohp9jFdMitEAmzaz8qVVefcQpN6Dx4BnDGKxja3TLDVF+EgL136wC8YzmoCX9w==",
+  "_location": "/vue3-highlightjs",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "version",
+    "registry": true,
+    "raw": "vue3-highlightjs@1.0.5",
+    "name": "vue3-highlightjs",
+    "escapedName": "vue3-highlightjs",
+    "rawSpec": "1.0.5",
+    "saveSpec": null,
+    "fetchSpec": "1.0.5"
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "https://registry.npmmirror.com/vue3-highlightjs/-/vue3-highlightjs-1.0.5.tgz",
+  "_spec": "1.0.5",
+  "_where": "C:\\Users\\Administrator\\Desktop\\demo\\v3tsvite",
+  "author": {
+    "name": "daizhen1995",
+    "email": "daizhen@know-act.com"
+  },
+  "bugs": {
+    "url": "https://github.com/Daizhen1995/vue3-highlightjs/issues"
+  },
+  "dependencies": {
+    "highlight.js": "^10.3.2"
+  },
+  "description": "Syntax highlighting with highlight.js for Vue.js 3.x",
+  "devDependencies": {
+    "@babel/core": "^7.12.3",
+    "@babel/preset-env": "^7.12.1",
+    "@rollup/plugin-babel": "^5.2.1",
+    "prettier": "^2.1.2",
+    "rimraf": "^3.0.2",
+    "rollup": "^2.33.1",
+    "rollup-plugin-terser": "^7.0.2"
+  },
+  "files": [
+    "dist/*.js",
+    "styles/*.css"
+  ],
+  "homepage": "https://github.com/Daizhen1995/vue3-highlightjs#readme",
+  "keywords": [
+    "vue",
+    "highlight",
+    "hightlightjs",
+    "vue-highlightjs",
+    "vue-highlight",
+    "vue3-highlightjs",
+    "vue3-highlight"
+  ],
+  "license": "ISC",
+  "main": "dist/vue3-highlight.js",
+  "module": "dist/vue3-highlight-es.js",
+  "name": "vue3-highlightjs",
+  "peerDependencies": {
+    "vue": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Daizhen1995/vue3-highlightjs.git"
+  },
+  "scripts": {
+    "build": "rollup -c build/rollup.config.dev.js",
+    "build:prod": "rollup -c build/rollup.config.prod.js",
+    "clean": "rimraf dist"
+  },
+  "version": "1.0.5"
+}

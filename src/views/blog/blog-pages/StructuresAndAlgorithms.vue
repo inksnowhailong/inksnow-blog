@@ -22,8 +22,8 @@
       花销了不够用，划大了浪费（这在早年是非常大的事情。）所以必须想办法解决问题。最后采用的方法是从入口开始，每一个数据块不仅仅是有数据，还会有指向下一个数据块的索引，用来找到下一个数据，
       这就是链表
     </p>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
           // js链表数据结构
         let Node = function(element) {.0
             this.element = element
@@ -33,8 +33,8 @@
     <p>
       还有双向链表，只是加了一个上一个node的索引。不仅如此，队列，栈，都是线性表的特殊形态。进行了操作上的限制罢了。既可以是数组，也可以是链表
     </p>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
          // js双向链表数据结构
         let Node = function(element) {
             this.element = element

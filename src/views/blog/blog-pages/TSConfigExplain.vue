@@ -46,8 +46,8 @@
       ts是有默认推导的，同时还有any类型，所以不是每个变量或参数定义需要明确告知类型是什么。
       如果开启该值，当有隐含any类型时，会报错。建议初次上手TypeScript，把该选项设置为false。
     </p>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
        // 当开启noImplicitAny时，需要隐含当any需要明确指出
         arr.find(item => item.name === name) // error  参数“item”隐式具有“any”类型。ts(7006)
         arr.find((item: any) => item.name === name) // ok   
@@ -92,8 +92,8 @@
       <br>
         <p> 说直白点，也就是遇到import { AAA } from './aaa'该如何去找对应文件模块解析。对于工程项目，建议大家使用node（vue-cli3 ts模板默认设置为node策略），因为这个更符合平时我们的书写习惯以及认知（平时都是webpack打包，webpack又基于node之上）。</p>
       </p>
-       <pre v-highlightjs>
-        <code class="javascript">
+       <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
           // 在源文件/root/src/A.ts中import { b } from "./moduleB"
           // 两种解析方式查找文件方式不同
 
@@ -120,8 +120,8 @@
         当启用了strictNullChecks，null和undefined获得了它们自己各自的类型null和undefined。开启该模式有助于发现并处理可能为undefined的赋值。
         如果是正式项目，我建议开启该选项;如果只是练手TypeScirpt，可以关闭该选项，不然所有可能为null/undefined的赋值，都需要写联合类型。</p>
       </p>
-       <pre v-highlightjs>
-        <code class="javascript">
+       <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         // 未开启strictNullChecks，number类型包含了null和undefined类型
         let foo: number = 123;
         foo = null; // Okay
@@ -172,8 +172,8 @@
       <br>
         <p>未设置include时，编译器默认包含当前目录和子目录下所有的TypeScript文件（.ts, .d.ts 和 .tsx）。如果allowJs被设置成true，JS文件（.js和.jsx）也被包含进来。exclude排除那些不需要编译的文件或文件夹。</p>
       </p>
-          <pre v-highlightjs>
-        <code class="javascript">
+          <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         {
          "compilerOptions": {},
          "include": [
@@ -187,8 +187,8 @@
         </code></pre>
       
       <h2>tsconfig.josn全解析</h2>
-          <pre v-highlightjs>
-        <code class="javascript">
+          <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
   {
     "compilerOptions": {
       /* 基本选项 */

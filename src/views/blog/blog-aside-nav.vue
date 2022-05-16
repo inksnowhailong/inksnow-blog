@@ -31,11 +31,11 @@ const list: navListInterface = reactive([
     is: "dt",
     text: "本博客遇到的以及好库推荐",
   },
-  {
-    is: "dd",
-    text: "输出代码高亮的库，专为vue3",
-    comp: "AboutHighlightCode",
-  },
+  // {
+  //   is: "dd",
+  //   text: "输出代码高亮的库，专为vue3",
+  //   comp: "AboutHighlightCode",
+  // },
   {
     is: "dd",
     text: "关于js插件的隐式any类型报错",

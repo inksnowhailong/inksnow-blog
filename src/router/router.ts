@@ -14,7 +14,7 @@ const routes: Array<RouteRecordRaw> = [
     path: "/blog",
     name: "blog",
     component: () => import("views/blog/index.vue"),
-    redirect:'/blog/AboutHighlightCode',
+    redirect:'/blog/AboutJsAny',
     children: [
       {
         path: 'AboutHighlightCode',

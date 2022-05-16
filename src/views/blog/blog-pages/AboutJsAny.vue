@@ -11,8 +11,8 @@
       </span>
     </el-alert>
     <strong class="success"> 解决办法：1、直接修改了tsconfig.json </strong>
-    <pre v-highlightjs>
-    <code class="javascript">
+    <pre  class="line-numbers">
+    <code v-prism class="language-javascript">
     {
       "compilerOptions": {
         // 这里加入这两行配置，就不报红了
@@ -23,8 +23,8 @@
     </code></pre>
     <strong class="success"> 解决办法：2、按提示所说的，设置d.ts文件，然后在ts.config中引入 </strong>
 
-    <pre v-highlightjs>
-    <code class="javascript">
+    <pre  class="line-numbers">
+    <code v-prism class="language-javascript">
       // 根目录建立一个index.d.ts文件，然后写入这行代码
           declare module "vue3-highlightjs";
       // 然后在tsconfig.json里面的include引用它

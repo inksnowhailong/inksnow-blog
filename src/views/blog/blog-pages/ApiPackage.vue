@@ -21,8 +21,8 @@
     </p>
     <h2>Vue2x的版本</h2>
     <h3>目录结构</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
             在src下建立http文件夹，目录结构如下
             http/
             |-- apis/
@@ -32,8 +32,8 @@
             |-- request.js
         </code></pre>
     <h3>request.js文件</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         import axios from 'axios'
         //这里设置全局默认属性
         axios.defaults.timeout = 20000
@@ -101,8 +101,8 @@
        
         </code></pre>
     <h3>index.js文件 这个vue是唯一要引入的文件</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         /* 导入apis中所有的api接口 */
         const apisFiles = require.context('./apis', true, /\.js$/)
         // 遍历这个拿到的文件数据 这个是个函数，里面还有固定的方法 在此不做详细叙述
@@ -126,8 +126,8 @@
       >
       里面的内容像这样去写
     </h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         import { get, del, post , request } from '../request.js'
         import qs from 'qs'
         // 获取数据  
@@ -148,8 +148,8 @@
         }
         </code></pre>
     <h3>最后在main.js里面</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
           import { Api } from './http/index.js'
           // 注入请求通道
           Vue.prototype.$apis = Api
@@ -173,8 +173,8 @@
       nuxt2x的版本，这里我采用了和vue时候不一样的逻辑方式去搞，区别很小，实现效果也一样，但是，能节省写几行代码
     </h2>
     <h3>目录结构，同vue2x版本</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
             在src下建立http文件夹，目录结构如下
             http/
             |-- apis/
@@ -184,8 +184,8 @@
             |-- request.js
         </code></pre>
     <h3>request文件</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         export default ({ $axios, app, redirect }) => {
         // 配置默认属性
         $axios.defaults.timeout = 20000
@@ -248,8 +248,8 @@
         }
         </code></pre>
     <h3>index.js文件</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         import apiTool from './request.js'
 
         export default (ctx, inject) => {
@@ -273,8 +273,8 @@
         }
         </code></pre>
     <h3>apis里面的模块文件,以如下方式来写入</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         import qs from 'qs'
         export default ({ get,post,del,request }) => {
             return {
@@ -291,8 +291,8 @@
         }
         </code></pre>
     <h3>最后，在nuxt.config里面</h3>
-    <pre v-highlightjs>
-        <code class="javascript">
+    <pre  class="line-numbers">
+        <code v-prism class="language-javascript">
         // 随后 在nuxt.config里面 把他引入就行
         plugins:[
             {

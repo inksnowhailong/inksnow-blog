@@ -5,9 +5,8 @@ import path from "path";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
-
+import prismjs from "vite-plugin-prismjs";
 // 性能分析
-
 import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig(({ command }) => {
@@ -33,6 +32,13 @@ export default defineConfig(({ command }) => {
       }),
       // 性能分析
       visualizer({ open: true }),
+      // 代码高亮
+      prismjs({
+        languages: ["javascript", "html"],
+        plugins: ["line-numbers","copy-to-clipboard"],
+        theme: "tomorrow",
+        css: true,
+      }),
     ],
     server: {
       host: true,
