@@ -35,11 +35,11 @@ $font-family-regular: "PingFang-SC-regular", Helvetica, Tahoma, Arial, "Microsof
   color: $fontColor;
 }
 
-@mixin font-large($size: 14px, $color: $font-normal-color) {
+@mixin font-large($size: 16px, $color: $font-normal-color) {
   @include font-class($font-family-medium, $size, $color);
 }
 
-@mixin font-normal($size: 14px, $color: $font-light-color) {
+@mixin font-normal($size: 16px, $color: $font-light-color) {
   @include font-class($font-family-regular, $size, $color);
 }
 
@@ -48,14 +48,11 @@ $theme: #2073eb;
 // vue色  副色
 $vcolor: #3eaf7c;
 // 侧边栏背景色
-$aside-box-color: #e2ebff;
+$aside-box-color: #ecf2ff;
 // 侧边栏宽度
 $aside-width: 250px;
 // 基础背景色
-$base-bg-color: #ebf4ff;
-
-//圆角
-
+$base-bg-color: #f5f9ff;
 
 // element颜色
 $el-success: #67c23a;
@@ -65,16 +62,17 @@ $el-danger: #f56c6c;
 $el-info: #909399;
 // 引用标记颜色
 $cite-color: #555666;
-$cite-background: #eef0f4;
+$cite-background: #eef2f8;
 $cite-border: #dddfe4;
 
 // 解析的背景颜色
-$parse-bg-color: #dae9ff;
+$parse-bg-color: #d7edffab;
 
 // 引用标记
 .cite {
+  display: inline-block;
   padding: 5px;
-  margin: 0 5px;
+  margin: 7px 5px;
   border-left: 4px solid $cite-border;
   border-right: 4px solid $cite-border;
   color: $cite-color;
@@ -98,7 +96,7 @@ $parse-bg-color: #dae9ff;
 // 解析
 .parse {
   display: inline-block;
-  padding: 4px 4px 4px 10px;
+  padding: 4px 4px 4px 4px;
   margin: 4px;
   border-radius: var(--el-border-radius-small);
   background: $parse-bg-color;

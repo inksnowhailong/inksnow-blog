@@ -32,6 +32,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'ApiPackage',
         component:()=>import('views/blog/blog-pages/ApiPackage.vue')
       },
+      {
+        path: 'StructuresAndAlgorithms',
+        component:()=>import('views/blog/blog-pages/StructuresAndAlgorithms.vue')
+      },
       
     ]
   },

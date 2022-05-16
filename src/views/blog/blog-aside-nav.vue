@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive} from "vue";
+import { ref, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 interface navListInterface {
@@ -59,17 +59,26 @@ const list: navListInterface = reactive([
     text: "vue和nuxt的请求封装方案",
     comp: "ApiPackage",
   },
+  {
+    is: "dt",
+    text: "JS",
+  },
+  {
+    is: "dd",
+    text: "数据结构与算法",
+    comp: "StructuresAndAlgorithms",
+  },
 ]);
 // 初始化路由状态时候，找到侧边导航对应的函数
-const route = useRoute()
-let activePath= ref<string>(route.path.slice(6));
+const route = useRoute();
+let activePath = ref<string>(route.path.slice(6));
 
-const router = useRouter()
+const router = useRouter();
 // 切换博客页面
 const fnChangePage = (comp: string): void => {
-    // 跳转路由
-    router.push(comp)
-    activePath.value  = comp
+  // 跳转路由
+  router.push(comp);
+  activePath.value = comp;
 };
 </script>
 
@@ -80,7 +89,7 @@ const fnChangePage = (comp: string): void => {
   box-sizing: border-box;
   background: $aside-box-color;
   dt {
-    @include font-normal(18px,#666);
+    @include font-normal(18px, #666);
     margin-bottom: 10px;
     cursor: default;
     pointer-events: none;
