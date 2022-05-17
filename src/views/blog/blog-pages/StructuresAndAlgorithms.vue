@@ -22,7 +22,7 @@
       花销了不够用，划大了浪费（这在早年是非常大的事情。）所以必须想办法解决问题。最后采用的方法是从入口开始，每一个数据块不仅仅是有数据，还会有指向下一个数据块的索引，用来找到下一个数据，
       这就是链表
     </p>
-    <pre  class="line-numbers">
+    <pre class="line-numbers">
         <code v-prism class="language-javascript">
           // js链表数据结构
         let Node = function(element) {.0
@@ -33,7 +33,7 @@
     <p>
       还有双向链表，只是加了一个上一个node的索引。不仅如此，队列，栈，都是线性表的特殊形态。进行了操作上的限制罢了。既可以是数组，也可以是链表
     </p>
-    <pre  class="line-numbers">
+    <pre class="line-numbers">
         <code v-prism class="language-javascript">
          // js双向链表数据结构
         let Node = function(element) {
@@ -77,6 +77,75 @@
         而<span class="parse">引用类型，</span>
         你根本不知道这个类型需要多大的内存空间，所以推荐使用堆存储最好不过。
       </li>
+      <h2>
+        1.3.2为什么会有<span class="parse">栈内存</span>和<span class="parse"
+          >堆内存</span
+        >之分
+      </h2>
+      <p>通常与垃圾回收机制有关，为了使程序运行时占用的内存最小。</p>
+      <p>
+        当一个方法执行时；<span class="parse"
+          >每个方法都会建立自己的内存栈，</span
+        >在这个方法内定义变量将会逐个放入这块栈内存里，随着方法的执行结束
+        这个方法的内存栈也将自然销毁了。因此所有在方法中定义的变量，都是放在栈内存中的；
+      </p>
+      <p>
+        当我们在程序中<span class="parse"
+          >创建一个对象时，这个对象将被保存到运行时数据区中，</span
+        >以便反复利用（因为对象的创建成本通常较大），这个运行时数据区就是堆内存。
+        <span class="parse">堆内存中的对象不会所方法的结束而销毁，</span
+        >即使方法结束后，这个对象还可能被另一个变量引用（方法的
+        参数传递时很常见），则这个对象依然不会被销毁，只有
+        当一个对象没有任何引用变量引用它的时候，这个对象就彻底丢失了，系统的垃圾回收机制才会在合适的时候回收它
+      </p>
+      <p>
+        在c语言这类没有垃圾回收机制的语言中，定义基本类型如char时，系统会自动在栈上为其开辟空间，而堆是需要程序员自己申请空间，如malloc(10)。由于栈上的空间是自动回收的，所以栈上的
+        数据的生存周期只是在函数的运行过程中，运行后就释放掉，不可以再访问。而堆上的数据只要程序员不释放空间，就一直可以访问到，不过缺点是一旦忘记释放会造成内存泄漏
+      </p>
+      <h2>总结</h2>
+      <ul>
+        <li>数组（连续存储）</li>
+        <li>链表（离散存储）</li>
+        <ul>
+          <li class="li-circle">
+            有序表：要求插入元素时，对元素对值进行比较，以找到相应的插入位置。
+          </li>
+          <li class="li-circle">顺序表、单链表、循环链表、双向链表</li>
+        </ul>
+        <li>
+          栈（线性结构常见应用，由链表或数组增删和改进功能实现）。特点是先进后出；
+        </li>
+        <li>
+          队列（线性结构常见应用，由链表或数组增删和改进功能实现）。特点是先进先出；
+        </li>
+      </ul>
+    </ul>
+    <p>
+      数组和链表是最基础的数据结构，<span class="parse"
+        >以相同的功能实现可以用数组结构，也可以用链表结构</span
+      >，如栈与队列的实现，可以底层存储是用数组，也可以是小块内存链接起来的链表。
+      再比如数组的reverse翻转，使用数组或链表数据结构，相关算法是完全不一样的。
+    </p>
+    <h2>2.集合、字典/散列表</h2>
+    <p>都属于非顺序数据结构</p>
+    <ul>
+      <li>
+        <span class="parse">集合：</span
+        >一组无序且唯一的项组成，可以理解为没有重复元素且没有顺序的数组（集合只存储value）。javascript
+        ES6新增Set数据结构即为此
+      </li>
+      <ul>
+        <li class="li-circle">js set： 无序不可重复的多个value的集合体</li>
+      </ul>
+      <li>
+        <span class="parse">字典：</span
+        >也称作映射，使用{key:value}键值对的形式存储数据。javascriptES6新增Map数据结构即为此
+      </li>
+      <ul>
+        <li class="li-circle">js map：无序的key不重复的多个key-value的集合体</li>
+        <li class="li-circle">散列表：是实现字典的一种方式，散列算法的作用，是尽可能在数据结构中找到一个值（O（1）时间复杂度）。其中最重要的，
+        就是选择一个好的<span class="parse">散列函数</span>，给定一个键值，然后返回值在表中的位置</li>
+      </ul>
     </ul>
   </div>
 </template>
@@ -85,8 +154,19 @@
 
 <style scoped lang="scss">
 ul {
-  & > li {
+  li {
     list-style: disc;
+    margin-left: 1em;
+  }
+  .li-circle {
+    margin-left: 2em;
+    list-style: circle;
+    &:first-child {
+      margin-top: 5px;
+    }
+    &:last-child {
+      margin-bottom: 5px;
+    }
   }
 }
 </style>

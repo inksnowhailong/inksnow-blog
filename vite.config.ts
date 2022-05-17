@@ -9,6 +9,10 @@ import prismjs from "vite-plugin-prismjs";
 // 性能分析
 import { visualizer } from "rollup-plugin-visualizer";
 
+// 使用插件进行gzip压缩来进一步优化
+
+import viteCompression from "vite-plugin-compression";
+
 export default defineConfig(({ command }) => {
   //区分环境改base 否则gitee pages 无法显示内容
   let base = command === "serve" ? "/" : "/inksnow-blog/";
@@ -16,6 +20,7 @@ export default defineConfig(({ command }) => {
     base,
     plugins: [
       vue(),
+      // 自动引入ele
       AutoImport({
         resolvers: [
           ElementPlusResolver({
@@ -23,6 +28,7 @@ export default defineConfig(({ command }) => {
           }),
         ],
       }),
+      // 自动注册ele
       Components({
         resolvers: [
           ElementPlusResolver({
@@ -35,10 +41,18 @@ export default defineConfig(({ command }) => {
       // 代码高亮
       prismjs({
         languages: ["javascript", "html"],
-        plugins: ["line-numbers","copy-to-clipboard"],
+        plugins: ["line-numbers", "copy-to-clipboard"],
         theme: "tomorrow",
         css: true,
       }),
+      // gzip压缩
+      viteCompression({
+        verbose: true,
+        disable: false,
+        threshold: 10240,
+        algorithm: 'gzip',
+        ext:'.gz'
+      })
     ],
     server: {
       host: true,
@@ -57,6 +71,27 @@ export default defineConfig(({ command }) => {
       preprocessorOptions: {
         scss: {
           additionalData: `@use "@/assets/style/index.scss" as *;`,
+        },
+      },
+    },
+
+    build: {
+      rollupOptions: {
+        // 配置打包后的文件名和路径
+        output: {
+          chunkFileNames: "static/js/[name]-[hash].js",
+          entryFileNames: "static/js/[name]-[hash].js",
+          assetsFileName: "static/[ext]/[name]-[hash].[ext]",
+          // 拆分包
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              return id
+                .toString()
+                .split("node_modules/")[1]
+                .split("/")[0]
+                .toString();
+            }
+          },
         },
       },
     },

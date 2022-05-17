@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite --force",
+    "dev": "vite ",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview"
   },
@@ -28,6 +28,7 @@
     "unplugin-auto-import": "^0.7.1",
     "unplugin-vue-components": "^0.19.3",
     "vite": "^2.9.5",
+    "vite-plugin-compression": "^0.5.1",
     "vite-plugin-prismjs": "0.0.8",
     "vue-tsc": "^0.34.7"
   },
