@@ -39,63 +39,63 @@
         axios.defaults.timeout = 20000
 
         // 拦截器
-        axios.interceptors.request.use(config => {
+        axios.interceptors.request.use(config = 》 {
             return config
         })
         axios.interceptors.response.use(
-            res => {
+            res = 》 {
                 return res
             },
-            error => {
+            error = 》 {
                 return Promise.reject({ data: { error }})
             }
         )
         // get方法
         export function get(url, params, headers) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) = 》 {
                 axios
                 .get(
                     url,
                     params,
                     { ...headers }
                 )
-                .then(res => resolve(res))
-                .catch(err => resolve(err))
+                .then(res = 》 resolve(res))
+                .catch(err = 》 resolve(err))
             })
         }
         // post方法
         export function post(url, params, headers) {
             const jsonParams = JSON.stringify(params)
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) = 》 {
                 axios
                 .post(url, jsonParams, {
                     headers: { 'Content-Type': 'application/json' }, ...headers
                 })
-                .then(res => resolve(res))
-                .catch(err => {
+                .then(res = 》 resolve(res))
+                .catch(err = 》 {
                     resolve(err)
                 })
             })
         }
         // delete方法
         export function del(url, params, headers) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) = 》 {
                 axios
                 .delete(
                     url,
                     params,
                     { ...headers }
                 )
-                .then(res => resolve(res))
-                .catch(err => resolve(err))
+                .then(res = 》 resolve(res))
+                .catch(err = 》 resolve(err))
             })
         }
         // 自义定方法
         export function request(method, url, params, headers) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) = 》 {
                 axios[method](url, params, { ...headers })
-                .then(res => resolve(res))
-                .catch(err => resolve(err))
+                .then(res = 》 resolve(res))
+                .catch(err = 》 resolve(err))
             })
         }
        
@@ -106,7 +106,7 @@
         /* 导入apis中所有的api接口 */
         const apisFiles = require.context('./apis', true, /\.js$/)
         // 遍历这个拿到的文件数据 这个是个函数，里面还有固定的方法 在此不做详细叙述
-        const apis = apisFiles.keys().reduce((modules, modulePath) => {
+        const apis = apisFiles.keys().reduce((modules, modulePath) = 》 {
             //modulePath 是拿到的文件路径，截取出来文件名
             const moduleName = modulePath.replace(/^\.\/(.*)\.\w+$/, '$1')
             //通过文件名，拿到指定文件到处的模块数据
@@ -186,62 +186,62 @@
     <h3>request文件</h3>
     <pre  class="line-numbers">
         <code v-prism class="language-javascript">
-        export default ({ $axios, app, redirect }) => {
+        export default ({ $axios, app, redirect }) = 》 {
         // 配置默认属性
         $axios.defaults.timeout = 20000
         // !! 注意这块，是nuxt 的坑，因为是服务端渲染，所以服务端是不该走代理的，在客户端才走代理，
         // 所以baseUrl应该不同，在服务端请求东西，应该前面加全请求的域名https什么的
         $axios.defaults.baseURL = process.client ? '/api' : process.env.baseUrl
         // 拦截器
-        $axios.interceptors.request.use((config) => {
+        $axios.interceptors.request.use((config) = 》 {
             return config
         })
         $axios.interceptors.response.use(
-            (res) => {
+            (res) = 》 {
             return res
             },
-            (error) => {
+            (error) = 》 {
             return Promise.reject({ data: { error, response: error.response.data } })
             }
         )
             return {
                 // get方法
                 get (url, params, headers) {
-                    return new Promise((resolve, reject) => {
+                    return new Promise((resolve, reject) = 》 {
                         $axios
                         .get(url, params, { ...headers })
-                        .then(res => resolve(res))
-                        .catch(err => resolve(err))
+                        .then(res = 》 resolve(res))
+                        .catch(err = 》 resolve(err))
                     })
                 },
                 // post方法
                 post (url, params, headers) {
                 const jsonParams = JSON.stringify(params)
-                    return new Promise((resolve, reject) => {
+                    return new Promise((resolve, reject) = 》 {
                         $axios
                         .post(url, jsonParams, {
                             headers: { 'Content-Type': 'application/json' },
                             ...headers
                         })
-                        .then(res => resolve(res))
-                        .catch(err => resolve(err))
+                        .then(res = 》 resolve(res))
+                        .catch(err = 》 resolve(err))
                     })
                 },
                 // delete方法、
                 del (url, params, headers) {
-                    return new Promise((resolve, reject) => {
+                    return new Promise((resolve, reject) = 》 {
                         $axios
                         .delete(url, params, { ...headers })
-                        .then(res => resolve(res))
-                        .catch(err => resolve(err))
+                        .then(res = 》 resolve(res))
+                        .catch(err = 》 resolve(err))
                     })
                 },
                 // 自义定方法
                 request (method, url, params, headers) {
-                    return new Promise((resolve, reject) => {
+                    return new Promise((resolve, reject) = 》 {
                         $axios[method](url, params, { ...headers })
-                        .then(res => resolve(res))
-                        .catch(err => resolve(err))
+                        .then(res = 》 resolve(res))
+                        .catch(err = 》 resolve(err))
                     })
                 },
             }
@@ -252,14 +252,14 @@
         <code v-prism class="language-javascript">
         import apiTool from './request.js'
 
-        export default (ctx, inject) => {
+        export default (ctx, inject) = 》 {
             // 引入请求工具
             const askFunc = apiTool(ctx)
             /* 导入apis中所有的api接口 */
             const apisFiles = require.context('./apis', true, /\.js$/)
             console.log(apisFiles)
             // 全部接口集成在这里
-            const apis = apisFiles.keys().reduce((modules, modulePath) => {
+            const apis = apisFiles.keys().reduce((modules, modulePath) = 》 {
                 // 说明：$1,$2上就是按顺序对应小括号里面的小正则 捕获到的内容。
                 const moduleName = modulePath.replace(/^\.\/(.*)\.\w+$/, '$1')
                 // 得到当前遍历到的这个模块
@@ -276,7 +276,7 @@
     <pre  class="line-numbers">
         <code v-prism class="language-javascript">
         import qs from 'qs'
-        export default ({ get,post,del,request }) => {
+        export default ({ get,post,del,request }) = 》 {
             return {
                 // 获取数据
                 getXXX(params) {
