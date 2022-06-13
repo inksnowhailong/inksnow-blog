@@ -9,6 +9,7 @@
 
 <script setup lang="ts">
 import Header from "components/layout/header.vue";
+import { reactive } from "vue";
 
 </script>
 
@@ -16,7 +17,7 @@ import Header from "components/layout/header.vue";
 .el-header {
   padding: 0;
 }
-.el-container{
+.el-container {
   height: 100%;
   overflow: hidden;
 }
