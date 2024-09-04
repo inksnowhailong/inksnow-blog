@@ -2,7 +2,6 @@ import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
 import { redirectPlugin } from '@vuepress/plugin-redirect'
-
 export default defineUserConfig({
   title: "海龙的博客",
   description: "海龙的博客",
@@ -30,9 +29,13 @@ export default defineUserConfig({
       ],
       "/blogs/codes": [
         {
-          text: "第三方服务库",
-          children: ["/js/高德地图"],
+          text: "第三方库",
+          children: ["/js/高德地图.md"],
         },
+        {
+          text: "JS/TS技巧",
+          children: ["/js/js主动触发事件.md"],
+        }
       ],
     },
     navbar: [
