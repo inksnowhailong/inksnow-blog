@@ -2,18 +2,19 @@ import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
 import { redirectPlugin } from "@vuepress/plugin-redirect";
-import path from 'path';
+// import path from 'path';
 export default defineUserConfig({
+  base: "/inksnow-blog/",
   title: "海龙的博客",
   description: "海龙的博客",
   bundler: viteBundler(),
   theme: recoTheme({
-    viteBundlerOptions: {
-      viteOptions:{
-        base: '/inksnow-blog/',
-      },
-      vuePluginOptions: {},
-    },
+    // viteBundlerOptions: {
+    //   viteOptions:{
+    //     base: '/inksnow-blog/',
+    //   },
+    //   vuePluginOptions: {},
+    // },
     primaryColor: "#4d78cc",
     catalogTitle: "目录",
     home: "/HOME.md",
