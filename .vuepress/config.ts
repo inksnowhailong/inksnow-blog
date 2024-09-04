@@ -1,12 +1,16 @@
 import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
-import { viteBundler } from '@vuepress/bundler-vite'
+import { viteBundler } from "@vuepress/bundler-vite";
+import { redirectPlugin } from '@vuepress/plugin-redirect'
 
 export default defineUserConfig({
   title: "海龙的博客",
   description: "海龙的博客",
   bundler: viteBundler(),
   theme: recoTheme({
+    primaryColor: '#4d78cc',
+    catalogTitle: "目录",
+    home: "/HOME.md",
     style: "@vuepress-reco/style-default",
     logo: "/logo.png",
     author: "海龙",
@@ -17,28 +21,28 @@ export default defineUserConfig({
     lastUpdatedText: "",
     // series 为原 sidebar
     series: {
-      "/docs/theme-reco/": [
+
+      "/blogs/reading/": [
         {
-          text: "module one",
-          children: ["home", "theme"],
+          text: "思想",
+          children: ["人生十二法则"],
         },
+      ],
+      "/blogs/codes": [
         {
-          text: "module two",
-          children: ["api", "plugin"],
+          text: "第三方服务库",
+          children: ["/js/高德地图"],
         },
       ],
     },
     navbar: [
-      { text: "首页", link: "/" },
+      { text: "首页", link: "/HOME" },
       { text: "编程", link: "/blogs/codes/index.md" },
-      { text: "读书", link: "/blogs/reading/index.md" },
       {
-        text: "Docs",
-        children: [
-          { text: "vuepress-reco", link: "/docs/theme-reco/theme" },
-          { text: "vuepress-theme-reco", link: "/blogs/other/guide" },
-        ],
+        text: "读书",
+        link: "/blogs/reading/index.md",
       },
+
     ],
     // bulletin: {
     //   body: [
@@ -108,5 +112,12 @@ export default defineUserConfig({
     //   },
     // },
   }),
+  plugins:[
+    redirectPlugin({
+      config: {
+        '/': '/HOME.md',
+      },
+    })
+  ],
   debug: true,
 });

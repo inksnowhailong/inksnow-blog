@@ -11,9 +11,12 @@
     "build": "vuepress build ."
   },
   "dependencies": {
+    "@vuepress/bundler-vite": "2.0.0-rc.14",
     "vue": "^3.4.27",
     "vuepress": "2.0.0-rc.14",
-    "vuepress-theme-reco": "2.0.0-rc.18",
-    "@vuepress/bundler-vite": "2.0.0-rc.14"
+    "vuepress-theme-reco": "2.0.0-rc.18"
+  },
+  "devDependencies": {
+    "@vuepress/plugin-redirect": "2.0.0-rc.42"
   }
 }
