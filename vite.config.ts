@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 export default defineConfig({
+  base: '/inksnow-blog/',
   resolve: {
     alias: {
         '@types': path.resolve(__dirname, '../types'),
