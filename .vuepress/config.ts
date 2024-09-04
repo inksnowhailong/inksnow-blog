@@ -1,13 +1,13 @@
 import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
-import { redirectPlugin } from '@vuepress/plugin-redirect'
+import { redirectPlugin } from "@vuepress/plugin-redirect";
 export default defineUserConfig({
   title: "海龙的博客",
   description: "海龙的博客",
   bundler: viteBundler(),
   theme: recoTheme({
-    primaryColor: '#4d78cc',
+    primaryColor: "#4d78cc",
     catalogTitle: "目录",
     home: "/HOME.md",
     style: "@vuepress-reco/style-default",
@@ -20,7 +20,6 @@ export default defineUserConfig({
     lastUpdatedText: "",
     // series 为原 sidebar
     series: {
-
       "/blogs/reading/": [
         {
           text: "思想",
@@ -35,7 +34,7 @@ export default defineUserConfig({
         {
           text: "JS/TS技巧",
           children: ["/js/js主动触发事件.md"],
-        }
+        },
       ],
     },
     navbar: [
@@ -45,7 +44,6 @@ export default defineUserConfig({
         text: "读书",
         link: "/blogs/reading/index.md",
       },
-
     ],
     // bulletin: {
     //   body: [
@@ -115,12 +113,12 @@ export default defineUserConfig({
     //   },
     // },
   }),
-  plugins:[
+  plugins: [
     redirectPlugin({
       config: {
-        '/': '/HOME.md',
+        "/": "/HOME.md",
       },
-    })
+    }),
   ],
   debug: true,
 });
