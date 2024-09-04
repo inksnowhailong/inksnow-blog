@@ -3,7 +3,7 @@ import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from '@vuepress/bundler-vite'
 
 export default defineUserConfig({
-  title: "inksnow-blog",
+  title: "海龙的博客",
   description: "海龙的博客",
   bundler: viteBundler(),
   theme: recoTheme({
