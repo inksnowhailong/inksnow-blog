@@ -1,3 +1,3 @@
-::: tip 介绍
-    去主页吧，这里没有太多介绍🙂‍↔😏
-:::
+
+
+[ 去主页吧，这里没有太多介绍 🙂‍😏👉](https://inksnowhailong.github.io/inksnow-blog/)

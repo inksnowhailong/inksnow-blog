@@ -11,6 +11,9 @@ importers:
       '@vuepress/bundler-vite':
         specifier: 2.0.0-rc.14
         version: 2.0.0-rc.14(@types/node@22.5.3)(jiti@1.21.6)(lightningcss@1.26.0)(sass@1.78.0)(terser@5.31.6)(yaml@2.5.1)
+      canvas-nest.js:
+        specifier: ^2.0.4
+        version: 2.0.4
       vue:
         specifier: ^3.4.27
         version: 3.5.0
@@ -1190,6 +1193,9 @@ packages:
 
   caniuse-lite@1.0.30001655:
     resolution: {integrity: sha512-jRGVy3iSGO5Uutn2owlb5gR6qsGngTw9ZTb4ali9f3glshcNmJ2noam4Mo9zia5P9Dk3jNNydy7vQjuE5dQmfg==}
+
+  canvas-nest.js@2.0.4:
+    resolution: {integrity: sha512-Wgc+39fQBIP8fm9+Rq+Zt6+QLHZRsIKpaOQPL5KcWPlXTAalCKY4KCuklY7qzzZqBRF/t2APIrk+PuRw6ZlOog==}
 
   chalk@2.4.2:
     resolution: {integrity: sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuQ==}
@@ -3138,6 +3144,9 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  size-sensor@0.2.6:
+    resolution: {integrity: sha512-0EZ0tXXjyRl9R9+JpoBdH57Xpnbf5NTyDdj7fnFL6KqCsdKyah286ShMflnV2SonnrSFH4OAT/52Jy8qqnoerg==}
 
   slash2@2.0.0:
     resolution: {integrity: sha512-7ElvBydJPi3MHU/KEOblFSbO/skl4Z69jKkFCpYIYVOMSIZsKi4gYU43HGeZPmjxCXrHekoDAAewphPQNnsqtA==}
@@ -5150,6 +5159,10 @@ snapshots:
 
   caniuse-lite@1.0.30001655: {}
 
+  canvas-nest.js@2.0.4:
+    dependencies:
+      size-sensor: 0.2.6
+
   chalk@2.4.2:
     dependencies:
       ansi-styles: 3.2.1
@@ -7110,6 +7123,8 @@ snapshots:
       object-inspect: 1.13.2
 
   signal-exit@4.1.0: {}
+
+  size-sensor@0.2.6: {}
 
   slash2@2.0.0: {}
 
