@@ -32,6 +32,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # 或者根据项目需求指定其他 Node.js 版本
+          cache: pnpm
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -39,12 +45,6 @@ jobs:
           version: 9
           # 使用 pnpm 安装依赖
           run_install: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20" # 或者根据项目需求指定其他 Node.js 版本
-          cache: pnpm
 
       # - name: Install dependencies
       #   run: npm install --legacy-peer-deps # 安装项目依赖
