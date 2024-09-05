@@ -1,29 +1,47 @@
 /* 设置滚动条的样式 */
 ::-webkit-scrollbar {
-    width: 6px;
-    background-color: #f5f5f500; /* 更浅的背景色 */
+  width: 6px;
+  background-color: #f5f5f500; /* 更浅的背景色 */
 }
 /* 设置滚动条的轨道样式 */
 ::-webkit-scrollbar-track {
-    background-color: #f5f5f500; /* 更浅的轨道背景色 */
+  background-color: #f5f5f500; /* 更浅的轨道背景色 */
 }
 /* 设置滚动条轨道的hover样式 */
 ::-webkit-scrollbar-track:hover {
-    background-color: #e0e0e0; /* 更浅的hover背景色 */
+  background-color: #e0e0e0; /* 更浅的hover背景色 */
 }
 /* 设置滑块的样式 */
 ::-webkit-scrollbar-thumb {
-    background-color: #d3d3d3; /* 更浅的滑块颜色 */
-    border-radius: 6px;
+  background-color: #d3d3d3; /* 更浅的滑块颜色 */
+  border-radius: 6px;
 }
 /* 设置滑块的hover样式 */
 ::-webkit-scrollbar-thumb:hover {
-    background-color: #c0c0c0; /* 更浅的hover滑块颜色 */
+  background-color: #c0c0c0; /* 更浅的hover滑块颜色 */
 }
 /* 设置滚动条的角的样式 */
 ::-webkit-scrollbar-corner {
-    background-color: #f5f5f5; /* 更浅的角背景色 */
+  background-color: #f5f5f5; /* 更浅的角背景色 */
 }
 /* .xicon-container{
     display: none;
 } */
+.navbar-container .site-brand .logo {
+  width:4.4em;
+  height:4.4em;
+  /* transform: scale(2.8); */
+}
+.navbar-container .site-brand {
+    display: flex;
+    align-items: center;
+}
+
+#c{
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+}
