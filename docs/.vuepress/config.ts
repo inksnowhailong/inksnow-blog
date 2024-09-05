@@ -31,17 +31,17 @@ export default defineUserConfig({
       "/blogs/reading/": [
         {
           text: "思想",
-          children: ["人生十二法则"],
+          children: ["人生十二法则",'架构整洁之道'],
         },
       ],
-      "/blogs/codes": [
+      "/blogs/codes/": [
         {
           text: "第三方库",
-          children: ["/js/高德地图.md"],
+          children: ["js/高德地图"],
         },
         {
           text: "JS/TS技巧",
-          children: ["/js/js主动触发事件.md"],
+          children: ["js/js主动触发事件"],
         },
       ],
     },
