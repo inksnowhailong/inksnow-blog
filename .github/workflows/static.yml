@@ -38,19 +38,19 @@ jobs:
           # 选择要使用的 pnpm 版本
           version: 9
           # 使用 pnpm 安装依赖
-          run_install: true
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20" # 或者根据项目需求指定其他 Node.js 版本
-          # cache: pnpm
+          cache: pnpm
 
-      # - name: Install dependencies
-      #   run: npm install --legacy-peer-deps # 安装项目依赖
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build project
-        run: npm run build  # 执行打包命令
+        run: npm run build # 执行打包命令
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
