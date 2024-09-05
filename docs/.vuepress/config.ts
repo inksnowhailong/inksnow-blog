@@ -17,15 +17,15 @@ export default defineUserConfig({
     // },
     primaryColor: "#4d78cc",
     catalogTitle: "目录",
-    // home: "/index",
+    // home: "/",
     style: "@vuepress-reco/style-default",
     logo: "/logo.png",
     author: "海龙",
     authorAvatar: "/head.png",
     docsRepo: "https://github.com/inksnowhailong/inksnow-blog",
     docsBranch: "master",
-    docsDir: ".",
-    lastUpdatedText: "",
+    docsDir: "/docs",
+    lastUpdatedText: "最后更新日期",
     // series 为原 sidebar
     series: {
       "/blogs/reading/": [

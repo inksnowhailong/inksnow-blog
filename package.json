@@ -6,7 +6,7 @@
   "author": "inksnow海龙 <inksnowhailong@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "vuepress dev .",
+    "dev": "vuepress dev docs",
     "start": "vuepress dev .",
     "build": "vuepress build ."
   },
