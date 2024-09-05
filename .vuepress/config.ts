@@ -124,7 +124,9 @@ export default defineUserConfig({
   plugins: [
     redirectPlugin({
       config: {
-        "/": "/HOME.md",
+        "/": "/HOME.html",
+        "/inksnow-blog/": "/HOME.html",
+        "/inksnow-blog": "/HOME.html",
       },
     }),
   ],
