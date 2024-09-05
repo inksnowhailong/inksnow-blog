@@ -1,7 +1,7 @@
 import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
-import { redirectPlugin } from "@vuepress/plugin-redirect";
+// import { redirectPlugin } from "@vuepress/plugin-redirect";
 // import path from 'path';
 export default defineUserConfig({
   base: "/inksnow-blog/",
@@ -17,7 +17,7 @@ export default defineUserConfig({
     // },
     primaryColor: "#4d78cc",
     catalogTitle: "目录",
-    home: "/HOME.md",
+    // home: "/index",
     style: "@vuepress-reco/style-default",
     logo: "/logo.png",
     author: "海龙",
@@ -46,7 +46,7 @@ export default defineUserConfig({
       ],
     },
     navbar: [
-      { text: "首页", link: "/HOME" },
+      { text: "首页", link: "/" },
       { text: "编程", link: "/blogs/codes/index.md" },
       {
         text: "读书",
@@ -122,13 +122,13 @@ export default defineUserConfig({
     // },
   }),
   plugins: [
-    redirectPlugin({
-      config: {
-        defaultBehavior: "homepage",
-        "/": "/HOME.html",
-        "/inksnow-blog/": "/inksnow-blog/HOME.html"
-      },
-    }),
+    // redirectPlugin({
+    //   config: {
+    //     defaultBehavior: "homepage",
+    //     "/": "/HOME.html",
+    //     "/inksnow-blog/": "/inksnow-blog/HOME.html"
+    //   },
+    // }),
   ],
   debug: true,
 });
