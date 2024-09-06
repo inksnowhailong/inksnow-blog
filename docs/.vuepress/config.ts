@@ -43,6 +43,10 @@ export default defineUserConfig({
           text: "JS/TS技巧",
           children: ["js/js主动触发事件"],
         },
+        {
+          text:"实验性",
+          children:["try/架构拆分实验1.md"],
+        }
       ],
     },
     navbar: [
