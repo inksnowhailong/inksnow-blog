@@ -1,8 +1,19 @@
 import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
-// import { redirectPlugin } from "@vuepress/plugin-redirect";
-// import path from 'path';
+import {getAllMdFilesSync,mdPathFormat} from './util'
+import * as path from 'node:path';
+
+/**读书 */
+const reading = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/reading') ),'reading/')
+
+
+/**第三方服务的使用 */
+const threeService = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/threeService') ),'codes/')
+/**jsTs技巧博客 */
+const jsTsTip = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/js') ),'codes/')
+/**实验博客路径 */
+const tryPaths = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/try') ),'codes/')
 export default defineUserConfig({
   base: "/inksnow-blog/",
   title: "海龙的博客",
@@ -31,21 +42,21 @@ export default defineUserConfig({
       "/blogs/reading/": [
         {
           text: "思想",
-          children: ["人生十二法则",'架构整洁之道'],
+          children: reading,
         },
       ],
       "/blogs/codes/": [
         {
           text: "第三方库",
-          children: ["js/高德地图"],
+          children: threeService,
         },
         {
           text: "JS/TS技巧",
-          children: ["js/js主动触发事件"],
+          children:jsTsTip,
         },
         {
           text:"实验性",
-          children:["try/架构拆分实验1.md"],
+          children:tryPaths,
         }
       ],
     },
