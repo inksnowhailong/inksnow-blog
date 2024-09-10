@@ -14,6 +14,9 @@ importers:
       echarts:
         specifier: ^5.5.1
         version: 5.5.1
+      markdown-it-plantuml:
+        specifier: ^1.4.1
+        version: 1.4.1
       vue:
         specifier: ^3.4.27
         version: 3.5.0
@@ -2364,6 +2367,9 @@ packages:
 
   markdown-it-emoji@3.0.0:
     resolution: {integrity: sha512-+rUD93bXHubA4arpEZO3q80so0qgoFJEKRkRbjKX8RTdca89v2kfyF+xR3i2sQTwql9tpPZPOQN5B+PunspXRg==}
+
+  markdown-it-plantuml@1.4.1:
+    resolution: {integrity: sha512-13KgnZaGYTHBp4iUmGofzZSBz+Zj6cyqfR0SXUIc9wgWTto5Xhn7NjaXYxY0z7uBeTUMlc9LMQq5uP4OM5xCHg==}
 
   markdown-it-task-lists@2.1.1:
     resolution: {integrity: sha512-TxFAc76Jnhb2OUu+n3yz9RMu4CwGfaT788br6HhEDlvWfdeJcLUsxk1Hgw2yJio0OXsxv7pyIPmvECY7bMbluA==}
@@ -6369,6 +6375,8 @@ snapshots:
   markdown-it-container@4.0.0: {}
 
   markdown-it-emoji@3.0.0: {}
+
+  markdown-it-plantuml@1.4.1: {}
 
   markdown-it-task-lists@2.1.1: {}
 

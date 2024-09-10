@@ -1,19 +1,33 @@
 import { defineUserConfig } from "vuepress";
 import recoTheme from "vuepress-theme-reco";
 import { viteBundler } from "@vuepress/bundler-vite";
-import {getAllMdFilesSync,mdPathFormat} from './util'
-import * as path from 'node:path';
+import { getAllMdFilesSync, mdPathFormat } from "./util";
+import * as path from "node:path";
+import mdit from "markdown-it-plantuml";
 
 /**读书 */
-const reading = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/reading') ),'reading/')
-
-
+const reading = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/reading")),
+  "reading/"
+);
 /**第三方服务的使用 */
-const threeService = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/threeService') ),'codes/')
+const threeService = mdPathFormat(
+  getAllMdFilesSync(
+    path.resolve("__dirname", "../docs/blogs/codes/threeService")
+  ),
+  "codes/"
+);
 /**jsTs技巧博客 */
-const jsTsTip = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/js') ),'codes/')
+const jsTsTip = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/js")),
+  "codes/"
+);
 /**实验博客路径 */
-const tryPaths = mdPathFormat(getAllMdFilesSync( path.resolve('__dirname', '../docs/blogs/codes/try') ),'codes/')
+const tryPaths = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/try")),
+  "codes/"
+);
+
 export default defineUserConfig({
   base: "/inksnow-blog/",
   title: "海龙的博客",
@@ -52,12 +66,12 @@ export default defineUserConfig({
         },
         {
           text: "JS/TS技巧",
-          children:jsTsTip,
+          children: jsTsTip,
         },
         {
-          text:"实验性",
-          children:tryPaths,
-        }
+          text: "实验性",
+          children: tryPaths,
+        },
       ],
     },
     navbar: [
@@ -136,6 +150,10 @@ export default defineUserConfig({
     //   },
     // },
   }),
+  extendsMarkdown: (md) => {
+    md.set({ breaks: true });
+    md.use(mdit);
+  },
   plugins: [
     // redirectPlugin({
     //   config: {

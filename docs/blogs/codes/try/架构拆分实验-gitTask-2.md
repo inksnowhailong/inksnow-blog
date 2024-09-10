@@ -1,6 +1,6 @@
 ---
 title: 架构拆分实验-gitTask-2
-date: 2024-9-9
+date: 2024-9-10
 categories:
  - 编程
 tags:
@@ -14,93 +14,54 @@ tags:
 - 只是在纯拆，没有让其结构明确。
 - 依赖关系的划分变得更混乱，甚至git操作相关概念和系统的关系也不太对
 - 抽象类是实现和抽象混合的，可以用于复用操作的，但是我的操作上完全就是在描述结构，没有具体实现，应该用接口来搞。
+- 关键业务逻辑之前描述的不太对，这里将采用“Todo逻辑”来描述
 
-<!-- ## 重新划分 -->
+## 重新划分依赖关系
 
-## 源码
+::: tip 依赖关系
 
-:::: code-group
-::: code-group-item demo.ts
+@startuml
 
-```ts
-const gitAction = new TaskGitActionImpl();
-new GitTaskImpl(gitAction);
-```
-
-:::
-::: code-group-item task.abstract.ts
-
-```ts
-/** 单个任务类型 */
-export type Task =  {
-  /**任务名称 */
-  name: string;
-  /**自定义信息 */
-  meta?: Record<string, any>;
-  /**创建时间 */
-  createTime: Number;
-}
-/**任务的数组 */
-export type TasksList = Task[];
-
-export interface TaskTodo {
-  /**获取列表 */
-  getList<T = TasksList | Error>(...ary: any[]): T | Promise<T>;
-  /**添加任务 */
-  addTask<T = Task | Error>(task: Task): T;
-  /**完成任务 */
-  finishTask<T = Task | Error>(task: Task): T;
-  /**修改任务描述 */
-  updateTask<T = Task | Error>(task: Task): T;
-  /**删除任务 */
-  deleteTask<T = Task | Error>(task: Task): T;
-}
-
-```
-
-:::
-::: code-group-item git.abstract.ts
-
-```ts
-export interface TaskGitAction<T = any> {
-  /** 获取git分支列表 */
-
-  /**新建分支 */
-
-  /**删除分支 */
-
-  /**切换分支 */
-
-  /**获取当前分支 */
-
-  /**获取当前分支的父分支 */
-
-  /**合并当前分支到father分支 */
-
-}
-
-```
-
-:::
-::: code-group-item TaskGitAction.Impl.ts
-
-```ts
-export class TaskGitActionImpl implements TaskGitAction<Task>  {
-  constructor() {
-    super();
+ package "Todo逻辑部分" {
+  interface "TaskTodo" {
+    + getList(...ary: any[])
+    + addTask(task: Task)
+    + finishTask(task: Task)
+    + updateTask(task: Task)
+    + deleteTask(task: Task)
   }
-}
-```
-
-:::
-::: code-group-item GitTask.impl.ts
-
-```ts
-export class GitTaskImpl implements TaskTodo {
-  constructor(private gitAction: TaskGitAction) {
-    super();
+  class "Task" {
+    + name: string
+    + meta: Record<string, any>
+    + createTime: Number
   }
-}
-```
+   interface "VersionControl" {
+    +getBranchList()
+    +createBranch(branchName:string)
+    +mergeBranch()
+  }
+
+  class "TaskTodoService" implements TaskTodo
+
+  TaskTodo --> VersionControl :"依赖版本控制接口,未来即使不用git，只要实现了这个接口就能用"
+  TaskTodo --|> Task :"管理"
+ }
+
+   package "底层实现" {
+
+     class "GitRepository" {
+      +checkout(branchName: String)
+      +add(file: String)
+      +commit(message: String)
+      +merge(branchName: String)
+      +delete(branchName: String)
+    }
+    class "GitService"
+
+    "GitService" ..|>  VersionControl : "git服务实现VersionControl"
+    "GitService" --|> GitRepository : "git服务依赖git命令操作类"
+   }
+
+
+@enduml
 :::
-::::
