@@ -76,10 +76,10 @@ export default defineUserConfig({
     },
     navbar: [
       { text: "首页", link: "/" },
-      { text: "编程", link: "/blogs/codes/index.md" },
+      { text: "编程", link: "/blogs/codes/编程.md" },
       {
         text: "读书",
-        link: "/blogs/reading/index.md",
+        link: "/blogs/reading/读书笔记记录.md",
       },
     ],
     // bulletin: {
