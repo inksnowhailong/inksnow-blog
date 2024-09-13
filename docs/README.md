@@ -29,4 +29,5 @@ footer:
   # startYear: 本网站开始时间
 
 ---
-<bg />
+<!-- <bg /> -->
+

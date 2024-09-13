@@ -34,12 +34,11 @@ export default defineUserConfig({
   description: "海龙的博客",
   bundler: viteBundler(),
   theme: recoTheme({
-    // viteBundlerOptions: {
-    //   viteOptions:{
-    //     base: '/inksnow-blog/',
-    //   },
-    //   vuePluginOptions: {},
-    // },
+    viteBundlerOptions: {
+      viteOptions:{
+        assetsInclude: ['**/*.glb']
+      },
+    },
     primaryColor: "#4d78cc",
     catalogTitle: "目录",
     // home: "/",
