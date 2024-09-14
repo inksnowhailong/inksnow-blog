@@ -29,7 +29,7 @@ const tryPaths = mdPathFormat(
 );
 
 export default defineUserConfig({
-  base: "/inksnow-blog/",
+  base: process.env.NODE_ENV=='netlify'?'/': "/inksnow-blog/",
   title: "海龙的博客",
   description: "海龙的博客",
   bundler: viteBundler(),

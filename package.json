@@ -6,9 +6,11 @@
   "author": "inksnow海龙 <inksnowhailong@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "vuepress dev docs",
+    "dev": " vuepress dev docs",
     "start": "vuepress dev docs",
-    "build": "vuepress build docs"
+    "build": "vuepress build docs",
+    "build:netlify": "cross-env NODE_ENV=netlify vuepress build docs"
+
   },
   "dependencies": {
     "@vuepress/bundler-vite": "2.0.0-rc.14",
@@ -20,6 +22,7 @@
     "vuepress-theme-reco": "2.0.0-rc.18"
   },
   "devDependencies": {
-    "@vuepress/plugin-redirect": "2.0.0-rc.42"
+    "@vuepress/plugin-redirect": "2.0.0-rc.42",
+    "cross-env": "^7.0.3"
   }
 }
