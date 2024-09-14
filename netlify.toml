@@ -1,0 +1,4 @@
+[[redirects]]
+  from = "/inksnow-blog/*"
+  to = "/inksnow-blog/:splat"
+  status = 200
