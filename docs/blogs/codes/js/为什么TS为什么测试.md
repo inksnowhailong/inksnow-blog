@@ -1,8 +1,68 @@
 ---
 title: 为什么需要TS?为什么前端需要单元测试？
-date: 2024-9-27
+date: 2024-9-30
 categories:
- - 编程
+  - 编程
 tags:
- - JS/TS
+  - JS/TS
 ---
+
+首先，“为什么需要 TS?为什么前端也需要单元测试？”，是我曾经查询而且想弄清楚的问题。
+
+## 浅薄的想法
+
+**为什么需要 TS?** 我 js 写的好好的，很方便，也很快就能去实现各种功能，没有什么问题，反而加了 TS 后，我感觉我好像一直在做脱裤子放屁的事情。这就是我曾经的想法
+举个例子: 我想搞一个计算数值倍数的函数，那我只需要写一个函数，然后去接收传递的参数的内容就好了
+
+```js
+const num = 1;
+const multiple = 2;
+/**
+ * 计算倍数
+ */
+function calculateMultiple(num1, num2) {
+  return num1 * num2;
+}
+```
+
+如果我换成**麻烦的 TS**会怎样？
+
+```ts
+const num: number = 1;
+const multiple: number = 2;
+/**
+ * 计算倍数
+ */
+function calculateMultiple(num1: number, num2: number): number {
+  return num1 * num2;
+}
+```
+
+这基本就是将简单的代码，加了一层注释一样，是的，我曾经感觉，TS 就像是一种<font style="color:red">注释</font>，会进行<font style="color:red">报错的注释</font>。
+就像是：“我写下一行代码，用于未来使用时候，告诉自己写的这个代码应该是什么类型的，别因为类型不对导致出错”
+
+**为什么需要单元测试?** 众所周知，单元测试，最基础上来说，就是写一堆代码，去模拟执行我已经写好的东西，然后通过判断某个值的布尔值，来确定是通过判断还是没通过。这么说可能不太清晰，上 Code
+
+```js
+import { calculateMultiple } from "./calculateMultiple";
+
+describe("calculateMultiple", () => {
+  test("测试1", () => {
+    expect(calculateMultiple(2, 3)).toBe(6);
+    expect(calculateMultiple(-2, 3)).toBe(-6);
+    expect(calculateMultiple(0, 3)).toBe(0);
+  });
+
+  test("测试2", () => {
+    expect(calculateMultiple(2.5, 4)).toBe(10);
+    expect(calculateMultiple(-2.5, 4)).toBe(-10);
+  });
+});
+```
+就像这里的expect,就像是 if判断一样，符合条件就通过测试，否则就没通过。但是这更奇怪了，非常奇怪。**“我写了个做某事的函数，然后我要写一堆代码去验证这个函数确实这么干了？”**
+如果这个函数没有这么做，我难道不是用的时候就立刻发现了吗？
+当然单元测试能测试很多东西，但是单元测试绝对是去测试某个小模块的，一小块一小块的进行，既然如此，我一个很简单的东西，为什么要写入一堆的测试？
+对于前端，有些页面性变化的单元测试，测试起来更是灾难，要写很多很多麻烦的代码，但是我明明几秒钟就能检测出来问题，而且几乎不可能会出问题，除非有人故意要报复公司了。
+以此来，这个东西确实就是，很奇怪的东西，**大的模块测起来实用性不强，而且编写测试复杂，小的模块一眼就能看出来怎么执行的东西又没必要测试。**
+
+## 终于，我某一天，搞懂了一些。
