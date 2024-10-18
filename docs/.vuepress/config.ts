@@ -35,9 +35,17 @@ export default defineUserConfig({
   title: "海龙的博客",
   description: "海龙的博客",
   lang: "zh-CN",
-
   bundler: viteBundler(),
   theme: recoTheme({
+    commentConfig: {
+      type: 'valine',
+      options: {
+        appId: 'jyNBwYQNyCPnnLSSRJnvfQfM-gzGzoHsz', // your appId
+        appKey: 'CTnjOhJbUp57wOdShiziBs03', // your appKey
+        hideComments: true, // 全局隐藏评论，默认 false
+        visitor: true
+      },
+    },
     viteBundlerOptions: {
       viteOptions:{
         assetsInclude: ['**/*.glb']
