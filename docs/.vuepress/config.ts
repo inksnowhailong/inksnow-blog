@@ -4,6 +4,8 @@ import { viteBundler } from "@vuepress/bundler-vite";
 import { getAllMdFilesSync, mdPathFormat } from "./util";
 import * as path from "node:path";
 import mdit from "markdown-it-plantuml";
+import { readingTimePlugin } from '@vuepress/plugin-reading-time'
+import { googleAnalyticsPlugin } from '@vuepress/plugin-google-analytics'
 
 /**读书 */
 const reading = mdPathFormat(
@@ -32,6 +34,8 @@ export default defineUserConfig({
   base: process.env.NODE_ENV=='netlify'?'/': "/inksnow-blog/",
   title: "海龙的博客",
   description: "海龙的博客",
+  lang: "zh-CN",
+
   bundler: viteBundler(),
   theme: recoTheme({
     viteBundlerOptions: {
@@ -154,6 +158,11 @@ export default defineUserConfig({
     md.use(mdit);
   },
   plugins: [
+    readingTimePlugin({
+    }),
+    googleAnalyticsPlugin({
+      id:'G-P3B0T91Z9B'
+    }),
     // redirectPlugin({
     //   config: {
     //     defaultBehavior: "homepage",
