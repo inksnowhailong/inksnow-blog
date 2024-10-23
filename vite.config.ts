@@ -11,4 +11,7 @@ export default defineConfig({
         '@composables': path.resolve(__dirname, '../client/composables'),
       },
   },
+  server:{
+    port:2001
+  }
 });
