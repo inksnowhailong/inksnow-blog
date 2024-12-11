@@ -22,11 +22,11 @@ isShowTitleInHome: true
 # actionText: About
 # actionLink: /views/other/about
 footer:
-  # record: 域名备案文案
+  record: 冀ICP备2024095601号-1
   # recordLink: 域名备案地址
   # cyberSecurityRecord: 公安备案文案
   # cyberSecurityLink: 公安备案地址
-  # startYear: 本网站开始时间
+  startYear: '2024.9.3'
 
 ---
 <!-- <bg /> -->

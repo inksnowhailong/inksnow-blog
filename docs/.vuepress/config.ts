@@ -32,6 +32,7 @@ const tryPaths = mdPathFormat(
 
 export default defineUserConfig({
   base: process.env.NODE_ENV == "netlify" ? "/" : "/inksnow-blog/",
+  head: [['link', { rel: 'icon', href: '/inksnow-blog/logo.png' }]],
   title: "海龙的博客",
   description: "海龙的博客",
   lang: "zh-CN",
