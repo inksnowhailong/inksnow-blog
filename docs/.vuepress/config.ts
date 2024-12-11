@@ -29,6 +29,11 @@ const tryPaths = mdPathFormat(
   getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/try")),
   "codes/"
 );
+/**软技能博客路径 */
+const Soft = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/soft")),
+  "codes/"
+);
 
 export default defineUserConfig({
   base: process.env.NODE_ENV == "netlify" ? "/" : "/inksnow-blog/",
@@ -110,6 +115,10 @@ export default defineUserConfig({
         {
           text: "实验性",
           children: tryPaths,
+        },
+        {
+          text: "软技能",
+          children: Soft,
         },
       ],
     },
