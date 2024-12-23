@@ -72,6 +72,9 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_IP: ${{ secrets.SERVER_IP }}  # 服务器 IP 地址
         run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+
           # 设置 SSH 密钥
           echo "$DEPLOY_SSH_KEY" > private_key.pem
           chmod 600 private_key.pem
