@@ -45,3 +45,7 @@
     height: 100vh;
     z-index: -1;
 }
+
+.theme-container .page-content.theme-reco-md-content code, .theme-container .theme-reco-md-content.theme-reco-md-content code{
+  background: transparent !important;
+}
