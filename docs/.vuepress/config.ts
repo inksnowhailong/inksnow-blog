@@ -46,6 +46,9 @@ export default defineUserConfig({
   title: "海龙的博客",
   description: "海龙的博客",
   lang: "zh-CN",
+  markdown:{
+    html:true
+  },
   bundler: viteBundler(),
   theme: recoTheme({
     commentConfig: {
