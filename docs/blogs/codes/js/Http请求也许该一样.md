@@ -1,8 +1,9 @@
 ---
-title: Http请求也许该一样
+title: 前端抽象化，打破框架枷锁:Http请求也许该一样
 date: 2025-02-28
 categories:
   - 编程
+  - 抽象前端，架构设计
 tags:
   - JS/TS
 ---

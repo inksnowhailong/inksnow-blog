@@ -1,5 +1,5 @@
 ---
-title: vscode,解析java文档到TS
+title: vscode扩展,解析java文档到TS
 date: 2024-10-21
 categories:
   - 编程

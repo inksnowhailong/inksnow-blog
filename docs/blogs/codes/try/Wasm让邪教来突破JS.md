@@ -1,5 +1,5 @@
 ---
-title: WebAssembly!让邪教来突破JS
+title: WebAssembly实践，性能也有局限性
 date: 2025-3-6
 categories:
  - 编程

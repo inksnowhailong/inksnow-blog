@@ -29,6 +29,11 @@ const tryPaths = mdPathFormat(
   getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/try")),
   "codes/"
 );
+/**AI的博客路径 */
+const AI = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/AI")),
+  "AI/"
+);
 /**软技能博客路径 */
 const Soft = mdPathFormat(
   getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/soft")),
@@ -121,6 +126,12 @@ export default defineUserConfig({
           children: Soft,
         },
       ],
+      "/blogs/AI/": [
+        {
+          text: "AI",
+          children: AI,
+        },
+      ],
     },
     navbar: [
       { text: "首页", link: "/" },
@@ -128,6 +139,10 @@ export default defineUserConfig({
       {
         text: "读书",
         link: "/blogs/reading/读书笔记记录.md",
+      },
+      {
+        text: "AI",
+        link: "/blogs/AI/这也许是时代.md",
       },
     ],
     // bulletin: {
