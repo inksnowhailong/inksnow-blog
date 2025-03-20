@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-const url = 'https://inksnow-corgi-shiba.hf.space';
+const props = defineProps<{ url: string }>();
+const url = props.url||'';
 const show = ref(false);
 onMounted(() => {
     show.value = true;
