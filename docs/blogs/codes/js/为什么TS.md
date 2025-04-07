@@ -1,11 +1,11 @@
----
+<!-- ---
 title: 为什么需要TS?更高层次理解
 date: 2025-4-3
 categories:
   - 编程
 tags:
   - JS/TS
----
+--- -->
 
 # TypeScript 是什么？
 
