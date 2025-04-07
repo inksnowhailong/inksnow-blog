@@ -51,6 +51,7 @@ TypeScript（简称 TS）是一种由微软开发的开源编程语言，作为 
 接下来，我们将通过示例展示 TS 在前端开发中的两种使用方式，突出其在抽象设计和解耦上的价值。本文**不以 JS 与 TS 的直接对比**为重点（那更适合基础教程），而是旨在展示一种思维方式的转变——从“写代码”到“设计工程”。
 
 ### 先以一个简单例子开始：登录
+#### 常见实现
 我们从一个最简示例来演示，这是一个登录功能，你首先编写了这样的一个登录功能来完成页面开发的任务。我简化了很多东西，但是通常来说TS使用者，就会这样，定义类型，定义函数，然后调用。
 ```ts
 // 定义用户数据的类型
@@ -100,7 +101,7 @@ async function login(params:LoginParams | PhoneLoginParams): { success: boolean;
   if(loginType === "phone") {
    res = await request.phoneLogin(params)
   } else {
-    res = await request.passwordLogin(params)
+    res = await request.login(params)
   }
 
   if(res.code === 200) {
@@ -125,116 +126,97 @@ login(data2).then(res=>{
 但是其实，这便是💩山代码的开始。你的代码和写JS的时候，几乎没有任何区别，只不过是多了一些类型定义而已。
 一旦未来发生需求变更，或者功能扩展，这个部分代码将越来越臃肿，越来越难以维护。
 
-**下面我将展示另一种思路，让你从另一种角度思考TS。**
-同样，从最开始的登录功能开始，这一次，我们将抽离出，页面关心的部分和业务逻辑部分。
-```ts
-
-/**
- * dto 将业务涉及的数据，抽离出来，脱离框架，脱离页面。
- * 思考一下页面关心的部分，即UI部分，它们真正依赖的是什么？
- **/
-
-// 登录所需参数
-interface LoginParams {
+#### 换个思路
+ **下面我将展示另一种思路，让你从另一种角度思考TS。**
+首先，我们确定一点是，我们要做的是一个登录的功能，核心就是登录。至于登录的页面是怎样的，登录后要做什么，都并不是核心部分。
+那么我们就以这个核心部分，建立一个抽象登录模块，登录模块我们简单的拆分为两个部分：**数据部分**和**业务逻辑部分**
+数据部分,需要登录的参数和返回值。
+``` ts
+// login.domain.ts
+// 登录的参数
+export interface LoginParams {
   username: string;
   password: string;
 }
-
-// 登录结果
-interface LoginResult {
-  success: boolean;
-  message: string;
+//登录的结果
+export interface loginResult {
+  success:boolean;
+  message:string
 }
 
-// 登录的方法，它根本就不应该关心登录所需参数和逻辑，它只管拿到登录的结果才对
-interface LoginMethod<T extends Record<string, any>> {
-  (params:T): Promise<LoginResult>
+// 登录服务模块
+export interface Login {
+  login(params:LoginParams):Promise<loginResult>
 }
 
-/**
- *业务逻辑部分，让登录的功能，脱离框架，脱离页面。
- **/
-// 这里采用面向对象方式来展示
-class Login {
-  private userlogin: LoginMethod<LoginParams>
-
-   loginMethod(params:Record<string, any>): Promise<LoginResult> {
-    return this.userlogin<T>(params)
+```
+接下来是实现部分，我采用类的方式来写这个，会更容通用，如果你是react玩家，你将其实现为hook也是完全没问题的
+```ts
+// login.service.ts
+import type {LoginParams,loginResult,Login} from './login.dto.ts'
+exort class LoginService implements Login {
+  // 登录
+  async login(params:LoginParams):loginResult {
+    const res = await request.login(params)
+    if(res.code === 200) {
+      return { success: true, message: "登录成功" }
+    } else {
+      return { success: false, message: "登录失败" }
+    }
   }
 }
-
-/**
- * view 页面
- * 思考一下页面关心的部分，即UI部分，它们真正依赖的是什么？
-**/
-
-// 模拟一个登录数据，其会渲染到页面上
-const data: LoginParams =   { username: "admin", password: "123456" },
-
-// 一个登录的业务模块
-const login = new Login()
-
+```
+最后就是使用的地方，我们只需要传入登录服务，就可以完成登录。
+```ts
+// login.tsx/login.vue/login.html
+import type {Login,LoginParams} from './login.dto.ts'
+import {LoginService} from './login.service.ts'
+// 初始化一个登录服务
+const login:Login = new LoginService()
+// 登录的参数
+const data:LoginParams = {username:"admin",password:"123456"}
 // 登录
-
-login.loginMethod<LoginParams>(data).then(res=>{
+login.login(data).then(res=>{
   console.log(res)
 })
 ```
-然后同样的，迎来了需求变更，需要增加手机号登录，于是你开始修改代码。
-```ts
-
-
-/**
- * dto
- **/
-
-// 登录所需参数
-interface LoginParams {
+同样的，如果需要添加手机号登录，我们只需要在登录服务中添加一个手机号登录的实现，然后调用的时候切换一下登录方式即可。
+``` ts
+// login.domain.ts
+// 登录的参数
+export interface LoginParams {
   username: string;
   password: string;
 }
 
-// 手机号登录所需参数
-interface PhoneLoginParams {
+// 我们增加了手机号登录的参数
+export interface PhoneLoginParams {
   phone: string;
   code: string;
 }
 
-// 登录类型
-const enum LoginType {
-  USERNAME = "username",
-  PHONE = "phone"
+//登录的结果
+export interface loginResult {
+  success:boolean;
+  message:string
+}
+// 登录服务
+export interface Login {
+  login(params:LoginParams):Promise<loginResult>
+  phoneLogin(params:PhoneLoginParams):Promise<loginResult>
 }
 
-// 登录结果
-interface LoginResult {
-  success: boolean;
-  message: string;
-}
+```
+```ts
+// login.service.ts
+import type {LoginParams,loginResult,Login} from './login.dto.ts'
 
-// 登录的方法，它根本就不应该关心登录所需参数和逻辑，它只管拿到登录的结果才对
-interface LoginMethod<T extends Record<string, any>> {
-  (params:T): Promise<LoginResult>
-}
-
-/**
- *业务逻辑
- **/
-class Login {
-  loginType: LoginType
-
-  // 账户密码登录
-  private userlogin: LoginMethod<LoginParams> = async (params:LoginParams): Promise<LoginResult> => {
+export class LoginService implements Login {
+  async login(params:LoginParams):loginResult {
     const res = await request.login(params)
-    if(res.code === 200) {
-    return { success: true, message: "登录成功" }
-    } else {
-    return { success: false, message: "登录失败" }
-    }
   }
-
   // 手机号登录
-  private phonelogin: LoginMethod<PhoneLoginParams> = async (params:PhoneLoginParams): Promise<LoginResult> => {
+  async phoneLogin(params:PhoneLoginParams):loginResult {
     const res = await request.phoneLogin(params)
     if(res.code === 200) {
       return { success: true, message: "登录成功" }
@@ -242,52 +224,195 @@ class Login {
       return { success: false, message: "登录失败" }
     }
   }
-
-  loginMethod(params:Record<string, any>): Promise<LoginResult> {
-    const type = this.validateLoginType(params)
-    switch(type) {
-      case LoginType.USERNAME:
-        return this.userlogin<T>(params)
-      case LoginType.PHONE:
-        return this.phonelogin<T>(params)
-
-    }
-  }
-
-  validateLoginType(params:Record<string, any>): LoginType {
-    if("username" in params) {
-      return LoginType.USERNAME
-    } else if("phone" in params) {
-      return LoginType.PHONE
-    } else {
-      throw new Error("参数错误")
-    }
-  }
 }
-
-/**
- * view 页面
- * 思考一下页面关心的部分，即UI部分，它们真正依赖的是什么？
-**/
-
-// 模拟一个登录数据，其会渲染到页面上
-const data: LoginParams =   { username: "admin", password: "123456" },
-const data2: PhoneLoginParams = { phone: "12345678901", code: "123456"}
-// 一个登录的业务模块
-const login = new Login()
+```
+```ts
+// login.tsx/login.vue/login.html
+import type {Login,LoginParams,PhoneLoginParams} from './login.dto.ts'
+import {LoginService} from './login.service.ts'
+// 初始化一个登录服务
+const login:Login = new LoginService()
+// 登录的参数
+const data:LoginParams = {username:"admin",password:"123456"}
+// 手机号登录的参数
+const data2:PhoneLoginParams = {phone:"12345678901",code:"123456"}
 // 登录
-login.loginMethod<LoginParams>(data).then(res=>{
+login.login(data).then(res=>{
   console.log(res)
 })
-
-login.loginMethod<PhoneLoginParams>(data2).then(res=>{
+// 手机号登录
+login.phoneLogin(data2).then(res=>{
   console.log(res)
 })
 ```
-这样的方式，你的页面就明显了有不同的层次，高层数据，中层业务逻辑，低层页面。依赖关系只会是低层次依赖高层次，而不会是高层次依赖低层次。
+
+@startuml
+package "登录模块" {
+  interface Login {
+    +login(params: LoginParams): Promise<loginResult>
+    +phoneLogin(params: PhoneLoginParams): Promise<loginResult>
+  }
+
+  class LoginService {
+    +login(params: LoginParams): Promise<loginResult>
+    +phoneLogin(params: PhoneLoginParams): Promise<loginResult>
+  }
+
+  class LoginParams {
+    +username: string
+    +password: string
+  }
+
+  class PhoneLoginParams {
+    +phone: string
+    +code: string
+  }
+
+  class loginResult {
+    +success: boolean
+    +message: string
+  }
+}
+
+package "登录页面" {
+  class "login.tsx/login.vue/login.html" as LoginPage {
+
+  }
+}
+
+LoginService ..|> Login
+Login --> LoginParams
+Login --> PhoneLoginParams
+Login --> loginResult
+LoginPage --> Login
+@enduml
 
 
+> 提示:对于登录功能来说,策略模式是再适合不过的设计模式了
+看，我们对这个登录模块进行了抽象，将每个不同部分都独立开来了。它从杂乱不堪的样子，变得井井有条。需要注意的是，我们登录页面并没有硬性的依赖LoginService，而是依赖于Login，LoginService只是Login的一个实现。
 
+更多的，如果要扩展注册，只需要在登录模块中添加一个注册的实现，然后调用的时候切换一下登录方式即可。
+### 第二个例子:http请求
+通常的TS项目中的请求,简单来说就是以下结构
+#### 常见的请求流程
+```ts
+// 一个封装了的axios
+export const request =  axios.create({
+  baseURL: 'http://localhost:3000'
+})
+//  ... 拦截器, 请求, 响应, 错误处理, 等等
+//一个api文件,你可能会这样写
+interface apiParams {
+  id:number
+}
+// 定义请求的结果
+interface apiResult {
+  data:any
+}
+export function getApi(params:apiParams):apiResult {
+  return request.get('/api',{params})
+}
+
+// 你可能会这样使用
+import {getApi} from '@/api/api.ts'
+function getData (){
+  getApi({id:1}).then(res=>{
+    console.log(res)
+    // 处理数据 放到可以响应式更新页面的状态中
+  })
+}
+```
+通常的这种结构,其实简单,且容易理解,但是当你的项目需要迁移到另一个项目中,或者需要迁移到另一个框架中,axios不再可以使用,你可能会发现,你之前的代码,已经无法满足新的需求了.你需要一些把要复用的请求,复制到新的项目中,但是只有请求的类型和url是复用的,其他部分要重新写.亦或者一个页面引入了大量请求,导致这个文件非常臃肿,难以维护.当很久之后你需要去理解和修改这个文件时,你得一点点去找到数据的前世今生,才知道每个接口是干嘛的
+亦或者,你的团队有一个很不错的生态,有自动生成api请求的工具或者其他的什么,那样其实也很不错,但是我这里要说的,还是一种思路的变更,它可以让你在面对需求变更的时候,更加从容.也能帮助你的团队,**建立这样的美好的生态**
+#### 换个思路
+对于一个接口请求,在乎的,只是参数、地址、方式、返回值,而请求的实现,以及什么取消重复,拦截,都并不重要.所以我们要将这个东西抽象出来,让接口请求函数不再依赖某个具体实现,而是任何一个满足其需求的东西
+```ts
+// request.ts
+// 请求的类型
+export const enum RequestMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT',
+  DELETE = 'DELETE'
+}
+export interface RequestParams<T = any> {
+  url: string;
+  method: RequestMethod;
+  data: T;
+}
+// 请求的返回值
+export interface RequestResult<T = any> {
+  data: T;
+  status: number;
+  message: string;
+}
+// 请求的函数
+export interface Request<P = any,R = any>{
+    (params:RequestParams<P>):Promise<RequestResult<R>>
+}
+
+// 这里也为请求模块.编写一个基础抽象类,我们用类去整理出一个一个模块的请求函数,而不是只是平铺在文件里
+export abstract class AsyncBase {
+  request:Request
+  constructor(request:Request){
+    this.request = request
+  }
+}
+```
+接下来是其实现,我们有了基础抽象类,就可以去实现具体的请求函数了
+```ts
+// axios.ts
+// 使用axios
+import axios from 'axios'
+import type {Request,RequestParams,RequestResult} from './request.ts'
+const axiosRequest=  axios.create({
+  baseURL: 'http://localhost:3000'
+})
+// 使用axios的request方法
+export const request:Request = (params:RequestParams)=>{
+  // 这里你需要一些操作去让axios 符合Request的类型，这也就是适配器模式的思想了
+  return axiosRequest(params)
+}
+```
+```ts
+// demoApi.ts
+import type {Request,RequestParams,RequestResult} from './request.ts'
+
+interface apiParams {
+  id:number
+}
+// 定义请求的结果
+interface apiResult {
+  data:any
+}
+
+export class demoApi extends AsyncBase {
+  /*
+  * 请求数据的
+  */
+  getApi(params:apiParams):Promise<apiResult> {
+    return this.request<apiParams,apiResult>({url:'/api',method:RequestMethod.GET,data:params})
+  }
+}
+```
+当你用起来后,不同部分将用不同的请求模块,不同模块有它的不同请求列表,你可以拥有IDE提示的来完成你的请求,而不是在文件中到处找.
+```ts
+// 使用
+import {demoApi} from './demoApi.ts'
+import {request} from './axios.ts'
+// 初始化一个请求模块  依赖注入一个request,其实这个你可以放到全局，使用单例模式，给全局使用
+const demo = new demoApi(request)
+demo.getApi({id:1}).then(res=>{
+  console.log(res)
+})
+```
+这种方式,相比于第一种,你的request可以
+
+### 例子中的内容总结
+你可以清楚的看出来,TS类型系统的两种用法的不同,因为思考方式的不同,导致代码的结构也不同.
+
+- 第一种方式,是传统的TS使用方式,定义类型,定义函数,然后调用.这是一个常见的开发者的思考方式,也是TS的常见使用方式.
+- 第二种方式,是TS的另一种使用方式,去思考需求有哪些部分,然后依赖关系应该是怎样的,然后去设计模块之间的关系,让它们容易修改,容易扩展,且结构清晰.这才是更像一名 **"工程师"** 的思考方式.你不再只是去实现需求,而是去设计系统来满足需求,且为未来可能的需求变更,留下了足够的扩展空间.
 
 
 

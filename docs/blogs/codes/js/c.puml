@@ -1,0 +1,40 @@
+@startuml
+package "登录模块" {
+  interface Login {
+    +login(params: LoginParams): Promise<loginResult>
+    +phoneLogin(params: PhoneLoginParams): Promise<loginResult>
+  }
+
+  class LoginService {
+    +login(params: LoginParams): Promise<loginResult>
+    +phoneLogin(params: PhoneLoginParams): Promise<loginResult>
+  }
+
+  class LoginParams {
+    +username: string
+    +password: string
+  }
+
+  class PhoneLoginParams {
+    +phone: string
+    +code: string
+  }
+
+  class loginResult {
+    +success: boolean
+    +message: string
+  }
+}
+
+package "登录页面" {
+  class "login.tsx/login.vue/login.html" as LoginPage {
+
+  }
+}
+
+LoginService ..|> Login
+Login --> LoginParams
+Login --> PhoneLoginParams
+Login --> loginResult
+LoginPage --> Login
+@enduml
