@@ -12,18 +12,22 @@
     "build:netlify": "cross-env NODE_ENV=netlify vuepress build docs"
   },
   "dependencies": {
-    "@vuepress/bundler-vite": "2.0.0-rc.14",
+    "@vuepress/bundler-vite": "2.0.0-rc.19",
     "echarts": "^5.5.1",
     "markdown-it-plantuml": "^1.4.1",
+    "openmeteo": "^1.2.0",
     "three": "^0.168.0",
     "vue": "^3.4.27",
-    "vuepress": "2.0.0-rc.14",
-    "vuepress-theme-reco": "2.0.0-rc.18"
+    "vuepress": "2.0.0-rc.19",
+    "vuepress-theme-reco": "2.0.0-rc.26"
   },
   "devDependencies": {
     "@vuepress/plugin-google-analytics": "2.0.0-rc.54",
     "@vuepress/plugin-reading-time": "2.0.0-rc.55",
     "@vuepress/plugin-redirect": "2.0.0-rc.42",
-    "cross-env": "^7.0.3"
+    "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17"
   }
 }
