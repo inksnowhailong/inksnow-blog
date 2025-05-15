@@ -6,10 +6,7 @@ interface WeatherData {
   sunrise: string;
   sunset: string;
 }
-/**
- * @description: 天气枚举
- * @return {*}
- */
+/**天气枚举 */
 const enum Weather {
   晴天 = "晴天",
   多云 = "多云",
@@ -22,6 +19,7 @@ const enum Weather {
   雷暴 = "雷暴",
   阵雨 = "阵雨",
 }
+/**天气英文映射 */
 const weatherEng = {
   "晴天": "sunny",
   "多云": "cloudy",
@@ -34,10 +32,7 @@ const weatherEng = {
   "雷暴": "thunderstorm",
   "阵雨": "rain",
 }
-/**
- * @description: 天气代码枚举
- * @return {*}
- */
+/**天气代码枚举 */
 const simplifiedWeatherCodeObj = {
   0: Weather.晴天,
   1: Weather.多云,
@@ -68,22 +63,82 @@ const simplifiedWeatherCodeObj = {
   96: Weather.雷暴,
   99: Weather.雷暴,
 };
-
+/**天气数据 */
 const weather = ref<WeatherData>({
   weather: Weather.晴天,
   sunrise: "",
   sunset: "",
 });
+// 背景图片
 const bgImg = ref<string>("");
-onMounted(() => {
-  getWeather();
-  getBgImg();
+
+onMounted(async () => {
+  // 获取天气数据
+  const weatherData = await getWeather();
+  weather.value  = {
+    weather: simplifiedWeatherCodeObj[weatherData.weatherCode],
+    sunrise: weatherData.sunrise,
+    sunset: weatherData.sunset,
+  };
+  // 获取对应天气的背景图片
+  const bgImgUrl = await getBgImg(`${weatherEng[weather.value.weather]}+${getTimeOfDay.value.en}`);
+  bgImg.value = bgImgUrl;
+});
+
+/**
+ * @description: 计算日出日落进度
+ * @param {*} computed
+ * @return {*}
+ */
+const getDayProgress = computed(() => {
+  const now = new Date();
+  const sunrise = new Date(weather.value.sunrise);
+  const sunset = new Date(weather.value.sunset);
+
+  // 如果当前时间在日出之前
+  if (now < sunrise) return 0;
+  // 如果当前时间在日落之后
+  if (now > sunset) return 100;
+
+  // 计算当前时间在日出日落之间的进度
+  const total = sunset.getTime() - sunrise.getTime();
+  const current = now.getTime() - sunrise.getTime();
+  return Math.round((current / total) * 100);
+});
+/**
+ * @description: 计算出是早晨、中午、傍晚、晚上，用于获取背景图片
+ * @return {*}
+ */
+const getTimeOfDay = computed(() => {
+  const now = new Date();
+  const sunrise = new Date(weather.value.sunrise);
+  const sunset = new Date(weather.value.sunset);
+  const nowTime = now.getTime();
+  const sunriseTime = sunrise.getTime();
+  const sunsetTime = sunset.getTime();
+
+  const morningEnd = sunriseTime + 4 * 3600 * 1000; // 早晨结束（日出后4小时）
+  const eveningStart = sunsetTime - 1 * 3600 * 1000; // 傍晚开始（日落前1小时）
+  const eveningEnd = sunsetTime + 1 * 3600 * 1000; // 傍晚结束（日落后1小时）
+
+  if (nowTime < sunriseTime) {
+    return { zh: "晚上", en: "night" };
+  } else if (nowTime >= sunriseTime && nowTime < morningEnd) {
+    return { zh: "早晨", en: "morning" };
+  } else if (nowTime >= morningEnd && nowTime < eveningStart) {
+    return { zh: "中午", en: "noon" };
+  } else if (nowTime >= eveningStart && nowTime < eveningEnd) {
+    return { zh: "傍晚", en: "evening" };
+  } else {
+    return { zh: "晚上", en: "night" };
+  }
 });
 /**
  * @description: 获取天气数据
  * @return {*}
  */
-async function getWeather() {
+ async function getWeather() {
+
   const params = {
     latitude: 39.9042,
     longitude: 116.4074,
@@ -103,8 +158,6 @@ async function getWeather() {
   }
 
   const url = "https://api.open-meteo.com/v1/forecast";
-  console.log(params);
-
   const responses = await fetchWeatherApi(url, params);
 
   // Process first location. Add a for-loop for multiple locations or weather models
@@ -134,35 +187,37 @@ async function getWeather() {
       ),
     },
   };
-
-  weather.value.weather = simplifiedWeatherCodeObj[weatherData.current.weatherCode];
-  weather.value.sunrise = weatherData.daily.sunrise[0].toLocaleString();
-  weather.value.sunset = weatherData.daily.sunset[0].toLocaleString();
+  return  {
+    weatherCode: weatherData.current.weatherCode,
+    sunrise: weatherData.daily.sunrise[0].toLocaleString(),
+    sunset: weatherData.daily.sunset[0].toLocaleString(),
+  }
 }
 /**
- * @description: 计算日出日落进度
- * @param {*} computed
+ * @description: 从pexels获取背景图片
  * @return {*}
  */
-const getDayProgress = computed(() => {
-  const now = new Date();
-  const sunrise = new Date(weather.value.sunrise);
-  const sunset = new Date(weather.value.sunset);
+async function getBgImg(query: string) {
+  interface CacheData {
+    query: string;
+    expires: number;
+    url: string;
+  }
+  // 如果有缓存就用缓存的,缓存有一小时的可用时间
+ try {
+   const cache = localStorage.getItem('bgImg');
+   if (cache) {
+     const cacheData: CacheData = JSON.parse(cache);
+     if ((cacheData.expires - Date.now()) > 1000 * 60 * 60 && cacheData.query === query) {
+       return cacheData.url;
+     }
+   }
+ } catch (error) {
 
-  // 如果当前时间在日出之前
-  if (now < sunrise) return 0;
-  // 如果当前时间在日落之后
-  if (now > sunset) return 100;
-
-  // 计算当前时间在日出日落之间的进度
-  const total = sunset.getTime() - sunrise.getTime();
-  const current = now.getTime() - sunrise.getTime();
-  return Math.round((current / total) * 100);
-});
-async function getBgImg() {
-
+ }
+  // 获取背景图片
   const response = await fetch(
-    `https://api.pexels.com/v1/search?query=${weatherEng[weather.value.weather]}&per_page=1`,
+    `https://api.pexels.com/v1/search?query=${query}&per_page=1`,
     {
       headers: {
         Authorization: "Y6Ka77FwnK3Y1HnbsAyH8fcIVMIoalwkE3KFL5cHn7tT8FROimAx397T",
@@ -170,8 +225,12 @@ async function getBgImg() {
     }
   );
   const data = await response.json();
-  console.log(data);
-  bgImg.value = data.photos[0].src.original;
+  // 缓存图片
+  localStorage.setItem('bgImg', JSON.stringify({
+    expires: Date.now() + 1000 * 60 * 60,
+    url: data.photos[0].src.original,
+  }));
+  return  data.photos[0].src.original;
 }
 </script>
 
@@ -183,11 +242,11 @@ async function getBgImg() {
     <!-- 天气信息卡片 -->
     <div class="absolute top-2 right-2 backdrop-blur-md bg-white/30 rounded-xl p-3 shadow-lg text-sm border border-white/30">
       <div class="flex items-center gap-1 mb-2">
-        <span class="font-medium text-white drop-shadow-sm">{{ weather.weather }}</span>
+        <span class="font-medium text-white drop-shadow-md">{{ weather.weather }}</span>
       </div>
       <!-- 日出日落进度条 -->
       <div class="w-48">
-        <div class="flex justify-between text-xs text-white/90 mb-1 drop-shadow-sm">
+        <div class="flex justify-between text-xs text-white/90 mb-1 drop-shadow-md">
           <span>日出 {{ weather.sunrise.split(" ")[1] }}</span>
           <span>日落 {{ weather.sunset.split(" ")[1] }}</span>
         </div>
