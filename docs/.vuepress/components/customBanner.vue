@@ -71,20 +71,6 @@ const weather = ref<WeatherData>({
 });
 // 背景图片
 const bgImg = ref<string>("");
-
-onMounted(async () => {
-  // 获取天气数据
-  const weatherData = await getWeather();
-  weather.value  = {
-    weather: simplifiedWeatherCodeObj[weatherData.weatherCode],
-    sunrise: weatherData.sunrise,
-    sunset: weatherData.sunset,
-  };
-  // 获取对应天气的背景图片
-  const bgImgUrl = await getBgImg(`${weatherEng[weather.value.weather]}+${getTimeOfDay.value.en}`);
-  bgImg.value = bgImgUrl;
-});
-
 /**
  * @description: 计算日出日落进度
  * @param {*} computed
@@ -215,9 +201,11 @@ async function getBgImg(query: string) {
  } catch (error) {
 
  }
+//  获取当前页面是横向还是纵向
+const isHorizontal =window.innerWidth > window.innerHeight
   // 获取背景图片
   const response = await fetch(
-    `https://api.pexels.com/v1/search?query=${query}&per_page=1`,
+    `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=${isHorizontal ? 'landscape' : 'portrait'}&size=small`,
     {
       headers: {
         Authorization: "Y6Ka77FwnK3Y1HnbsAyH8fcIVMIoalwkE3KFL5cHn7tT8FROimAx397T",
@@ -232,6 +220,22 @@ async function getBgImg(query: string) {
   }));
   return  data.photos[0].src.original;
 }
+
+
+onMounted(async () => {
+
+  // 获取天气数据
+  const weatherData = await getWeather();
+  weather.value  = {
+    weather: simplifiedWeatherCodeObj[weatherData.weatherCode],
+    sunrise: weatherData.sunrise,
+    sunset: weatherData.sunset,
+  };
+  // 获取对应天气的背景图片
+  const bgImgUrl = await getBgImg(`${weatherEng[weather.value.weather]}+${getTimeOfDay.value.en}`);
+  bgImg.value = bgImgUrl;
+});
+
 </script>
 
 <template>
@@ -240,7 +244,7 @@ async function getBgImg(query: string) {
     :style="{ backgroundImage: `url(${bgImg})`, backgroundSize: 'cover', backgroundPosition: 'center' }"
   >
     <!-- 天气信息卡片 -->
-    <div class="absolute top-2 right-2 backdrop-blur-md bg-white/30 rounded-xl p-3 shadow-lg text-sm border border-white/30">
+    <div class="absolute top-2 right-2 backdrop-blur-md bg-white/30 rounded-xl p-3 shadow-lg text-sm border border-white/30 animate-fade-in-up">
       <div class="flex items-center gap-1 mb-2">
         <span class="font-medium text-white drop-shadow-md">{{ weather.weather }}</span>
       </div>
@@ -259,7 +263,7 @@ async function getBgImg(query: string) {
       </div>
     </div>
 
-    <div class="max-w-4xl mx-auto px-4 text-center backdrop-blur-md bg-white/70 rounded-xl p-3 shadow-lg text-sm border border-white/30">
+    <div class="max-w-4xl mx-auto px-4 text-center backdrop-blur-md bg-white/70 rounded-xl p-3 shadow-lg text-sm border border-white/30 animate-fade-in-up">
       <h1 class="text-5xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
         inksnow海龙的博客
       </h1>
@@ -270,6 +274,9 @@ async function getBgImg(query: string) {
       </blockquote>
     </div>
   </div>
+  <!-- <teleport to="body">
+    <loading-page :is-show-loading="isShowLoading" />
+  </teleport> -->
 </template>
 
 <style scoped>
@@ -278,5 +285,20 @@ async function getBgImg(query: string) {
 }
 .backdrop-blur-sm {
   backdrop-filter: blur(4px);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 1s ease-out forwards;
 }
 </style>
