@@ -205,7 +205,7 @@ async function getBgImg(query: string) {
 const isHorizontal =window.innerWidth > window.innerHeight
   // 获取背景图片
   const response = await fetch(
-    `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=${isHorizontal ? 'landscape' : 'portrait'}&size=small`,
+    `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=${isHorizontal ? 'landscape' : 'portrait'}&size=medium`,
     {
       headers: {
         Authorization: "Y6Ka77FwnK3Y1HnbsAyH8fcIVMIoalwkE3KFL5cHn7tT8FROimAx397T",
