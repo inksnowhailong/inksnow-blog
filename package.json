@@ -12,6 +12,7 @@
     "build:netlify": "cross-env NODE_ENV=netlify vuepress build docs"
   },
   "dependencies": {
+    "@types/three": "^0.177.0",
     "@vuepress/bundler-vite": "2.0.0-rc.19",
     "echarts": "^5.5.1",
     "markdown-it-plantuml": "^1.4.1",
