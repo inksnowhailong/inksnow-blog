@@ -1,7 +1,8 @@
 ---
 home: true
 modules:
-  - customBanner
+  - BannerBrand
+  # - customBanner
   - Blog
   - MdContent
   - Footer
