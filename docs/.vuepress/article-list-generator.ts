@@ -54,12 +54,13 @@ async function articleListGenerator(app: App) {
    */
   const contentMap: { [key: string]: string } = {};
   codePages.forEach((page) => {
+    const httpPath = page.path;
     pathList.push({
       title: page.title,
-      path: page.htmlFilePath,
+      path:page.path,
       date: page.date,
     });
-    contentMap[page.htmlFilePath] = page.content;
+    contentMap[httpPath] = page.content;
   });
   /** 输出路径列表文件 */
   const outPath = path.resolve(app.dir.dest(), "pathList.json");
