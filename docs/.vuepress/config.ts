@@ -6,7 +6,7 @@ import * as path from "node:path";
 import mdit from "markdown-it-plantuml";
 // import { readingTimePlugin } from "@vuepress/plugin-reading-time";
 import { googleAnalyticsPlugin } from "@vuepress/plugin-google-analytics";
-
+import articleList from "./article-list-generator";
 /**读书 */
 const reading = mdPathFormat(
   getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/reading")),
@@ -221,6 +221,7 @@ export default defineUserConfig({
     md.use(mdit);
   },
   plugins: [
+    articleList(),
     // readingTimePlugin({}),
     googleAnalyticsPlugin({
       id: "G-P3B0T91Z9B",

@@ -3,6 +3,7 @@ import path from 'path';
 
 export default defineConfig({
   base: '/inksnow-blog/',
+
   resolve: {
     alias: {
         '@types': path.resolve(__dirname, '../types'),
@@ -14,5 +15,7 @@ export default defineConfig({
   },
   server:{
     port:2001
-  }
+  },
+  plugins: [
+  ],
 });
