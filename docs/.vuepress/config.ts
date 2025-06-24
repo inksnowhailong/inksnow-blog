@@ -51,6 +51,7 @@ export default defineUserConfig({
   },
   bundler: viteBundler(),
   theme: recoTheme({
+    colorModeSwitch: false,
     // commentConfig: {
     //   type: "valine",
     //   options: {
