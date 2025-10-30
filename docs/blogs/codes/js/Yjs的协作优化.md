@@ -1,12 +1,12 @@
 ---
-title: Yjs+TipTap 的自定义：WebSocket 拦截性能优化 + 历史记录自定义处理回滚
+title: Yjs+TipTap优化：WebSocket 拦截性能优化 + 历史记录自定义处理回滚
 date: 2025-10-29
 categories:
   - 编程
 tags:
   - JS/TS
 ---
-# Yjs 协作：把“发送消息优化”和“版本回滚”做简单了
+# Yjs 协作：把“发送消息性能优化”和“版本回滚”做简单了
 
 这篇记两件很常用、也很实用的小技巧：
 
