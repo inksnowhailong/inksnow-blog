@@ -39,6 +39,11 @@ const Soft = mdPathFormat(
   getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/codes/soft")),
   "codes/"
 );
+/**日常博客路径 */
+const Days = mdPathFormat(
+  getAllMdFilesSync(path.resolve("__dirname", "../docs/blogs/days")),
+  "days/"
+);
 
 export default defineUserConfig({
   base: process.env.NODE_ENV == "netlify" ? "/" : "/inksnow-blog/",
@@ -136,6 +141,12 @@ export default defineUserConfig({
           children: AI,
         },
       ],
+      "/blogs/days/": [
+        {
+          text: "日常",
+          children: Days,
+        },
+      ],
     },
     navbar: [
       { text: "首页", link: "/" },
@@ -147,6 +158,10 @@ export default defineUserConfig({
       {
         text: "AI",
         link: "/blogs/AI/这也许是时代.md",
+      },
+      {
+        text: "日常",
+        link: "/blogs/days/三种知名架构与DDD与FSD.md",
       },
     ],
     // bulletin: {

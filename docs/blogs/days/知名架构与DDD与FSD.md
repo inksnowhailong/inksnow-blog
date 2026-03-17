@@ -1,8 +1,10 @@
-# 架构知识笔记（详细版）：Hexagonal、Onion、Clean、DDD 与前端 FSD
-
-记录日期：2026 年
-目的：完整、系统、客观记录三种主流后端领域中心架构、DDD 的定位与结合方式，以及前端 Feature-Sliced Design 的全部结构细节、规则与逻辑。
-供后续反复阅读、对比、思考使用。不含任何行动建议或价值判断，仅为知识档案。
+---
+title: 知名架构与DDD与FSD
+date: 2026-3-17
+categories:
+    - 日济
+---
+# Hexagonal、Onion、Clean、DDD 与前端 FSD
 
 ## 1. 三种后端架构的核心概念、历史背景、原则与详细对比
 
