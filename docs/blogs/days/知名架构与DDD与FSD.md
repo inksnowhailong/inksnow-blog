@@ -3,6 +3,7 @@ title: 知名架构与DDD与FSD
 date: 2026-3-17
 categories:
     - 日济
+    - 抽象前端架构设计
 ---
 # Hexagonal、Onion、Clean、DDD 与前端 FSD
 
