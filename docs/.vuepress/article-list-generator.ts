@@ -31,9 +31,12 @@ async function articleListGenerator(app: App) {
    *   path: 路径
    *   date: 日期
    */
-  const codePages = app.pages.filter((page) =>
-    page.path.startsWith("/blogs/codes/")
-  );
+  const codePages = app.pages.filter((page) => {
+    const isHidden =
+      page.frontmatter.draft === true || page.frontmatter.hidden === true;
+
+    return page.path.startsWith("/blogs/codes/") && !isHidden;
+  });
   /**
    * 文章路径与元信息列表
    * @type {Array<{title: string; path: string; date: string;}>}

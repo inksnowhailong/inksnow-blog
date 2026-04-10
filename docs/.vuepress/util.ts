@@ -1,6 +1,23 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+function isHiddenMarkdownFile(filePath: string): boolean {
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const frontmatterMatch = content.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+
+        if (!frontmatterMatch) {
+            return false;
+        }
+
+        const frontmatter = frontmatterMatch[1];
+        return /^draft:\s*true\s*$/m.test(frontmatter) || /^hidden:\s*true\s*$/m.test(frontmatter);
+    } catch (error) {
+        console.error(`读取文章出错：${(error as Error).message}`);
+        return false;
+    }
+}
+
 /**
  * 递归获取指定目录下的所有 .md 文件路径
  * @param {string} dir - 要搜索的目录路径
@@ -22,8 +39,10 @@ export function getAllMdFilesSync(dir: string): string[] {
                 const filesInSubDir = getAllMdFilesSync(fullPath);
                 mdFiles = mdFiles.concat(filesInSubDir);
             } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.md') {
-                // 如果是 .md 文件，添加到结果数组
-                mdFiles.push(fullPath);
+                // 草稿或隐藏文章不参与导航和列表生成
+                if (!isHiddenMarkdownFile(fullPath)) {
+                    mdFiles.push(fullPath);
+                }
             }
         }
     } catch (error) {
