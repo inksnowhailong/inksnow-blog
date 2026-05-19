@@ -126,24 +126,48 @@ Modular Monolith
 
 架构做得好，本质上是在减少 AI 的上下文搜索成本和错误决策空间。
 
-如果把这些变化换成一张更直观的图，大概是这种感觉：
+如果换成图示，大概是这种差异：
 
-```text
-            扁平 Next.js                       当前 DDD + 模块化
-            ─────────────                      ──────────────────
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 18
+skinparam defaultFontName Microsoft YaHei
+skinparam titleFontSize 18
+skinparam rectangle {
+  FontColor #0F172A
+  BorderThickness 1
+}
 
-            AI 找代码    ▓▓▓░░░░░░░            AI 找代码    ▓▓▓▓▓▓▓▓▓░
-            改对位置    ▓▓▓▓▓░░░░░             改对位置    ▓▓▓▓▓▓▓▓▓▓
-            一次通过    ▓▓▓░░░░░░░             一次通过    ▓▓▓▓▓▓▓▓▓░
-            可验证性    ▓▓░░░░░░░░             可验证性    ▓▓▓▓▓▓▓▓▓▓
-            弱模型友好  ▓▓░░░░░░░░             弱模型友好  ▓▓▓▓▓▓▓▓▓░
-            并行 worker ▓▓░░░░░░░░             并行 worker ▓▓▓▓▓▓▓░░░
-            可逆性      ▓▓░░░░░░░░             可逆性      ▓▓▓▓▓▓▓▓▓▓
-            启动成本    ▓▓▓▓▓▓▓▓▓░             启动成本    ▓▓▓▓▓▓▓▓░░
-            token/单次  ▓▓▓▓▓▓▓░░░             token/单次  ▓▓▓▓▓▓▓▓░░
+title AI 友好度：从“让模型猜”到“让规则带路”
 
-            综合 AI 友好度：4/10                综合 AI 友好度：9/10
-```
+rectangle "扁平 Next.js\nAI 友好度：4 / 10" as flat #FEF3C7 {
+  rectangle "找代码\n跨 app / api / types / components 搜索" as f1 #FFFBEB
+  rectangle "改位置\n靠模型临场判断" as f2 #FFFBEB
+  rectangle "验证\n主要靠人工 review 发现边界问题" as f3 #FFFBEB
+  rectangle "风险\n旧逻辑容易混进新模块" as f4 #FFFBEB
+}
+
+rectangle "DDD + 模块化\nAI 友好度：9 / 10" as ddd #DCFCE7 {
+  rectangle "找代码\n业务模块先定位，层级再定位" as d1 #F0FDF4
+  rectangle "改位置\nrules 明确规定代码归属" as d2 #F0FDF4
+  rectangle "验证\nESLint + tsc 秒级拦截" as d3 #F0FDF4
+  rectangle "收益\n弱模型也能稳定执行复杂任务" as d4 #F0FDF4
+}
+
+flat -[#64748B,thickness=2]-> ddd : 边界清晰后\n搜索成本下降，错误路径减少
+
+note bottom of flat
+  目录少不等于理解成本低。
+  AI 新会话仍然要扫多个位置拼业务全貌。
+end note
+
+note bottom of ddd
+  最大收益不是少写代码，
+  而是让 AI 少猜、少跑偏、可验证。
+end note
+@enduml
 
 这里有两个地方容易误解。
 
@@ -151,22 +175,7 @@ Modular Monolith
 
 第二，`token` 节省不是最大收益。模块化之后文件数会上升，但 AI 单次通常只需要 load 相关层和相关模块，净节省大概是 20% 到 40%。真正大的收益在“少猜”和“少改错”。
 
-如果把它量化成评分，我更愿意这样看：
-
-| 维度 | 评分 | 关键指标 |
-|---|---|---|
-| 定位速度 | ★★★★★ | AI 定位 token 约 -60% |
-| 改动半径 | ★★★★★ | 单次 task 文件数约 -50% |
-| 上下文 token | ★★★☆☆ | 净 -20% ~ -40%，但不是最大收益 |
-| 生成准确率 | ★★★★★ | 实测 6 / 6 一次成功 |
-| 弱模型可用 | ★★★★★ | 最重要的隐性收益之一 |
-| 并行 worker 友好 | ★★★★☆ | 偶有 race，但可以靠边界自修复 |
-| 可逆性 | ★★★★★ | commit 按 layer / 模块拆，单独 revert 风险低 |
-| 可验证性 | ★★★★★ | `tsc` / `eslint` 能给秒级反馈 |
-| 启动成本 | ★★★★★ | rules 灌入后，AI 不必全仓库乱扫 |
-| 学习代价 | ★★★★★ | AI 时代不再是过去那种纯人力成本 |
-
-综合下来，我会给这套架构形态 **4.6 / 5**。
+综合下来，这套架构形态大概是 **4.6 / 5**。如果只看 AI 协作友好度，我会把扁平结构打到 **4 / 10**，把当前 DDD + 模块化打到 **9 / 10**。
 
 当然这个分数不是行业基准，只是这个项目里的实验结论。这里最值得关注的不是“DDD 多高级”，而是“弱模型可用”和“启动成本下降”这两项隐性收益。它们直接影响团队能不能用更便宜的模型、更短的会话，完成更复杂的任务。
 
