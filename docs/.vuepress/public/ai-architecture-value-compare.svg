@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="720" viewBox="0 0 1120 720" role="img">
+    <defs>
+        <linearGradient id="flatBar" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#fb923c" />
+            <stop offset="100%" stop-color="#f97316" />
+        </linearGradient>
+        <linearGradient id="dddBar" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#22c55e" />
+            <stop offset="100%" stop-color="#16a34a" />
+        </linearGradient>
+        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.10" />
+        </filter>
+        <style>
+            .title { font: 700 30px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #0f172a; }
+            .subtitle { font: 400 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #64748b; }
+            .axis { font: 600 13px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #94a3b8; }
+            .metric { font: 700 16px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #0f172a; }
+            .hint { font: 400 12px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #64748b; }
+            .legend { font: 700 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #334155; }
+            .score { font: 800 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #0f172a; }
+            .summary { font: 700 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #0f172a; }
+        </style>
+    </defs>
+
+    <rect width="1120" height="720" rx="28" fill="#f8fafc" />
+    <text x="560" y="48" text-anchor="middle" class="title">AI &#x53CB;&#x597D;&#x5EA6;&#x6A2A;&#x5411;&#x8BC4;&#x5206;&#x5BF9;&#x6BD4;</text>
+    <text x="560" y="76" text-anchor="middle" class="subtitle">&#x7EB5;&#x5411;&#x770B;&#x7EF4;&#x5EA6;&#xFF0C;&#x6A2A;&#x5411;&#x770B;&#x8FDB;&#x5EA6;&#xFF1A;&#x67B6;&#x6784;&#x8D8A;&#x6E05;&#x6670;&#xFF0C;AI &#x8D8A;&#x5C11;&#x731C;</text>
+
+    <rect x="48" y="105" width="1024" height="500" rx="24" fill="#ffffff" stroke="#e2e8f0" filter="url(#shadow)" />
+
+    <g transform="translate(230 132)">
+        <line x1="0" y1="0" x2="720" y2="0" stroke="#cbd5e1" stroke-width="1" />
+        <line x1="0" y1="0" x2="0" y2="420" stroke="#cbd5e1" stroke-width="1" />
+        <line x1="180" y1="0" x2="180" y2="420" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 6" />
+        <line x1="360" y1="0" x2="360" y2="420" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 6" />
+        <line x1="540" y1="0" x2="540" y2="420" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 6" />
+        <line x1="720" y1="0" x2="720" y2="420" stroke="#cbd5e1" stroke-width="1" />
+        <text x="0" y="-12" text-anchor="middle" class="axis">0</text>
+        <text x="180" y="-12" text-anchor="middle" class="axis">2.5</text>
+        <text x="360" y="-12" text-anchor="middle" class="axis">5</text>
+        <text x="540" y="-12" text-anchor="middle" class="axis">7.5</text>
+        <text x="720" y="-12" text-anchor="middle" class="axis">10</text>
+        <text x="720" y="448" text-anchor="end" class="axis">&#x8D8A;&#x9760;&#x53F3;&#xFF0C;AI &#x534F;&#x4F5C;&#x8D8A;&#x53CB;&#x597D;</text>
+    </g>
+
+    <g transform="translate(74 104)">
+        <rect x="0" y="0" width="18" height="18" rx="5" fill="url(#flatBar)" />
+        <text x="28" y="15" class="legend">&#x6241;&#x5E73; Next.js</text>
+        <rect x="150" y="0" width="18" height="18" rx="5" fill="url(#dddBar)" />
+        <text x="178" y="15" class="legend">DDD + &#x6A21;&#x5757;&#x5316;</text>
+    </g>
+
+    <g transform="translate(74 148)">
+        <text x="0" y="12" class="metric">AI &#x627E;&#x4EE3;&#x7801;</text>
+        <text x="0" y="30" class="hint">&#x80FD;&#x5426;&#x5FEB;&#x901F;&#x5B9A;&#x4F4D;&#x4E1A;&#x52A1;&#x4F4D;&#x7F6E;</text>
+        <rect x="156" y="0" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="0" width="216" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="20" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="20" width="648" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="13" class="score">3 / 10</text>
+        <text x="892" y="33" class="score">9 / 10</text>
+
+        <text x="0" y="68" class="metric">&#x6539;&#x5BF9;&#x4F4D;&#x7F6E;</text>
+        <text x="0" y="86" class="hint">&#x4EE3;&#x7801;&#x80FD;&#x5426;&#x8FDB;&#x5165;&#x6B63;&#x786E;&#x5C42;&#x7EA7;</text>
+        <rect x="156" y="56" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="56" width="360" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="76" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="76" width="720" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="69" class="score">5 / 10</text>
+        <text x="892" y="89" class="score">10 / 10</text>
+
+        <text x="0" y="124" class="metric">&#x4E00;&#x6B21;&#x901A;&#x8FC7;</text>
+        <text x="0" y="142" class="hint">&#x5927;&#x578B;&#x4EFB;&#x52A1;&#x80FD;&#x5426;&#x5C11;&#x8FD4;&#x5DE5;</text>
+        <rect x="156" y="112" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="112" width="216" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="132" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="132" width="648" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="125" class="score">3 / 10</text>
+        <text x="892" y="145" class="score">9 / 10</text>
+
+        <text x="0" y="180" class="metric">&#x53EF;&#x9A8C;&#x8BC1;&#x6027;</text>
+        <text x="0" y="198" class="hint">&#x9519;&#x8BEF;&#x80FD;&#x5426;&#x88AB;&#x5DE5;&#x5177;&#x53CA;&#x65F6;&#x62E6;&#x4F4F;</text>
+        <rect x="156" y="168" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="168" width="144" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="188" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="188" width="720" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="181" class="score">2 / 10</text>
+        <text x="892" y="201" class="score">10 / 10</text>
+
+        <text x="0" y="236" class="metric">&#x5F31;&#x6A21;&#x578B;&#x53CB;&#x597D;</text>
+        <text x="0" y="254" class="hint">&#x666E;&#x901A;&#x6A21;&#x578B;&#x662F;&#x5426;&#x4E5F;&#x80FD;&#x7A33;&#x5B9A;&#x6267;&#x884C;</text>
+        <rect x="156" y="224" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="224" width="144" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="244" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="244" width="648" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="237" class="score">2 / 10</text>
+        <text x="892" y="257" class="score">9 / 10</text>
+
+        <text x="0" y="292" class="metric">&#x5E76;&#x884C; worker</text>
+        <text x="0" y="310" class="hint">&#x591A;&#x4EFB;&#x52A1;&#x5E76;&#x884C;&#x662F;&#x5426;&#x4E92;&#x76F8;&#x6C61;&#x67D3;</text>
+        <rect x="156" y="280" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="280" width="144" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="300" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="300" width="504" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="293" class="score">2 / 10</text>
+        <text x="892" y="313" class="score">7 / 10</text>
+
+        <text x="0" y="348" class="metric">&#x53EF;&#x9006;&#x6027;</text>
+        <text x="0" y="366" class="hint">&#x6539;&#x9519;&#x540E;&#x80FD;&#x5426;&#x6309;&#x6A21;&#x5757;&#x56DE;&#x6EDA;</text>
+        <rect x="156" y="336" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="336" width="144" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="356" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="356" width="720" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="349" class="score">2 / 10</text>
+        <text x="892" y="369" class="score">10 / 10</text>
+
+        <text x="0" y="404" class="metric">&#x542F;&#x52A8;&#x6210;&#x672C;</text>
+        <text x="0" y="422" class="hint">&#x65B0;&#x4F1A;&#x8BDD;&#x7406;&#x89E3;&#x9879;&#x76EE;&#x7684;&#x6210;&#x672C;</text>
+        <rect x="156" y="392" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="392" width="648" height="14" rx="7" fill="url(#flatBar)" />
+        <rect x="156" y="412" width="720" height="14" rx="7" fill="#e2e8f0" />
+        <rect x="156" y="412" width="576" height="14" rx="7" fill="url(#dddBar)" />
+        <text x="892" y="405" class="score">9 / 10</text>
+        <text x="892" y="425" class="score">8 / 10</text>
+    </g>
+
+    <g transform="translate(72 640)">
+        <rect x="0" y="0" width="464" height="48" rx="16" fill="#fff7ed" stroke="#fdba74" />
+        <text x="22" y="31" class="summary">&#x6241;&#x5E73;&#x7ED3;&#x6784;&#xFF1A;&#x7EFC;&#x5408; AI &#x53CB;&#x597D;&#x5EA6; 4 / 10</text>
+        <rect x="584" y="0" width="464" height="48" rx="16" fill="#f0fdf4" stroke="#86efac" />
+        <text x="606" y="31" class="summary">DDD + &#x6A21;&#x5757;&#x5316;&#xFF1A;&#x7EFC;&#x5408; AI &#x53CB;&#x597D;&#x5EA6; 9 / 10</text>
+    </g>
+</svg>

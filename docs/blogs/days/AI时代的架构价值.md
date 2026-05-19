@@ -128,46 +128,7 @@ Modular Monolith
 
 如果换成图示，大概是这种差异：
 
-@startuml
-!theme plain
-skinparam backgroundColor #FFFFFF
-skinparam shadowing false
-skinparam roundcorner 18
-skinparam defaultFontName Microsoft YaHei
-skinparam titleFontSize 18
-skinparam rectangle {
-  FontColor #0F172A
-  BorderThickness 1
-}
-
-title AI 友好度：从“让模型猜”到“让规则带路”
-
-rectangle "扁平 Next.js\nAI 友好度：4 / 10" as flat #FEF3C7 {
-  rectangle "找代码\n跨 app / api / types / components 搜索" as f1 #FFFBEB
-  rectangle "改位置\n靠模型临场判断" as f2 #FFFBEB
-  rectangle "验证\n主要靠人工 review 发现边界问题" as f3 #FFFBEB
-  rectangle "风险\n旧逻辑容易混进新模块" as f4 #FFFBEB
-}
-
-rectangle "DDD + 模块化\nAI 友好度：9 / 10" as ddd #DCFCE7 {
-  rectangle "找代码\n业务模块先定位，层级再定位" as d1 #F0FDF4
-  rectangle "改位置\nrules 明确规定代码归属" as d2 #F0FDF4
-  rectangle "验证\nESLint + tsc 秒级拦截" as d3 #F0FDF4
-  rectangle "收益\n弱模型也能稳定执行复杂任务" as d4 #F0FDF4
-}
-
-flat -[#64748B,thickness=2]-> ddd : 边界清晰后\n搜索成本下降，错误路径减少
-
-note bottom of flat
-  目录少不等于理解成本低。
-  AI 新会话仍然要扫多个位置拼业务全貌。
-end note
-
-note bottom of ddd
-  最大收益不是少写代码，
-  而是让 AI 少猜、少跑偏、可验证。
-end note
-@enduml
+![AI 时代架构对比图](/ai-architecture-value-compare.svg)
 
 这里有两个地方容易误解。
 
