@@ -55,6 +55,23 @@ worktree 怎么隔离并行作业？
 
 `tvs-team-spawn` 把这套工程封装成一个 Skill，让任何项目一句话起团队。
 
+## 产品速览
+
+先给个一眼能看完的能力清单：
+
+- **一句 `/tvs-team-spawn` 装配**：从访谈到生成 leader + 全员 sub skill，全自动
+- **19 种内置角色任选任意配比**：你需要什么团队就拉什么团队（详见后面"角色配方"）
+- **同一个 Skill 服务多个项目**：每个项目独立的团队、独立的记忆、独立的邮箱，互不干扰
+- **必定生效的 stop hook**：agent 任何"忘了挂回待命"的行为都会被 hook 强制纠正
+- **self-probe 身份绑定**：chat 自动注册到团队路由表，不需要手动管理 chat ↔ agent 映射
+- **watcher 自愈循环**：短命进程 + hook 接替，避免长驻 daemon 的脏状态
+- **邮箱通信 + 黑板共识**：所有协作都走文件系统，可审计、可重放、可调试
+- **批量记忆初始化**：一轮团队级访谈搞定所有 agent 的人设和边界
+- **worktree 并行作业**：多 sub 同时改不同分支，由 leader 统一合并
+- **模型选型推荐**：装配末尾自动给出"最佳质量"和"节约 token"两套配置方案
+
+下面把这些拆开讲。
+
 ## 它装出来的团队长什么样
 
 跑完 `/tvs-team-spawn` 后，你的项目目录会多出这些东西：
@@ -67,10 +84,9 @@ worktree 怎么隔离并行作业？
 ├── hooks.json                    hook 注册
 ├── skills/
 │   ├── team-leader-<teamName>/   leader 的 skill
-│   ├── sub-architect/            按你选的角色生成
-│   ├── sub-executor/
-│   ├── sub-critic/
-│   └── sub-qa-tester/
+│   ├── sub-<role-a>/             按你装配时选的角色逐个生成
+│   ├── sub-<role-b>/             比如 architect / executor / critic / qa-tester ...
+│   └── ...                       19 种内置角色任选任意组合，sub 数量也由你定
 └── .team/
     ├── config.json               团队拓扑 + chat 绑定表
     ├── inbox/<agent>/            每个 agent 一个邮箱目录
@@ -103,6 +119,50 @@ leader 汇总给你 → 等你拍板 commit
 ```
 
 整个过程中你只跟 leader 一个 chat 对话，其它 chat 在背后并行干活。
+
+## 一个 Skill，多个项目并行
+
+这是我自己最喜欢的一个产品特性：**同一份 Skill 可以同时装在任意多个项目里，每个项目按自己的需要捏自己的团队，互不干扰**。
+
+每个项目的所有团队运行态都在自己的 `.cursor/.team/` 目录里，跟 git 同级：
+
+- 团队拓扑、角色配比、成员命名
+- 邮箱（项目级隔离，不会串）
+- 黑板（项目共识不外溢）
+- 每个 agent 的私有记忆（项目 A 的 executor 不会用 B 的偏好）
+- bindings（chat ↔ agent 路由表，项目级）
+- watcher 进程（pid 文件、监听器，互相不干扰）
+
+也就是说你可以同时让 Cursor 里这样跑着：
+
+```text
+ProjectA · Vue 前端重构
+  └── 团队：architect + designer + executor + critic + qa-tester
+
+ProjectB · Python 数据科学
+  └── 团队：scientist + writer + critic
+
+ProjectC · 安全审计
+  └── 团队：security-reviewer + code-reviewer + tracer + debugger
+
+ProjectD · 文档/教程站
+  └── 团队：document-specialist + writer + critic
+```
+
+四个项目、四套团队、四组记忆、四条邮件流，全部并行、全部隔离。你切换项目窗口的时候，每个团队都还在自己那边按部就班待命，不会因为你今天主要在 ProjectA 干活，B 的团队就"忘了"自己是谁。
+
+之所以能做到这一点，是因为整个系统的存储设计就是"项目本地化"的：
+
+```text
+全局：~/.cursor/runtime/team.mjs    通信运行时（所有项目共享）
+全局：~/.cursor/hooks/team-stop-driver.mjs    hook 实现（共享）
+项目：<project>/.cursor/.team/    运行态（绝对隔离）
+项目：<project>/.cursor/skills/    生成出来的 leader / sub skill（每个项目自己一份）
+```
+
+全局只有"机制代码"，每个项目自己持有"团队实例"。装配工在每个项目第一次跑时自动把全局机制拷一份到项目本地，之后这个项目的团队就完全自包含。换电脑、换工作目录、git clone 到新机器，跑一次 spawn 就重新起来。
+
+> 一份 Skill，N 个项目，N 套团队，N 组记忆。每套都按那个项目自己的需要捏。
 
 ## 几个核心能力
 
@@ -245,23 +305,55 @@ leader 是唯一的协调者，也是唯一会跟用户对话的人。
 
 5 套独立访谈被压缩成 1 套团队访谈 + 1 次审阅，启动 chat 时记忆已经就绪，不用再跑任何额外步骤。
 
-### 六、19 个内置角色 + 两套模型选型方案
+### 六、19 个内置角色 + 任意配比
 
-skill 自带 19 个常见角色：architect、executor、explore、document-specialist、designer、writer、vision、planner、critic、analyst、qa-tester、tracer、security-reviewer、debugger、test-engineer、code-reviewer、scientist、git-master、code-simplifier。
-
-每个角色带一份默认的 system prompt 模板 + memory hints + 推荐模型。
-
-装配工会根据你的任务类型推荐配比：
+skill 自带 19 个常见角色，覆盖从架构判断到具体执行的完整光谱：
 
 ```text
-新功能：planner + executor + critic + test-engineer
-大型重构：architect + executor + code-reviewer + git-master
-Bug 排查：tracer + debugger + critic
-安全敏感：security-reviewer + code-reviewer + critic
-前端：designer + executor + critic
+判断 / 决策类：
+  architect / planner / analyst / scientist / code-simplifier
+
+实现 / 执行类：
+  executor / test-engineer / git-master
+
+审查 / 把关类：
+  critic / code-reviewer / security-reviewer
+
+侦察 / 调试类：
+  explore / tracer / debugger
+
+知识 / 文档类：
+  document-specialist / writer / vision
+
+设计 / 体验类：
+  designer
+
+测试 / 验收类：
+  qa-tester
 ```
 
-最后一步会给你两份模型选型推荐：
+每个角色带一份默认的 system prompt 模板 + memory hints + 推荐模型。**装配时你按业务需要任选任意配比**，sub 数量也自己定。装配工会根据你描述的任务类型给推荐方案：
+
+| 业务场景 | 推荐配比 |
+|---|---|
+| 新功能开发 | planner + executor + critic + test-engineer |
+| 大型重构 | architect + executor + code-reviewer + git-master |
+| Bug 排查 | tracer + debugger + critic |
+| 安全审计 | security-reviewer + code-reviewer + critic |
+| 前端项目 | designer + executor + critic + qa-tester |
+| 数据科学 | scientist + writer + critic |
+| 文档 / 教程站 | document-specialist + writer + critic |
+| TDD 测试驱动开发 | test-engineer + executor + code-reviewer |
+| 性能优化 | analyst + executor + critic + qa-tester |
+| 复杂调研 / 探索 | explore + analyst + document-specialist + critic |
+
+这些只是推荐起点，你完全可以拒绝、改造或者自己拼一套。同样的 skill 在不同项目里可以拉完全不同的团队——这是它跟"固定形态的多 Agent 框架"最大的不同。
+
+至少要保证一个审查角色（critic / code-reviewer / security-reviewer 之一），别的随你。
+
+### 七、两套模型选型方案
+
+装配的最后一步，装配工会按你团队的实际配比，给出两份选型推荐：
 
 | 方案 | 思路 |
 |---|---|
@@ -289,9 +381,13 @@ leader: 汇总 → 跟你确认 → commit
 
 ### 跨界协作
 
-leader 可以自己当代码勘察员，无需开 sub-explore。
-SQL 任务也可以让 executor 兼任，不必专门加 backend sub。
-跨界的边界由装配时录入的 `conventions.md` 守住。
+不一定每种工作都要开一个对应 sub。装配时可以把某些能力"挂到"已有 sub 身上：
+
+- 让 leader 兼任代码勘察员（不开 sub-explore，leader 自己跑 Grep / Glob）
+- 让 executor 兼任跨界小活（一个 sub 主前端，顺手能写少量 SQL）
+- 让 git-master 的权限委托给 leader（小团队不必单独开 git 角色）
+
+这些"职能扩展"在装配访谈时录入，会写进 `conventions.md` 守住边界——sub 知道自己什么可以兼、什么必须转给别人。
 
 ### 并行作业
 
@@ -364,6 +460,6 @@ skill 在我维护的 `ai-tools-skills` 仓库里：
 
 agent 写代码的能力已经够强了，缺的是它们之间的"协作可靠性"——路由、身份、强制、自愈、责任边界，每一条都需要被设计，而不是希望它自然发生。
 
-这个 skill 把这些机制全部封装好了。
+这个 skill 把这些机制全部封装好了。一份 Skill，多个项目并行；19 种角色随你配比；每个团队的记忆都属于它自己那个项目，长期积累下来就是一群"懂你这条业务线"的 agent。
 
 你只需要打开 Cursor，在你下一个项目里说一句 `/tvs-team-spawn`，剩下的我都替你想好了。(´ω｀)
