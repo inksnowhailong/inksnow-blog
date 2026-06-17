@@ -63,8 +63,10 @@ worktree 怎么隔离并行作业？
 - **19 种内置角色任选任意配比**：你需要什么团队就拉什么团队（详见后面"角色配方"）
 - **同一个 Skill 服务多个项目**：每个项目独立的团队、独立的记忆、独立的邮箱，互不干扰
 - **必定生效的 stop hook**：agent 任何"忘了挂回待命"的行为都会被 hook 强制纠正
-- **self-probe 身份绑定**：chat 自动注册到团队路由表，不需要手动管理 chat ↔ agent 映射
+- **chat 身份绑定**：一句 `bind` 自动把当前 chat 注册进团队路由表，不用手动管理 chat ↔ agent 映射
+- **跨平台稳的 watcher**：优先用 chokidar，没装也能跑（自动回退 fs.watch + 5 秒轮询兜底）
 - **watcher 自愈循环**：短命进程 + hook 接替，避免长驻 daemon 的脏状态
+- **三层知识分工**：codegraph 答代码结构、记忆库答业务领域、黑板放团队协调态，互补不重叠
 - **邮箱通信 + 黑板共识**：所有协作都走文件系统，可审计、可重放、可调试
 - **批量记忆初始化**：一轮团队级访谈搞定所有 agent 的人设和边界
 - **worktree 并行作业**：多 sub 同时改不同分支，由 leader 统一合并
@@ -78,9 +80,7 @@ worktree 怎么隔离并行作业？
 
 ```text
 .cursor/
-├── runtime/team.mjs              通信和编排的运行时
-├── hooks/team-stop-driver.mjs    必定生效的 stop hook
-├── schemas/team-*.schema.json    消息和配置的契约
+├── hooks/team-stop-driver.mjs    必定生效的 stop hook（部署时生成）
 ├── hooks.json                    hook 注册
 ├── skills/
 │   ├── team-leader-<teamName>/   leader 的 skill
@@ -96,8 +96,10 @@ worktree 怎么隔离并行作业？
     │   └── decisions.jsonl       决策记录
     ├── memory/<agent>/           每个 agent 的私有记忆
     ├── worktrees/                按需创建的 git worktree
-    └── state/                    probe marker、watcher pid 等运行态
+    └── watchers/                 watcher pid 等运行态
 ```
+
+> 通信和编排的运行时 `team.mjs` 不拷进项目——它在 skill 自己的目录里（软链方式安装），所有命令都从 skill 路径直接跑，项目里只留 `.team/` 这些运行态。
 
 启动方式也很轻：开 N+1 个 chat（一个 leader + 每个 sub 一个），每个 chat 输入对应的 skill 名（例如 `/team-leader-myteam` / `/sub-critic`），它们会自动绑定、自动加载记忆、自动进入待命状态。
 
@@ -154,13 +156,15 @@ ProjectD · 文档/教程站
 之所以能做到这一点，是因为整个系统的存储设计就是"项目本地化"的：
 
 ```text
-全局：~/.cursor/runtime/team.mjs    通信运行时（所有项目共享）
-全局：~/.cursor/hooks/team-stop-driver.mjs    hook 实现（共享）
-项目：<project>/.cursor/.team/    运行态（绝对隔离）
-项目：<project>/.cursor/skills/    生成出来的 leader / sub skill（每个项目自己一份）
+全局（随 skill 安装、软链到仓库，所有项目共享一份）：
+  ~/.cursor/skills/tvs-team-spawn/    运行时 team.mjs（通信与编排，不拷进项目）
+项目级（每个项目自己一份，绝对隔离）：
+  <project>/.cursor/.team/                运行态：邮箱 / 黑板 / 记忆 / watcher pid
+  <project>/.cursor/skills/               部署时生成的 leader / sub skill
+  <project>/.cursor/hooks/team-stop-driver.mjs    部署时生成的 stop driver
 ```
 
-全局只有"机制代码"，每个项目自己持有"团队实例"。装配工在每个项目第一次跑时自动把全局机制拷一份到项目本地，之后这个项目的团队就完全自包含。换电脑、换工作目录、git clone 到新机器，跑一次 spawn 就重新起来。
+全局只有"机制代码"（运行时在 skill 里，软链方式安装，`git pull` 即更新）；每个项目自己持有"团队实例"。装配工在每个项目第一次跑时，只生成项目侧的产物——`.team/` 运行态、leader/sub skill、stop driver——运行时本身不拷贝，所有命令都直接从 skill 路径跑。换电脑、换工作目录、git clone 到新机器，跑一次 spawn 重新生成项目侧产物就能起来。
 
 > 一份 Skill，N 个项目，N 套团队，N 组记忆。每套都按那个项目自己的需要捏。
 
@@ -168,38 +172,28 @@ ProjectD · 文档/教程站
 
 下面这些是我觉得最值得拿出来讲的设计点，它们决定了这套系统是真能稳定跑，而不是 demo 级别。
 
-### 一、self-probe 身份绑定
+### 一、chat 身份绑定
 
-每个 chat 启动时都需要知道"我是这个团队里的哪个 agent"，然后把自己注册到路由表里。
+每个 chat 启动时都需要知道"我是这个团队里的哪个 agent"，然后把自己注册到一张路由表（`config.json` 的 `bindings`）里——这样后续 stop hook 才能凭会话 id 反查出"当前这个 chat 是谁"。
 
-这件事看起来简单，实际上有个根本困难：
-
-> Cursor 的 chat 子进程拿不到自己的 conversation_id。
-
-如果让 chat 自己去猜——比如扫 transcripts 目录找最近修改的文件——多 chat 并发时几乎一定猜错。
-
-`tvs-team-spawn` 的解法是把"写身份"这件事交给 stop hook：
+绑定本身分两半，一半在 chat、一半在 hook，各取自己能稳定拿到的东西：
 
 ```text
-chat 启动
+chat 启动 → 跑一次 bind <agent>
+  → 取当前会话 id：优先用显式传入的 id；
+     没有就取"最近修改的那个 transcript 文件"的 uuid
+     （所以要求这个 chat 先发过一条消息，保证它的 transcript 是最新的那个）
+  → 写入 bindings[会话id] = agent
+  → 同时清掉这个 agent 之前的旧绑定（重绑即迁移，不留脏映射）
   ↓
-跑 pre-bind-probe . <agent>
-  → 在 state 目录写一个 marker 文件，里面只写"我是哪个 agent"
-  ↓
-chat 主动停止本轮
-  ↓
-stop hook 触发
-  → Cursor 通过 stdin 把准确的 conversation_id 传给 hook
-  → hook 读 marker，知道这个 chat 该绑成哪个 agent
-  → 把 conversation_id ↔ agent 写入 bindings
-  → 注入 followup_message 让 chat 继续走启动协议
+之后每次 stop hook 触发
+  → 宿主通过 stdin 把【精确的】会话 id 直接交给 hook
+  → hook 用这个精确 id 查 bindings，立刻知道该 chat 是哪个 agent
 ```
 
-这个设计的工程美感不在算法本身，在责任转移：
+这里的分工很关键：**真正精确的会话 id，永远是 hook 从宿主拿到的那个**；chat 端的 `bind` 只负责在一个受控的时刻（你刚在这个 chat 发完消息、它的 transcript 是最新的）把"这条会话 → 这个 agent"这条映射先落下来。一次只绑一个 chat、加上"按 agent 去重"的兜底，就避开了多 chat 并发时"猜错身份"的坑。
 
-> 不要让一个不知情的对象自证身份。让那个真正知情的对象替它写。
-
-整条链路里 conversation_id 从来没经过 chat 进程的猜测，全部由 hook 进程直接拿到。这是这套系统最底层、最关键的一块。
+> 路由表只认会话 id。绑定的全部职责，就是在对的时机把 id 和 agent 对上号，然后让 hook 这个唯一拿得到精确 id 的角色去查。
 
 ### 二、必定生效的 stop hook
 
@@ -256,6 +250,8 @@ chat 启动新 watcher → 再守 1 小时
 
 这跟 Erlang "let it crash" 是同一个味道：单点不需要绝对可靠，整体的接替机制才是可靠性来源。
 
+而每个 watcher 具体"怎么盯邮箱"，我也留了一层稳健性：优先用 `chokidar`（跨平台文件事件更稳，尤其能扛住编辑器的原子写入 / 重命名、以及网络盘的事件抖动），团队初始化时一次性全局装好、所有项目所有 chat 都受益。但没装也绝不卡——自动回退到 Node 内置 `fs.watch` + 5 秒轮询。这里要强调一句：**轮询不是可有可无的双保险，是主力的一条腿**——`fs.watch` 在 Windows 和网络盘上是真会漏事件、还会把一次写报成好几次，没有轮询兜底，watcher 偶尔就会"睡过去"叫不醒。
+
 ### 四、邮箱通信 + 黑板共识
 
 通信层有两个明确分工：
@@ -280,6 +276,14 @@ chat 启动新 watcher → 再守 1 小时
 ```
 
 leader 是唯一的协调者，也是唯一会跟用户对话的人。
+
+**再补一层：知识的三层分工。** 黑板只是团队协作里"知识"的一种。我把团队要用的知识刻意拆成三层，互不重叠，各管一摊：
+
+- **代码结构**（X 在哪定义、谁调用它、改了影响谁）→ 交给 codegraph（AST 知识图谱），机器维护、秒级新鲜。团队初始化时一次性接好，勘察 / 架构 / 审查类角色（explore / architect / code-reviewer / tracer）共享，比让每个 agent 反复 grep 又省 token 又准。
+- **业务领域知识**（这个项目的业务规则、历史背景）→ 放专门的记忆库。
+- **本次协作的临时状态**（当前目标、阶段、决策）→ 才放黑板。
+
+为什么这么分？因为这三类知识的"谁来维护、多久过期"完全不同：代码结构归工具自动维护、改一行就变；领域知识慢、靠人沉淀；协调态最易变、随任务走。**按"维护方 + 时效"给知识分层，而不是一锅烩塞进一个地方**，是我觉得很多 agent 记忆系统没想清楚的一点。agent 查什么去对应的层，既不会拿过期信息，也不会为了一个结构问题烧一堆 token 去翻代码。
 
 ### 五、批量记忆初始化
 
@@ -427,8 +431,8 @@ skill 装好后，在任意项目里：
 装配工会跟你做一轮访谈（sub 数量 / 角色构成 / leader 职能 / 团队名 / 团队目标），然后自动跑：
 
 ```text
-0a. 资产安装（runtime / hooks / schemas）
-0.  依赖检查
+0.  依赖检查（chokidar，可选，缺了自动回退）
+0.5 接入 codegraph（结构知识层，可选）
 1.  访谈
 2.  角色推荐
 3.  初始化目录
