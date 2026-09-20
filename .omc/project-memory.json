@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775526203221,
-  "projectRoot": "/Users/zhanghailong/Desktop/coding/inksnow-blog",
+  "lastScanned": 1782217077347,
+  "projectRoot": "e:\\inksnow\\inksnow-blog",
   "techStack": {
     "languages": [
       {
@@ -66,20 +66,13 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 2,
-      "lastAccessed": 1775526203200,
+      "fileCount": 1,
+      "lastAccessed": 1782217077312,
       "keyFiles": [
         "README.md"
       ]
     }
   },
-  "hotPaths": [
-    {
-      "path": "docs/blogs/days/工程架构认知(三).md",
-      "accessCount": 2,
-      "lastAccessed": 1775526462622,
-      "type": "file"
-    }
-  ],
+  "hotPaths": [],
   "userDirectives": []
 }

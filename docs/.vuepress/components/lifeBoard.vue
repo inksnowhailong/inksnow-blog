@@ -25,6 +25,7 @@ const diagnosis = ref<any>(null);
 const ledger = ref<any>(null);
 const ideas = ref<any>(null);
 const heat = ref<any[]>([]);
+const plan = ref<any[]>([]);
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
 const activeDay = ref<any>(null);
@@ -84,16 +85,18 @@ async function loadAll() {
   try {
     const to = today();
     const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h] = await Promise.all([
+    const [d, l, i, h, p] = await Promise.all([
       api('/life/diagnosis'),
       api('/life/ledger'),
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
+      api('/life/plan'),
     ]);
     diagnosis.value = d;
     ledger.value = l;
     ideas.value = i;
     heat.value = h;
+    plan.value = p;
     if (!activeDate.value) activeDate.value = to;
     await loadActiveDay();
     unlocked.value = true;
@@ -379,6 +382,42 @@ const streak = computed(() => {
   return { current, active, total: days.length };
 });
 
+/** 展开或收起一个清单组 */
+function toggleGroup(id: string) {
+  openGroups.value = { ...openGroups.value, [id]: !openGroups.value[id] };
+}
+
+/**
+ * 取某组下的全部清单项
+ * @description 从计划树里找，因而带着说明与完成状态；
+ * 诊断接口只给接下来两项，不足以支撑展开后的全貌
+ */
+function groupItems(groupId: string): any[] {
+  const walk = (nodes: any[]): any => {
+    for (const n of nodes) {
+      if (n.id === groupId) return n;
+      const hit = walk(n.children ?? []);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const group = walk(plan.value);
+  return (group?.children ?? [])
+    .filter((c: any) => c.level === 'CHECKLIST')
+    .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+}
+
+/** 组名去掉「A 组 ·」这类编号前缀，只留说得清是什么的部分 */
+function groupShortName(title: string): string {
+  const parts = String(title).split('·');
+  return (parts[1] ?? parts[0]).trim();
+}
+
+/** 清单项说明里剥掉统一的判定标准，那句话在组头说一次即可 */
+function itemBrief(description: string): string {
+  return String(description || '').split('。判定：')[0];
+}
+
 /** 各组接下来该做的一项，平铺到顶层免去逐组展开 */
 const nextUps = computed(() => {
   const groups = diagnosis.value?.checklist?.groups ?? [];
@@ -654,16 +693,24 @@ onMounted(() => {
             v-for="n in nextUps"
             :key="n.id"
             data-alt="next-item"
-            class="flex items-center gap-2"
+            class="flex items-start gap-2 rounded-lg border border-slate-100 p-2 dark:border-slate-700"
           >
             <button
               data-alt="quick-check"
-              class="flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
+              class="mt-0.5 flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
               :disabled="busy"
               @click="checkItem(n.id)"
             >勾掉</button>
-            <span class="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-200">{{ n.title }}</span>
-            <span class="flex-none text-[10px] text-slate-400">{{ n.group.split(' ')[0] }}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2">
+                <span class="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">{{ n.title }}</span>
+                <span class="flex-none text-[10px] text-slate-400">{{ groupShortName(n.group) }}</span>
+              </div>
+              <p
+                v-if="itemBrief(n.description)"
+                class="m-0 mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400"
+              >{{ itemBrief(n.description) }}</p>
+            </div>
           </div>
         </div>
       </section>
@@ -701,8 +748,13 @@ onMounted(() => {
         >{{ t.label }}</button>
       </div>
 
-      <!-- 全部清单：默认展开进度，点组名看未完成项 -->
+      <!-- 全部清单：进度直接可见，点组名看条目 -->
       <section v-if="tab === 'checklist'" data-alt="checklist-section" class="grid gap-2">
+        <p class="m-0 text-xs leading-relaxed text-slate-400">
+          条目前的编号是学习顺序，前面的是后面的基础，按顺序做不要跳。
+          清单不计分，分数只来自每日打卡；清单的价值在里程碑：
+          整组勾完 +{{ diagnosis.rules.milestoneQuarterly }} 元。
+        </p>
         <div
           v-for="g in diagnosis.checklist.groups"
           :key="g.id"
@@ -710,10 +762,13 @@ onMounted(() => {
           class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800"
         >
           <button
+            data-alt="group-toggle"
             class="flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left"
             @click="toggleGroup(g.id)"
           >
-            <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ g.title }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+              {{ groupShortName(g.title) }}
+            </span>
             <span class="flex-none font-mono text-xs tabular-nums text-slate-500">{{ g.requiredDone }}/{{ g.required }}</span>
             <span class="flex-none text-[10px] text-slate-400">{{ openGroups[g.id] ? '收起' : '展开' }}</span>
           </button>
@@ -723,16 +778,59 @@ onMounted(() => {
               :style="{ width: (g.required ? (g.requiredDone / g.required) * 100 : 0) + '%' }"
             ></div>
           </div>
-          <div v-if="openGroups[g.id]" class="mt-2 grid gap-1.5">
-            <div v-for="n in g.nextUp" :key="n.id" class="flex items-center gap-2">
+          <div v-if="openGroups[g.id]" data-alt="group-items" class="mt-3 grid gap-2">
+            <p class="m-0 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] leading-relaxed text-slate-500 dark:bg-slate-700/50 dark:text-slate-400">
+              这组全部勾完 +{{ diagnosis.rules.milestoneQuarterly }} 元。清单项本身不计分，
+              分数只来自每日打卡；判定标准是能不看资料讲清楚「这是什么 / 什么时候用 / 有什么坑」，且动手验证过一次。
+            </p>
+            <div
+              v-for="item in groupItems(g.id)"
+              :key="item.id"
+              data-alt="checklist-item"
+              class="flex items-start gap-2 rounded-lg border p-2"
+              :class="
+                item.status === 'DONE'
+                  ? 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-900/20'
+                  : 'border-slate-100 dark:border-slate-700'
+              "
+            >
               <button
-                class="flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
+                v-if="item.status !== 'DONE'"
+                data-alt="item-check"
+                class="mt-0.5 flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
                 :disabled="busy"
-                @click="checkItem(n.id)"
+                @click="checkItem(item.id)"
               >勾掉</button>
-              <span class="min-w-0 flex-1 text-sm text-slate-600 dark:text-slate-300">{{ n.title }}</span>
+              <span
+                v-else
+                class="mt-0.5 flex-none px-1 text-[11px] text-teal-700 dark:text-teal-400"
+              >✓</span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline gap-2">
+                  <span
+                    class="min-w-0 flex-1 text-sm"
+                    :class="
+                      item.status === 'DONE'
+                        ? 'text-slate-400 line-through'
+                        : 'text-slate-700 dark:text-slate-200'
+                    "
+                  >{{ item.title }}</span>
+                  <span
+                    v-if="!item.required"
+                    class="flex-none rounded bg-slate-100 px-1 text-[10px] text-slate-500 dark:bg-slate-700"
+                  >选修</span>
+                  <span
+                    v-if="item.doneOn"
+                    class="flex-none font-mono text-[10px] text-slate-400"
+                  >{{ item.doneOn.slice(5) }}</span>
+                </div>
+                <p
+                  v-if="itemBrief(item.description)"
+                  class="m-0 mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400"
+                >{{ itemBrief(item.description) }}</p>
+              </div>
             </div>
-            <p v-if="!g.nextUp.length" class="m-0 text-xs text-slate-400">这组已经做完了</p>
+            <p v-if="!groupItems(g.id).length" class="m-0 text-xs text-slate-400">这组还没有条目</p>
           </div>
         </div>
       </section>
