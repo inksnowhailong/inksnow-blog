@@ -6,7 +6,7 @@
  */
 
 /** 会改动计划本身的草稿，比记一笔流水影响大，界面上要区别对待 */
-const PLAN_KINDS = ['plan_update', 'plan_create', 'plan_drop'];
+const PLAN_KINDS = ['plan_update', 'plan_create', 'plan_drop', 'daily_rule'];
 
 /** 会删掉已有数据的草稿 */
 const DESTRUCTIVE_KINDS = ['undo', 'plan_drop'];
@@ -37,6 +37,14 @@ export function describeDraft(
   if (p.kind === 'note')
     return `给「${p.ideaContent}」写研究笔记：${p.note?.question ?? ''}`;
   if (p.kind === 'log') return `给「${p.nodeTitle}」记一条：${p.text}`;
+  if (p.kind === 'research_log')
+    return `给研究「${p.ideaContent}」记一条进展：${p.text}`;
+  if (p.kind === 'idea_drop')
+    return (
+      `删掉想法「${p.ideaContent}」` +
+      (p.logCount ? `，连同 ${p.logCount} 条研究日志` : '') +
+      (p.yuanLost ? `，额度少 ${p.yuanLost} 元` : '')
+    );
   if (p.kind === 'undo')
     return `删掉「${p.nodeTitle}」${p.occurredOn} 的 ${p.events.length} 条记录，共 ${p.totalMinutes} 分钟`;
   if (p.kind === 'plan_update') {
@@ -49,6 +57,13 @@ export function describeDraft(
   if (p.kind === 'plan_create')
     return `在「${p.parentTitle}」下新增「${p.title}」`;
   if (p.kind === 'plan_drop') return `砍掉「${p.nodeTitle}」：${p.reason}`;
+  if (p.kind === 'daily_rule') {
+    const parts = [
+      p.thresholdMinutes != null ? `达标改成 ${p.thresholdMinutes} 分钟` : '',
+      p.points != null ? `分值改成 ${p.points} 分` : '',
+    ].filter(Boolean);
+    return `改「${p.nodeTitle}」的计分规则：${parts.join('，')}`;
+  }
   return (p.items ?? [])
     .map((i: any) => {
       if (i.kind === 'MISS') return `记一条未完成：${nodeTitleOf(i.nodeId)}`;
@@ -99,6 +114,24 @@ export function draftDetails(draft: any): DraftDetail[] {
     }));
   }
 
+  if (p.kind === 'daily_rule') {
+    const out: DraftDetail[] = [];
+    if (p.thresholdMinutes != null)
+      out.push({
+        label: '达标时长',
+        before: `${p.before.thresholdMinutes} 分钟`,
+        after: `${p.thresholdMinutes} 分钟`,
+      });
+    if (p.points != null)
+      out.push({
+        label: '分值',
+        before: `${p.before.points} 分`,
+        after: `${p.points} 分`,
+      });
+    out.push({ label: '影响', value: '只改往后的计分，已经记过的分不动' });
+    return out;
+  }
+
   if (p.kind === 'plan_drop') {
     return [
       { label: '砍掉', value: p.nodeTitle },
@@ -146,6 +179,13 @@ export async function applyDraft(
       method: 'POST',
       body: JSON.stringify({ text: p.text }),
     });
+  } else if (p.kind === 'research_log') {
+    await api(`/life/ideas/${p.ideaId}/logs`, {
+      method: 'POST',
+      body: JSON.stringify({ text: p.text }),
+    });
+  } else if (p.kind === 'idea_drop') {
+    await api(`/life/ideas/${p.ideaId}`, { method: 'DELETE' });
   } else if (p.kind === 'plan_update') {
     await api(`/life/plan/${p.nodeId}`, {
       method: 'PATCH',
@@ -164,6 +204,16 @@ export async function applyDraft(
         level: 'CHECKLIST',
       }),
     });
+  } else if (p.kind === 'daily_rule') {
+    await api(`/life/plan/${p.nodeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...(p.thresholdMinutes != null
+          ? { thresholdMinutes: p.thresholdMinutes }
+          : {}),
+        ...(p.points != null ? { points: p.points } : {}),
+      }),
+    });
   } else if (p.kind === 'plan_drop') {
     await api(`/life/plan/${p.nodeId}/drop`, {
       method: 'POST',
@@ -172,4 +222,60 @@ export async function applyDraft(
   } else {
     throw new Error(`还不认识这种草稿：${p.kind}`);
   }
+}
+
+/**
+ * 流式问一句
+ * @description 用 POST + 手动读流而不是 EventSource：后者只能发 GET、
+ * 带不了请求头，密钥就只能塞进查询串落进访问日志。
+ * 工具调用的结果是结构化的没什么可流，值得流的是纯提问时的回答
+ * @param api 仅用来取基地址与密钥，实际请求在这里自己发
+ * @param base 接口基地址
+ * @param key 访问密钥
+ * @param message 用户原话
+ * @param onDelta 每收到一段文字就回调
+ * @param history 之前几轮对话，让模型接得上上文
+ * @returns 最终的草稿或回答
+ */
+export async function askStream(
+  base: string,
+  key: string,
+  message: string,
+  onDelta: (text: string) => void,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+): Promise<any> {
+  const res = await fetch(`${base}/life/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-life-key': key },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!res.ok || !res.body) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.message || `请求失败 ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: any = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE 以空行分隔事件，最后一段可能不完整，留到下一轮
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+    for (const part of parts) {
+      const event = part.match(/^event: (.+)$/m)?.[1];
+      const data = part.match(/^data: (.+)$/m)?.[1];
+      if (!event || !data) continue;
+      const payload = JSON.parse(data);
+      if (event === 'delta') onDelta(payload.text);
+      else if (event === 'result') result = payload;
+      else if (event === 'error') throw new Error(payload.message);
+    }
+  }
+  if (!result) throw new Error('没拿到结果');
+  return result;
 }

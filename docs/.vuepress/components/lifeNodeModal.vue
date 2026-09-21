@@ -34,6 +34,37 @@ const dropReason = ref('');
 
 /** 单条日志的字数上限，与后端一致 */
 const LOG_MAX = 120;
+
+/** 每日项才有的计分设定 */
+const threshold = ref(0);
+const points = ref(0);
+const isDaily = computed(() => props.node?.level === 'DAILY');
+
+/** 计分设定被改过 */
+const ruleDirty = computed(
+  () =>
+    isDaily.value &&
+    (threshold.value !== (props.node?.thresholdMinutes ?? 0) ||
+      points.value !== (props.node?.points ?? 0)),
+);
+
+/**
+ * 存下改动后的计分规则
+ * @description 只影响往后的计分。已经记下的分是按当时的规则算出来的，
+ * 不会被追溯重算——否则改一次规则，过去几个月的账全变了
+ */
+function saveRule() {
+  run(async () => {
+    await props.api(`/life/plan/${props.node.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        thresholdMinutes: threshold.value,
+        points: points.value,
+      }),
+    });
+    emit('changed');
+  });
+}
 const logs = ref<any[]>([]);
 const logDraft = ref('');
 const logsLoading = ref(false);
@@ -86,6 +117,8 @@ watch(
     dropReason.value = '';
     logDraft.value = '';
     logs.value = [];
+    threshold.value = props.node?.thresholdMinutes ?? 0;
+    points.value = props.node?.points ?? 0;
     if (props.node) loadLogs();
   },
   { immediate: true },
@@ -254,6 +287,60 @@ function drop() {
             class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
         </label>
+        <!--
+          每日项的计分设定。放在这里而不是只让 AI 改：
+          一句话说不清的东西交给模型有误判风险，但完全不给入口
+          等于把路堵死——使用者连自己的计划参数都调不了
+        -->
+        <div v-if="isDaily" data-alt="daily-rule" class="grid gap-2">
+          <div class="grid grid-cols-2 gap-2">
+            <label class="grid gap-1">
+              <span class="text-xs text-slate-500 dark:text-slate-400"
+                >达标时长（分钟）</span
+              >
+              <input
+                v-model.number="threshold"
+                data-alt="edit-threshold"
+                type="number"
+                min="1"
+                max="600"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-slate-500 dark:text-slate-400"
+                >达标得分</span
+              >
+              <input
+                v-model.number="points"
+                data-alt="edit-points"
+                type="number"
+                min="1"
+                max="20"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+          </div>
+          <div v-if="ruleDirty" class="flex items-center gap-2">
+            <button
+              data-alt="save-rule"
+              type="button"
+              :disabled="busy"
+              title="保存计分规则"
+              aria-label="保存计分规则"
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500 text-white transition hover:bg-amber-600 disabled:opacity-50"
+              @click="saveRule"
+            >
+              <LifeIcon name="check" class="h-4 w-4" />
+            </button>
+            <span class="text-[11px] leading-snug text-slate-400">
+              {{ node.thresholdMinutes }} 分钟 / {{ node.points }} 分 →
+              {{ threshold }} 分钟 / {{ points }} 分 ·
+              只改往后的计分，已记的分不动
+            </span>
+          </div>
+        </div>
+
         <button
           v-if="dirty"
           data-alt="save-edit"

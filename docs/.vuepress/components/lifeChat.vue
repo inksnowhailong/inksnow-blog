@@ -10,12 +10,16 @@ import {
   describeDraft,
   applyDraft,
   touchesPlan as draftTouchesPlan,
+  askStream,
 } from './useLifeDraft';
 import LifeIcon from './lifeIcon.vue';
 import LifeDraftDetail from './lifeDraftDetail.vue';
 
 const props = defineProps<{
   api: (path: string, init?: RequestInit) => Promise<any>;
+  /** 流式请求要自己发，故需要基地址与密钥 */
+  apiBase: string;
+  apiKey: string;
   /** 按ID取每日项标题，用于把草稿说成人话 */
   nodeTitleOf: (id: string) => string;
 }>();
@@ -54,21 +58,52 @@ async function send() {
   busy.value = true;
   errorMsg.value = '';
   pending.value = null;
+
+  // 之前几轮原样带上去，模型才接得住「那这个呢」「改成 30 分钟」这类话。
+  // 必须在把当前这句压进 log 之前取，否则问题会重复一遍
+  const history = log.value
+    .map((t) => ({
+      role: (t.role === 'me' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: t.text,
+    }))
+    .filter((t) => t.content.trim())
+    .slice(-12);
+
   log.value = [...log.value, { role: 'me', text }];
   input.value = '';
   await scrollToEnd();
+
+  // 先占一条空的回话，模型每吐一段就往里追加，使用者立刻看到有反应
+  const slot = log.value.length;
+  log.value = [...log.value, { role: 'ai', text: '' }];
+
   try {
-    const res = await props.api('/life/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message: text }),
-    });
+    const res = await askStream(
+      props.apiBase,
+      props.apiKey,
+      text,
+      (delta) => {
+        const next = [...log.value];
+        next[slot] = { role: 'ai', text: next[slot].text + delta };
+        log.value = next;
+        scrollToEnd();
+      },
+      history,
+    );
+
     if (res.kind === 'answer') {
-      log.value = [...log.value, { role: 'ai', text: res.text }];
+      // 流下来的正文与最终结果一致时不必覆盖，避免闪一下
+      const next = [...log.value];
+      next[slot] = { role: 'ai', text: res.text || next[slot].text };
+      log.value = next;
     } else {
+      // 出草稿时那段思考文字没有保留价值，撤掉占位改用草稿卡片
+      log.value = log.value.filter((_, i) => i !== slot);
       pending.value = res;
     }
     await scrollToEnd();
   } catch (e: any) {
+    log.value = log.value.filter((_, i) => i !== slot);
     errorMsg.value =
       e.message === '密钥无效' ? e.message : 'AI 暂时不可用：' + e.message;
   } finally {
