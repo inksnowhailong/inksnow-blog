@@ -705,7 +705,7 @@ onMounted(() => {
         data-alt="key-input"
         type="password"
         autocomplete="current-password"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
       />
       <button
         data-alt="unlock-button"
@@ -1085,7 +1085,7 @@ onMounted(() => {
                   type="text"
                   maxlength="200"
                   placeholder="想试试什么"
-                  class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-base sm:text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   @keydown.enter.prevent="captureIdea"
                 />
                 <button

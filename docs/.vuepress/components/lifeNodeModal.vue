@@ -272,7 +272,7 @@ function drop() {
             data-alt="edit-title"
             type="text"
             maxlength="200"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
         </label>
         <label class="grid gap-1">
@@ -284,7 +284,7 @@ function drop() {
             data-alt="edit-desc"
             rows="4"
             maxlength="1000"
-            class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm leading-relaxed text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
         </label>
         <!--
@@ -304,7 +304,7 @@ function drop() {
                 type="number"
                 min="1"
                 max="600"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
             </label>
             <label class="grid gap-1">
@@ -317,7 +317,7 @@ function drop() {
                 type="number"
                 min="1"
                 max="20"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
             </label>
           </div>
@@ -366,7 +366,7 @@ function drop() {
             data-alt="ai-instruction"
             type="text"
             placeholder="怎么改，例如：把做完的标准写具体点"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
             @keydown.enter.prevent="askAi"
           />
           <button
@@ -448,7 +448,7 @@ function drop() {
             type="text"
             :maxlength="LOG_MAX"
             placeholder="搞懂了什么，或卡在哪"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
             @keydown.enter.prevent="addLog"
           />
           <button
@@ -457,7 +457,7 @@ function drop() {
             :disabled="busy || !logDraft.trim()"
             title="记下这一条"
             aria-label="记下这一条"
-            class="grid shrink-0 place-items-center rounded-lg bg-brand-500 px-2.5 text-white transition hover:bg-brand-600 disabled:opacity-40"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:h-auto sm:w-auto sm:px-2.5"
             @click="addLog"
           >
             <LifeIcon name="check" class="h-3.5 w-3.5" />
@@ -552,7 +552,7 @@ function drop() {
             v-model="dropReason"
             type="text"
             placeholder="为什么不做了"
-            class="min-w-0 flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm outline-none dark:border-rose-500/40 dark:bg-slate-900"
+            class="min-w-0 flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-base sm:text-sm outline-none dark:border-rose-500/40 dark:bg-slate-900"
           />
           <button
             data-alt="drop-confirm-btn"

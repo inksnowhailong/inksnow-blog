@@ -143,7 +143,7 @@ async function confirm() {
         data-alt="chat-input"
         type="text"
         placeholder="今天主线写了 40 分钟"
-        class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:py-2 sm:text-sm"
         @keydown.enter.prevent="send"
       />
       <button
@@ -152,7 +152,7 @@ async function confirm() {
         :disabled="busy || !input.trim()"
         title="发送"
         aria-label="发送"
-        class="grid shrink-0 place-items-center rounded-lg bg-brand-500 px-3 text-white transition hover:bg-brand-600 disabled:opacity-40"
+        class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:h-auto sm:w-auto sm:px-3"
         @click="send"
       >
         <LifeIcon

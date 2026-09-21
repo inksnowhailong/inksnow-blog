@@ -319,7 +319,7 @@ watch(
             type="text"
             :maxlength="LOG_MAX"
             placeholder="这次试了什么，发现了什么"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
             @keydown.enter.prevent="addLog"
           />
           <button
@@ -328,7 +328,7 @@ watch(
             :disabled="busy || !logDraft.trim()"
             title="记下这一条"
             aria-label="记下这一条"
-            class="grid shrink-0 place-items-center rounded-lg bg-brand-500 px-2.5 text-white transition hover:bg-brand-600 disabled:opacity-40"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:h-auto sm:w-auto sm:px-2.5"
             @click="addLog"
           >
             <LifeIcon name="check" class="h-3.5 w-3.5" />
@@ -387,7 +387,7 @@ watch(
           :data-alt="'idea-note-' + row.k"
           type="text"
           :placeholder="row.p"
-          class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
         />
         <p class="text-[11px] text-slate-400">
           结论是「不成」同样算完成——一次记录在案的失败比一次没记录的成功值钱
