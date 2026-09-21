@@ -6,3 +6,8 @@ node_modules
 docs/.vuepress/dist
 docs/.vuepress/.cache
 docs/.vuepress/.temp
+
+# OMC 运行时状态不进版本控制；项目级 skill 是唯一例外
+# 用 /.omc/* 而非 /.omc/ ，否则 git 不会下探目录，下面的排除规则失效
+/.omc/*
+!/.omc/skills/
