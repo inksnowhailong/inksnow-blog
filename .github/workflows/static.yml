@@ -103,10 +103,15 @@ jobs:
             nginx -t && systemctl reload nginx
           EOF
 
-          # 部署后自检：页面回得来、应用清单也在
-          for path in "/inksnow-blog/life/" "/inksnow-blog/manifest.webmanifest"; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://inksnowhl.cn$path")
-            echo "$path -> $code"
-            [ "$code" = "200" ] || exit 1
-          done
+          # 部署后自检。不能用状态码判断：nginx 配了找不到就回首页的兜底，
+          # 任何路径都是 200，靠状态码的检查永远通过、等于没检查。
+          # 改为取本次构建才有的那个带 hash 的入口 js——它存在，才证明
+          # 这一版真的落到服务器上了；没传成功就会被兜底成 text/html。
+          MAIN_JS=$(basename $(ls ./docs/.vuepress/dist/assets/app-*.js | head -1))
+          CT=$(curl -s -o /dev/null -w "%{content_type}" --max-time 20             "https://inksnowhl.cn/inksnow-blog/assets/$MAIN_JS")
+          echo "assets/$MAIN_JS -> $CT"
+          case "$CT" in
+            *javascript*) echo "本次构建已生效" ;;
+            *) echo "服务器上没有这一版的 $MAIN_JS，同步没成功"; exit 1 ;;
+          esac
 
