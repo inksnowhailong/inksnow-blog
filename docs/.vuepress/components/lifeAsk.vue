@@ -5,7 +5,7 @@
  * 带上这个东西是什么，然后用人话说你想干嘛。
  * 桌面端锚在点击处，窄屏退化成底部抽屉——锚定在手机上必然溢出。
  */
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeDraftDetail from './lifeDraftDetail.vue';
 
@@ -41,6 +41,17 @@ const emit = defineEmits<{
 const text = ref('');
 const box = ref<HTMLElement | null>(null);
 
+/**
+ * 挂载后才渲染 Teleport
+ * @description 服务端没有 document.body，Teleport 在预渲染阶段留下的占位
+ * 与客户端对不上，hydration 失配会让整棵子树渲染失败——表现为整页全白。
+ * 开发服务器上看不出来，必须用生产构建验证
+ */
+const mounted = ref(false);
+onMounted(() => {
+  mounted.value = true;
+});
+
 /** 浮层宽度，定位时要用它算左边界 */
 const WIDTH = 288;
 
@@ -74,7 +85,7 @@ function send() {
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport v-if="mounted" to="body">
     <div
       v-if="anchor"
       data-alt="ask-mask"
