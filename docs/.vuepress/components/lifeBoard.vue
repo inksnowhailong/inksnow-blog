@@ -357,10 +357,10 @@ function heatClass(cell: any): string {
   }
   const base = cell.fullScore || 10;
   const ratio = cell.score / base;
-  if (ratio >= 1) return 'bg-teal-700 dark:bg-teal-400';
-  if (ratio >= 0.6) return 'bg-teal-600/75 dark:bg-teal-400/75';
-  if (ratio >= 0.3) return 'bg-teal-600/50 dark:bg-teal-400/50';
-  return 'bg-teal-600/25 dark:bg-teal-400/30';
+  if (ratio >= 1) return 'bg-brand-500 dark:bg-brand-300';
+  if (ratio >= 0.6) return 'bg-brand-500/75 dark:bg-brand-300/75';
+  if (ratio >= 0.3) return 'bg-brand-500/50 dark:bg-brand-300/50';
+  return 'bg-brand-500/25 dark:bg-brand-300/30';
 }
 
 /** 鼠标悬停时的说明文本 */
@@ -380,6 +380,33 @@ const streak = computed(() => {
   }
   const active = days.filter((d: any) => d.score > 0).length;
   return { current, active, total: days.length };
+});
+
+/**
+ * 各每日项在近九周工作日里的坚持率
+ * @description 热力图看的是整体链条，这张看的是哪一项最常断——
+ * 四项加起来才是当日满分，某一项长期垫底就是它在拖分
+ */
+const persistence = computed(() => {
+  const items = diagnosis.value?.today?.items ?? [];
+  const workdays = heat.value.filter((d: any) => d.workday);
+  if (!items.length || !workdays.length) return [];
+  return items
+    .map((it: any) => {
+      const hit = workdays.filter((d: any) =>
+        (d.reached ?? []).includes(it.nodeId),
+      ).length;
+      return {
+        id: it.nodeId,
+        title: it.title,
+        points: it.points,
+        isMainline: it.isMainline,
+        hit,
+        total: workdays.length,
+        ratio: workdays.length ? hit / workdays.length : 0,
+      };
+    })
+    .sort((a: any, b: any) => b.ratio - a.ratio);
 });
 
 /** 展开或收起一个清单组 */
@@ -461,12 +488,12 @@ onMounted(() => {
         v-model="key"
         type="password"
         placeholder="访问密钥"
-        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-teal-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         @keyup.enter="loadAll"
       />
       <button
         data-alt="unlock-button"
-        class="mt-3 w-full cursor-pointer rounded-lg border-0 bg-teal-700 px-4 py-2 font-medium text-white disabled:opacity-50"
+        class="mt-3 w-full cursor-pointer rounded-lg border-0 bg-brand-500 px-4 py-2 font-medium text-white disabled:opacity-50"
         :disabled="loading || !key"
         @click="loadAll"
       >{{ loading ? '加载中…' : '进入' }}</button>
@@ -512,7 +539,7 @@ onMounted(() => {
           <div class="flex items-baseline gap-2">
             <span
               data-alt="day-score"
-              class="font-mono text-3xl font-semibold tabular-nums text-teal-700 dark:text-teal-400"
+              class="font-mono text-3xl font-semibold tabular-nums text-brand-600 dark:text-brand-300"
             >{{ activeDay.score }}</span>
             <span class="font-mono text-sm text-slate-400">/ {{ activeDay.fullScore || 10 }} 分</span>
             <span
@@ -530,7 +557,7 @@ onMounted(() => {
         </div>
         <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
           <div
-            class="h-full rounded-full bg-teal-700 transition-all dark:bg-teal-400"
+            class="h-full rounded-full bg-brand-500 transition-all dark:bg-brand-300"
             :style="{ width: dayRatio * 100 + '%' }"
           ></div>
         </div>
@@ -543,27 +570,27 @@ onMounted(() => {
             class="rounded-lg border p-3"
             :class="
               item.reached
-                ? 'border-teal-600 bg-teal-50 dark:border-teal-500 dark:bg-teal-900/20'
+                ? 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30'
                 : 'border-slate-200 dark:border-slate-600'
             "
           >
             <div class="flex items-baseline justify-between gap-2">
               <span class="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
                 {{ item.title }}
-                <span v-if="item.isMainline" class="text-[10px] text-teal-700 dark:text-teal-400">主线</span>
+                <span v-if="item.isMainline" class="text-[10px] text-brand-600 dark:text-brand-300">主线</span>
               </span>
               <span class="flex-none font-mono text-xs tabular-nums text-slate-500">
                 {{ item.minutes }}/{{ item.thresholdMinutes }}′
               </span>
             </div>
             <div class="mt-2 flex items-center gap-2">
-              <span v-if="item.reached" class="text-xs text-teal-700 dark:text-teal-400">
+              <span v-if="item.reached" class="text-xs text-brand-600 dark:text-brand-300">
                 已达标 +{{ item.points }}
               </span>
               <button
                 v-else
                 data-alt="punch-full"
-                class="cursor-pointer rounded border-0 bg-teal-700 px-2.5 py-1 text-xs text-white disabled:opacity-50"
+                class="cursor-pointer rounded border-0 bg-brand-500 px-2.5 py-1 text-xs text-white disabled:opacity-50"
                 :disabled="busy"
                 @click="punch(item.nodeId, item.thresholdMinutes - item.minutes)"
               >记满 +{{ item.points }}</button>
@@ -586,10 +613,11 @@ onMounted(() => {
         >这天状态差，走最小日（不计欠债）</button>
       </section>
 
-      <!-- 连续性热力图 -->
+      <!-- 连续性热力图与坚持率 -->
+      <div class="grid gap-3 lg:grid-cols-5">
       <section
         data-alt="heatmap"
-        class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+        class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800"
       >
         <div class="mb-2 flex items-baseline justify-between gap-2">
           <span class="text-[11px] uppercase tracking-wider text-slate-400">近九周</span>
@@ -597,26 +625,26 @@ onMounted(() => {
             连续 {{ streak.current }} 天 · 工作日覆盖 {{ streak.active }}/{{ streak.total }}
           </span>
         </div>
-        <div class="flex gap-1 overflow-x-auto pb-1">
-          <div class="mr-0.5 grid flex-none gap-1 pt-0" style="grid-template-rows: repeat(7, 1fr)">
+        <div class="flex gap-1.5 overflow-x-auto pb-1">
+          <div class="mr-1 grid flex-none gap-1.5" style="grid-template-rows: repeat(7, 1fr)">
             <span
               v-for="(w, i) in ['一', '', '三', '', '五', '', '日']"
               :key="i"
-              class="flex h-3 items-center text-[9px] leading-none text-slate-400"
+              class="flex h-5 items-center text-[10px] leading-none text-slate-400"
             >{{ w }}</span>
           </div>
           <div
             v-for="(col, ci) in heatColumns"
             :key="ci"
             data-alt="heat-column"
-            class="grid flex-none gap-1"
+            class="grid flex-none gap-1.5"
             style="grid-template-rows: repeat(7, 1fr)"
           >
             <button
               v-for="(cell, ri) in col"
               :key="ri"
               data-alt="heat-cell"
-              class="h-3 w-3 rounded-sm border-0 p-0"
+              class="h-5 w-5 rounded border-0 p-0"
               :class="[heatClass(cell), cell ? 'cursor-pointer' : 'cursor-default']"
               :title="heatTitle(cell)"
               :disabled="!cell"
@@ -628,6 +656,38 @@ onMounted(() => {
           颜色越深当天得分越高，虚线格是周末（不排计划）。点任意一格可跳到那天补记。
         </p>
       </section>
+
+      <section
+        data-alt="persistence"
+        class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800"
+      >
+        <div class="mb-3 text-[11px] uppercase tracking-wider text-slate-400">各项坚持率</div>
+        <div v-if="persistence.length" class="grid gap-3">
+          <div v-for="p in persistence" :key="p.id" data-alt="persistence-row">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300">
+                {{ p.title }}
+                <span v-if="p.isMainline" class="text-[10px] text-brand-600 dark:text-brand-300">主线</span>
+              </span>
+              <span class="flex-none font-mono text-[11px] tabular-nums text-slate-400">
+                {{ p.hit }}/{{ p.total }}
+              </span>
+            </div>
+            <div class="mt-1 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+              <div
+                class="h-full rounded-full transition-all"
+                :class="p.isMainline ? 'bg-brand-600 dark:bg-brand-300' : 'bg-brand-400 dark:bg-brand-500'"
+                :style="{ width: p.ratio * 100 + '%' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <p v-else class="m-0 py-6 text-center text-xs text-slate-400">还没有记录</p>
+        <p class="m-0 mt-3 text-[11px] leading-relaxed text-slate-400">
+          近九周工作日里各项各自达标了多少天。哪条最短，就是哪个习惯在拖当日分数。
+        </p>
+      </section>
+      </div>
 
       <!-- 本周与账本 -->
       <section data-alt="week-ledger" class="grid gap-3 sm:grid-cols-2">
@@ -697,10 +757,11 @@ onMounted(() => {
           >
             <button
               data-alt="quick-check"
-              class="mt-0.5 flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
+              class="mt-1 h-4 w-4 flex-none cursor-pointer rounded-full border-2 border-slate-300 bg-transparent p-0 transition-colors hover:border-brand-500 hover:bg-brand-50 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-brand-900/30"
               :disabled="busy"
+              title="勾掉：能不看资料讲清楚且验证过一次"
               @click="checkItem(n.id)"
-            >勾掉</button>
+            ></button>
             <div class="min-w-0 flex-1">
               <div class="flex items-baseline gap-2">
                 <span class="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">{{ n.title }}</span>
@@ -774,7 +835,7 @@ onMounted(() => {
           </button>
           <div class="mt-2 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
             <div
-              class="h-full rounded-full bg-teal-700 dark:bg-teal-400"
+              class="h-full rounded-full bg-brand-500 dark:bg-brand-300"
               :style="{ width: (g.required ? (g.requiredDone / g.required) * 100 : 0) + '%' }"
             ></div>
           </div>
@@ -790,20 +851,22 @@ onMounted(() => {
               class="flex items-start gap-2 rounded-lg border p-2"
               :class="
                 item.status === 'DONE'
-                  ? 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-900/20'
+                  ? 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/30'
                   : 'border-slate-100 dark:border-slate-700'
               "
             >
               <button
                 v-if="item.status !== 'DONE'"
                 data-alt="item-check"
-                class="mt-0.5 flex-none cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-0.5 text-[11px] text-slate-500 disabled:opacity-50 dark:border-slate-600"
+                class="mt-1 h-4 w-4 flex-none cursor-pointer rounded-full border-2 border-slate-300 bg-transparent p-0 transition-colors hover:border-brand-500 hover:bg-brand-50 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-brand-900/30"
                 :disabled="busy"
+                title="勾掉：能不看资料讲清楚且验证过一次"
                 @click="checkItem(item.id)"
-              >勾掉</button>
+              ></button>
               <span
                 v-else
-                class="mt-0.5 flex-none px-1 text-[11px] text-teal-700 dark:text-teal-400"
+                data-alt="item-done"
+                class="mt-1 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-brand-500 text-[10px] leading-none text-white"
               >✓</span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-baseline gap-2">
@@ -901,16 +964,16 @@ onMounted(() => {
         <div
           v-if="pending"
           data-alt="pending-card"
-          class="mb-2 rounded-xl border border-teal-600 bg-white p-3 dark:bg-slate-800"
+          class="mb-2 rounded-xl border border-brand-500 bg-white p-3 dark:bg-slate-800"
         >
-          <div class="mb-2 text-xs text-teal-700 dark:text-teal-400">确认这一条吗</div>
+          <div class="mb-2 text-xs text-brand-600 dark:text-brand-300">确认这一条吗</div>
           <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-700 dark:text-slate-200">
             {{ pendingText }}
           </div>
           <div class="mt-2 flex gap-2">
             <button
               data-alt="confirm-button"
-              class="cursor-pointer rounded-lg border-0 bg-teal-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              class="cursor-pointer rounded-lg border-0 bg-brand-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
               :disabled="busy"
               @click="confirmPending"
             >确认</button>
@@ -935,12 +998,12 @@ onMounted(() => {
             v-model="chatInput"
             type="text"
             placeholder="说一句：昨天英文读了20分钟 / A1搞定了 / 我这周怎么样"
-            class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-teal-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             @keyup.enter="send"
           />
           <button
             data-alt="send-button"
-            class="flex-none cursor-pointer rounded-lg border-0 bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            class="flex-none cursor-pointer rounded-lg border-0 bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             :disabled="busy || !chatInput"
             @click="send"
           >{{ busy ? '…' : '说' }}</button>
