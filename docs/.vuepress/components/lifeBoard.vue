@@ -1,18 +1,26 @@
 <script setup lang="ts">
 /**
  * 一年计划面板
- * @description 按《一年计划·操作手册》的标尺呈现。
- * 日期可前后切换，用于补记前几天；热力图直接呈现"链条是否连续"，
- * 这是手册里比进度更要紧的东西。
+ * @description 按《一年计划·操作手册》的标尺呈现，分工是：
+ * 打卡区管每天重复的四项，路线图管一次性的清单进度，两者不重叠。
+ * 单位只认「分」这一种主货币，元与体能债都是它的换算面。
  */
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import LifePlanTree from './lifePlanTree.vue';
+import LifeNodeModal from './lifeNodeModal.vue';
+import LifeChat from './lifeChat.vue';
+import LifeIcon from './lifeIcon.vue';
+import LifeAsk from './lifeAsk.vue';
+import LifeChanges from './lifeChanges.vue';
+import { describeDraft, applyDraft, isDestructive } from './useLifeDraft';
 
 /** 后端地址写成绝对路径，使本地开发与线上走同一条链路 */
 const API = 'https://inksnowhl.cn/api';
-/** 本地保存密钥的键名 */
 const KEY_STORE = 'life-key';
 /** 热力图回看的周数 */
 const HEATMAP_WEEKS = 9;
+/** 打卡的快捷增量，分钟 */
+const QUICK_MINUTES = [15, 30];
 
 const mounted = ref(false);
 const key = ref('');
@@ -26,15 +34,16 @@ const ledger = ref<any>(null);
 const ideas = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
+const changes = ref<any[]>([]);
+
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
 const activeDay = ref<any>(null);
-const tab = ref<'checklist' | 'ideas' | 'stalled'>('checklist');
-const openGroups = ref<Record<string, boolean>>({});
 
-const chatInput = ref('');
-const pending = ref<any>(null);
-const chatReply = ref('');
+/** 弹窗里正在看的节点 */
+const picked = ref<any>(null);
+const pickedPath = ref('');
+const showIdeas = ref(false);
 
 /** 带密钥调用后端 */
 async function api(path: string, init: RequestInit = {}) {
@@ -85,20 +94,25 @@ async function loadAll() {
   try {
     const to = today();
     const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p] = await Promise.all([
+    const [d, l, i, h, p, c] = await Promise.all([
       api('/life/diagnosis'),
       api('/life/ledger'),
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
       api('/life/plan'),
+      api('/life/plan-changes?limit=20'),
     ]);
     diagnosis.value = d;
     ledger.value = l;
     ideas.value = i;
     heat.value = h;
     plan.value = p;
+    changes.value = c;
     if (!activeDate.value) activeDate.value = to;
-    await loadActiveDay();
+    if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
+    await Promise.all([loadActiveDay(), loadMonth()]);
+    // 弹窗开着时同步刷新里面那份，否则改完还显示旧内容
+    if (picked.value) picked.value = findNode(picked.value.id);
     unlocked.value = true;
     try {
       localStorage.setItem(KEY_STORE, key.value);
@@ -116,9 +130,7 @@ async function loadActiveDay() {
     activeDay.value = diagnosis.value.today;
     return;
   }
-  activeDay.value = await api(
-    `/life/settlement/daily?date=${activeDate.value}`,
-  );
+  activeDay.value = await api(`/life/settlement/daily?date=${activeDate.value}`);
 }
 
 /** 切换操作日期，不允许切到未来 */
@@ -133,7 +145,6 @@ async function moveDate(delta: number) {
   }
 }
 
-/** 回到今天 */
 async function backToToday() {
   activeDate.value = today();
   await loadActiveDay();
@@ -169,18 +180,23 @@ async function punch(nodeId: string, minutes: number) {
   }
 }
 
-/** 声明选中日期为最小日 */
-async function declareMinimal() {
-  if (busy.value) return;
+/** 一键补到刚好达标，省得自己算还差几分钟 */
+function punchToThreshold(item: any) {
+  punch(item.nodeId, Math.max(0, item.thresholdMinutes - item.minutes));
+}
+
+/**
+ * 记一笔账本动作
+ * @param kind REPAY 还债 / EXERCISE 存运动储备
+ * @param amount 单位数
+ */
+async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
+  if (busy.value || amount <= 0) return;
   busy.value = true;
   try {
     await api('/life/events', {
       method: 'POST',
-      body: JSON.stringify({
-        kind: 'MINIMAL_DAY',
-        occurredOn: activeDate.value,
-        note: '状态差，走最小日',
-      }),
+      body: JSON.stringify({ kind, amount, occurredOn: today() }),
     });
     await loadAll();
   } catch (e: any) {
@@ -190,83 +206,171 @@ async function declareMinimal() {
   }
 }
 
-/** 勾掉一个清单项 */
-async function checkItem(id: string) {
+/** 当日进度占免债线的比例，用于画进度条 */
+const debtFreeProgress = computed(() => {
+  const d = activeDay.value;
+  if (!d?.debtFreeScore) return 0;
+  return Math.min(100, (d.score / d.debtFreeScore) * 100);
+});
+
+/**
+ * 体能债的一句说明
+ * @description 字段来自后端下发的规则。后端升级与页面刷新之间存在时间差，
+ * 那一小段时间里字段会缺，必须兜底，否则界面上会出现 undefined
+ */
+const debtUnitText = computed(() => {
+  const r = diagnosis.value?.rules;
+  if (!r?.debtUnit) return '';
+  return `目标${r.fitnessGoal ?? ''} · 1 个 ≈ ${r.debtUnit}`;
+});
+
+/** 当月真正动过的天数 */
+const monthActiveDays = computed(
+  () => monthHeat.value.filter((d: any) => d.score > 0).length,
+);
+
+/** 超出阈值的投入，只记录不加分 */
+const overMinutes = computed(() => {
+  const items = activeDay.value?.items ?? [];
+  return items.reduce(
+    (sum: number, i: any) => sum + Math.max(0, i.minutes - i.thresholdMinutes),
+    0,
+  );
+});
+
+/**
+ * 就地问 AI 的浮层状态
+ * @description 全页共用一个浮层：谁唤起它，谁就把自己的上下文塞进来。
+ * 这样"AI 能操作的地方"等于"哪里挂了这个组件"，不必到处铺输入框
+ */
+const ask = ref<{
+  anchor: { x: number; y: number } | null;
+  title: string;
+  context: string;
+  placeholder: string;
+  directLabel: string;
+  /** 点「直接记下」时执行什么 */
+  direct: (() => Promise<void>) | null;
+  /** 交给模型前，在用户原话前面补的一句背景 */
+  prefix: string;
+}>({
+  anchor: null,
+  title: '',
+  context: '',
+  placeholder: '',
+  directLabel: '',
+  direct: null,
+  prefix: '',
+});
+const askReply = ref('');
+const askPending = ref<any>(null);
+
+/** 从点击事件里取锚点坐标 */
+function anchorOf(e: MouseEvent) {
+  const el = e.currentTarget as HTMLElement;
+  const r = el.getBoundingClientRect();
+  return { x: r.left, y: r.bottom };
+}
+
+function closeAsk() {
+  ask.value = { ...ask.value, anchor: null, direct: null };
+  askReply.value = '';
+  askPending.value = null;
+}
+
+/**
+ * 把浮层里的话交给模型
+ * @description 前面补一句背景，模型才知道这句话是在说哪件事——
+ * 它没有对话历史，全靠这一次把上下文说全。
+ * 拿回来只出草稿不落库，与对话栏同一套规矩：模型永远不直接改数据。
+ */
+async function askSend(text: string) {
   if (busy.value) return;
   busy.value = true;
-  try {
-    await api(`/life/plan/${id}/check`, { method: 'POST' });
-    await loadAll();
-  } catch (e: any) {
-    errorMsg.value = e.message;
-  } finally {
-    busy.value = false;
-  }
-}
-
-/** 直接记一个想法，不经模型 */
-async function captureIdea(content: string) {
-  if (busy.value || !content.trim()) return;
-  busy.value = true;
-  try {
-    await api('/life/ideas', {
-      method: 'POST',
-      body: JSON.stringify({ content }),
-    });
-    chatInput.value = '';
-    await loadAll();
-  } catch (e: any) {
-    errorMsg.value = e.message;
-  } finally {
-    busy.value = false;
-  }
-}
-
-/** 把一句话交给后端解析，只拿草稿不落库 */
-async function send() {
-  const text = chatInput.value.trim();
-  if (!text || busy.value) return;
-  busy.value = true;
-  chatReply.value = '';
-  pending.value = null;
+  askReply.value = '';
+  askPending.value = null;
   try {
     const res = await api('/life/chat', {
       method: 'POST',
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: ask.value.prefix + text }),
     });
-    if (res.kind === 'answer') chatReply.value = res.text;
-    else pending.value = res;
-    chatInput.value = '';
+    if (res.kind === 'answer') askReply.value = res.text;
+    else askPending.value = res;
   } catch (e: any) {
-    errorMsg.value =
-      e.message === '密钥无效' ? e.message : 'AI 暂时不可用：' + e.message;
+    askReply.value = 'AI 暂时不可用：' + e.message;
   } finally {
     busy.value = false;
   }
 }
 
-/** 确认后才真正写入 */
-async function confirmPending() {
-  if (!pending.value || busy.value) return;
+/** 浮层里点头之后才写入 */
+async function askConfirm() {
+  const p = askPending.value;
+  if (!p || busy.value) return;
   busy.value = true;
   try {
-    const p = pending.value;
-    if (p.kind === 'record') {
-      for (const item of p.items) {
-        await api('/life/events', {
-          method: 'POST',
-          body: JSON.stringify(item),
-        });
-      }
-    } else if (p.kind === 'check') {
-      await api(`/life/plan/${p.nodeId}/check`, { method: 'POST' });
-    } else if (p.kind === 'idea') {
-      await api('/life/ideas', {
-        method: 'POST',
-        body: JSON.stringify({ content: p.content }),
-      });
-    }
-    pending.value = null;
+    await applyDraft(p, api);
+    askPending.value = null;
+    askReply.value = '已记下';
+    await loadAll();
+  } catch (e: any) {
+    askReply.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** 草稿的一句话描述，交给浮层展示 */
+const askPendingText = computed(() =>
+  askPending.value ? describeDraft(askPending.value, nodeTitleOf) : '',
+);
+
+/** 点浮层里的「直接记下」 */
+async function askDirect() {
+  const fn = ask.value.direct;
+  if (!fn || busy.value) return;
+  await fn();
+  closeAsk();
+}
+
+/** 点某一个体能债方块 */
+function openDebtAsk(e: MouseEvent, index: number) {
+  ask.value = {
+    anchor: anchorOf(e),
+    title: `还掉第 ${index + 1} 个体能债`,
+    context: debtUnitText.value,
+    placeholder: '我刚做了 10 个俯卧撑',
+    directLabel: '直接记为已还 1 个',
+    direct: () => ledgerAction('REPAY', 1),
+    prefix: '关于还体能债：',
+  };
+  askReply.value = '';
+  askPending.value = null;
+}
+
+/** 点运动储备的空位，存一个 */
+function openBankAsk(e: MouseEvent) {
+  ask.value = {
+    anchor: anchorOf(e),
+    title: '存 1 个运动储备',
+    context: '提前锻炼存起来，以后产生欠债自动抵扣',
+    placeholder: '刚做了 20 个深蹲',
+    directLabel: '直接记为存 1 个',
+    direct: () => ledgerAction('EXERCISE', 1),
+    prefix: '关于主动锻炼存运动储备：',
+  };
+  askReply.value = '';
+  askPending.value = null;
+}
+
+/** 清掉某项某天的记录，不经模型 */
+async function clearDay(nodeId: string) {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    await api(`/life/plan/${nodeId}/records?date=${activeDate.value}`, {
+      method: 'DELETE',
+    });
     await loadAll();
   } catch (e: any) {
     errorMsg.value = e.message;
@@ -275,73 +379,132 @@ async function confirmPending() {
   }
 }
 
-/** 待确认草稿的一句话描述 */
-const pendingText = computed(() => {
-  const p = pending.value;
-  if (!p) return '';
-  if (p.kind === 'check') return `勾掉「${p.title}」`;
-  if (p.kind === 'idea') return `记下想法：${p.content}`;
-  if (p.kind === 'note') return `写下研究笔记：${p.note.question}`;
-  return p.items
-    .map((i: any) => {
-      if (i.kind === 'MINIMAL_DAY') return '声明最小日';
-      if (i.kind === 'MISS') return '记一条未完成';
-      if (i.kind === 'EXERCISE') return `主动锻炼 ${i.amount} 单位`;
-      if (i.kind === 'REPAY') return `还债 ${i.amount} 单位`;
-      if (i.kind === 'SPEND') return `花掉 ${i.amount} 元`;
-      return `${nodeTitleOf(i.nodeId)} +${i.minutes} 分钟（${i.occurredOn}）`;
-    })
-    .join('；');
-});
-
-/** 按ID找每日项标题 */
-function nodeTitleOf(id: string): string {
-  const hit = diagnosis.value?.today?.items?.find((i: any) => i.nodeId === id);
-  return hit?.title ?? '未归类';
+/**
+ * 点每日项，用说话的方式补记
+ * @description 前缀只说是哪一项哪一天，不报已投入多少分钟——
+ * 实测把分钟数写进上下文会把模型带偏，它会照着那个数再记一笔
+ */
+function openDailyAsk(e: MouseEvent, item: any) {
+  ask.value = {
+    anchor: anchorOf(e),
+    title: item.title,
+    context: `${item.minutes}/${item.thresholdMinutes} 分钟 · 达标得 ${item.points} 分`,
+    placeholder: '刚又做了半小时',
+    directLabel: '',
+    direct: null,
+    prefix: `关于「${item.title}」这一项，日期 ${activeDate.value}：`,
+  };
+  askReply.value = '';
+  askPending.value = null;
 }
 
-/** 选中日期的得分占满分比例 */
-const dayRatio = computed(() => {
-  const d = activeDay.value;
-  if (!d || !d.fullScore) return 0;
-  return Math.min(1, d.score / d.fullScore);
-});
+/** 在计划树里按ID找节点，弹窗刷新后要用 */
+function findNode(id: string): any {
+  const walk = (nodes: any[]): any => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      const hit = walk(n.children ?? []);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(plan.value);
+}
 
-/** 选中日期是否为今天 */
+/** 按ID找每日项标题，交给对话栏把草稿说成人话 */
+function nodeTitleOf(id: string): string {
+  const hit = diagnosis.value?.today?.items?.find((i: any) => i.nodeId === id);
+  return hit?.title ?? findNode(id)?.title ?? '未归类';
+}
+
+function openNode(node: any, path: string) {
+  picked.value = node;
+  pickedPath.value = path;
+}
+
 const isToday = computed(() => activeDate.value === today());
 
-/** 选中日期的显示文本 */
+/**
+ * 与昨天的差额
+ * @description 《人生十二法则》规则四的落地：唯一该比的对象是昨天的自己。
+ * 昨天没记录时返回 null，不拿 0 分当基准去制造虚假的进步
+ */
+const vsYesterday = computed(() => {
+  if (!activeDay.value) return null;
+  const prev = heat.value.find(
+    (d: any) => d.date === shiftDays(activeDate.value, -1),
+  );
+  if (!prev) return null;
+  return activeDay.value.score - prev.score;
+});
+
 const dateLabel = computed(() => {
   if (!activeDate.value) return '';
   const [, m, d] = activeDate.value.split('-');
   return `${Number(m)}/${Number(d)} 周${WEEK_LABELS[weekdayOf(activeDate.value)]}`;
 });
 
-/**
- * 热力图的列，每列一周，从周一排到周日
- * @description 补齐首尾使每列都是完整的一周，空位用 null 占位
- */
-const heatColumns = computed(() => {
-  if (!heat.value.length) return [];
-  const byDate = new Map(heat.value.map((d: any) => [d.date, d]));
-  const first = heat.value[0].date;
-  // 回退到该周周一，使每一列都从周一开始
-  const startOffset = (weekdayOf(first) + 6) % 7;
-  const start = shiftDays(first, -startOffset);
-  const columns: any[][] = [];
-  const last = heat.value[heat.value.length - 1].date;
+/** 日历表头，周一起排 */
+const WEEK_HEAD = ['一', '二', '三', '四', '五', '六', '日'];
 
-  let cursor = start;
-  while (cursor <= last) {
-    const week: any[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = shiftDays(cursor, i);
-      week.push(date > last || date < first ? null : (byDate.get(date) ?? null));
-    }
-    columns.push(week);
-    cursor = shiftDays(cursor, 7);
+/** 正在查看的月份 YYYY-MM */
+const heatMonth = ref('');
+/** 该月的逐日结算 */
+const monthHeat = ref<any[]>([]);
+
+/** 取某月的逐日结算，切月份时调用 */
+async function loadMonth() {
+  const [y, m] = heatMonth.value.split('-').map(Number);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  monthHeat.value = await api(
+    `/life/settlement/range?from=${heatMonth.value}-01&to=${heatMonth.value}-${days}`,
+  );
+}
+
+/** 切月份，不允许翻到未来 */
+async function moveMonth(delta: number) {
+  const [y, m] = heatMonth.value.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  const next = d.toISOString().slice(0, 7);
+  if (next > today().slice(0, 7)) return;
+  heatMonth.value = next;
+  try {
+    await loadMonth();
+  } catch (e: any) {
+    errorMsg.value = e.message;
   }
-  return columns;
+}
+
+/** 已经看到最新的一个月 */
+const atLatestMonth = computed(
+  () => heatMonth.value >= today().slice(0, 7),
+);
+
+const monthLabel = computed(() => {
+  if (!heatMonth.value) return '';
+  const [y, m] = heatMonth.value.split('-').map(Number);
+  // 跨年时才带上年份，平时只写月份
+  return y === Number(today().slice(0, 4)) ? `${m} 月` : `${y} 年 ${m} 月`;
+});
+
+/**
+ * 当月日历的格子
+ * @description 周一起排，月初补空位使星期列对齐。
+ * 三态：有记录的日子、该日无记录、只是为对齐补的空位
+ */
+const monthCells = computed(() => {
+  if (!heatMonth.value) return [];
+  const [y, m] = heatMonth.value.split('-').map(Number);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (weekdayOf(`${heatMonth.value}-01`) + 6) % 7;
+  const byDate = new Map(monthHeat.value.map((d: any) => [d.date, d]));
+
+  const cells: any[] = Array(lead).fill(undefined);
+  for (let d = 1; d <= days; d++) {
+    const date = `${heatMonth.value}-${String(d).padStart(2, '0')}`;
+    cells.push(byDate.get(date) ?? null);
+  }
+  return cells;
 });
 
 /**
@@ -349,24 +512,24 @@ const heatColumns = computed(() => {
  * @description 分四档深浅；周末无义务，做了才着色，没做显示为空底
  */
 function heatClass(cell: any): string {
+  // undefined 表示该月没有这一天，整格不画；null 表示这天不在统计范围内
+  if (cell === undefined) return 'invisible';
   if (!cell) return 'bg-transparent';
   if (cell.score <= 0) {
     return cell.workday
       ? 'bg-slate-100 dark:bg-slate-700'
       : 'bg-transparent border border-dashed border-slate-200 dark:border-slate-700';
   }
-  const base = cell.fullScore || 10;
-  const ratio = cell.score / base;
+  const ratio = cell.score / (cell.fullScore || 10);
   if (ratio >= 1) return 'bg-brand-500 dark:bg-brand-300';
   if (ratio >= 0.6) return 'bg-brand-500/75 dark:bg-brand-300/75';
   if (ratio >= 0.3) return 'bg-brand-500/50 dark:bg-brand-300/50';
   return 'bg-brand-500/25 dark:bg-brand-300/30';
 }
 
-/** 鼠标悬停时的说明文本 */
 function heatTitle(cell: any): string {
   if (!cell) return '';
-  const tag = cell.minimalDay ? '（最小日）' : cell.workday ? '' : '（周末）';
+  const tag = cell.workday ? '' : '（周末）';
   return `${cell.date} ${cell.score}/${cell.fullScore || 0} 分${tag}`;
 }
 
@@ -378,84 +541,31 @@ const streak = computed(() => {
     if (days[i].score > 0) current++;
     else break;
   }
-  const active = days.filter((d: any) => d.score > 0).length;
-  return { current, active, total: days.length };
-});
-
-/**
- * 各每日项在近九周工作日里的坚持率
- * @description 热力图看的是整体链条，这张看的是哪一项最常断——
- * 四项加起来才是当日满分，某一项长期垫底就是它在拖分
- */
-const persistence = computed(() => {
-  const items = diagnosis.value?.today?.items ?? [];
-  const workdays = heat.value.filter((d: any) => d.workday);
-  if (!items.length || !workdays.length) return [];
-  return items
-    .map((it: any) => {
-      const hit = workdays.filter((d: any) =>
-        (d.reached ?? []).includes(it.nodeId),
-      ).length;
-      return {
-        id: it.nodeId,
-        title: it.title,
-        points: it.points,
-        isMainline: it.isMainline,
-        hit,
-        total: workdays.length,
-        ratio: workdays.length ? hit / workdays.length : 0,
-      };
-    })
-    .sort((a: any, b: any) => b.ratio - a.ratio);
-});
-
-/** 展开或收起一个清单组 */
-function toggleGroup(id: string) {
-  openGroups.value = { ...openGroups.value, [id]: !openGroups.value[id] };
-}
-
-/**
- * 取某组下的全部清单项
- * @description 从计划树里找，因而带着说明与完成状态；
- * 诊断接口只给接下来两项，不足以支撑展开后的全貌
- */
-function groupItems(groupId: string): any[] {
-  const walk = (nodes: any[]): any => {
-    for (const n of nodes) {
-      if (n.id === groupId) return n;
-      const hit = walk(n.children ?? []);
-      if (hit) return hit;
-    }
-    return null;
+  return {
+    current,
+    active: days.filter((d: any) => d.score > 0).length,
+    total: days.length,
   };
-  const group = walk(plan.value);
-  return (group?.children ?? [])
-    .filter((c: any) => c.level === 'CHECKLIST')
-    .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
-}
-
-/** 组名去掉「A 组 ·」这类编号前缀，只留说得清是什么的部分 */
-function groupShortName(title: string): string {
-  const parts = String(title).split('·');
-  return (parts[1] ?? parts[0]).trim();
-}
-
-/** 清单项说明里剥掉统一的判定标准，那句话在组头说一次即可 */
-function itemBrief(description: string): string {
-  return String(description || '').split('。判定：')[0];
-}
-
-/** 各组接下来该做的一项，平铺到顶层免去逐组展开 */
-const nextUps = computed(() => {
-  const groups = diagnosis.value?.checklist?.groups ?? [];
-  return groups
-    .filter((g: any) => g.nextUp.length)
-    .map((g: any) => ({ group: g.title, ...g.nextUp[0] }));
 });
 
-watch(unlocked, (v) => {
-  if (v && !activeDate.value) activeDate.value = today();
+/**
+ * 想法池分组
+ * @description 后端已按状态分好组返回，这里只做中文标签与空组过滤
+ */
+const ideaGroups = computed(() => {
+  const d = ideas.value ?? {};
+  return [
+    { label: '冷静期', list: d.cooling ?? [] },
+    { label: '在做', list: d.started ?? [] },
+    { label: '已成笔记', list: d.noted ?? [] },
+    { label: '沉了', list: d.sunk ?? [] },
+  ].filter((g) => g.list.length);
 });
+
+/** 想法总条数 */
+const ideaCount = computed(() =>
+  ideaGroups.value.reduce((n, g) => n + g.list.length, 0),
+);
 
 onMounted(() => {
   mounted.value = true;
@@ -471,558 +581,627 @@ onMounted(() => {
 </script>
 
 <template>
-  <div data-alt="life-board" class="my-6">
+  <!--
+    [&_p]:!my-0 是在压主题的 markdown 正文样式：它给内容区每个 p 加了
+    24px 上下边距，而本页的 p 全是界面标签不是段落。标题同理不能用 h1~h6，
+    主题给它们挂了锚点偏移（负 margin + 大 padding），会把文字顶出卡片
+  -->
+  <div data-alt="life-board" class="my-6 [&_p]:!my-0">
     <!-- 密钥入口 -->
-    <div
+    <form
       v-if="mounted && !unlocked"
       data-alt="life-unlock"
-      class="mx-auto max-w-md rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+      class="mx-auto flex max-w-sm flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+      @submit.prevent="loadAll"
     >
-      <p class="m-0 mb-1 text-base font-medium text-slate-800 dark:text-slate-100">
-        一年计划
-      </p>
-      <p class="m-0 mb-4 text-sm text-slate-500 dark:text-slate-400">输入密钥查看</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400">输入密钥查看</p>
       <input
-        id="life-key-input"
-        data-alt="key-input"
         v-model="key"
+        data-alt="key-input"
         type="password"
-        placeholder="访问密钥"
-        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-        @keyup.enter="loadAll"
+        autocomplete="current-password"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
       />
       <button
         data-alt="unlock-button"
-        class="mt-3 w-full cursor-pointer rounded-lg border-0 bg-brand-500 px-4 py-2 font-medium text-white disabled:opacity-50"
+        type="submit"
         :disabled="loading || !key"
-        @click="loadAll"
-      >{{ loading ? '加载中…' : '进入' }}</button>
-      <p v-if="errorMsg" class="mb-0 mt-3 text-sm text-rose-600">{{ errorMsg }}</p>
-    </div>
+        class="rounded-lg bg-brand-500 px-4 py-2 text-sm text-white transition hover:bg-brand-600 disabled:opacity-40"
+      >
+        <span class="flex items-center justify-center gap-1.5">
+          {{ loading ? '加载中…' : '打开' }}
+          <LifeIcon v-if="!loading" name="enter" class="h-4 w-4" />
+        </span>
+      </button>
+      <p v-if="errorMsg" class="text-sm text-rose-600 dark:text-rose-400">
+        {{ errorMsg }}
+      </p>
+    </form>
 
     <!-- 面板主体 -->
-    <div v-else-if="mounted && diagnosis && activeDay" data-alt="life-content" class="grid gap-4">
-      <!-- 日期导航 -->
-      <div data-alt="date-nav" class="flex items-center justify-between gap-2">
-        <button
-          data-alt="prev-day"
-          class="cursor-pointer rounded-lg border border-slate-300 bg-transparent px-3 py-1 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-300"
-          @click="moveDate(-1)"
-        >‹</button>
-        <div class="flex items-baseline gap-2">
-          <span class="font-mono text-sm font-medium text-slate-800 dark:text-slate-100">{{ dateLabel }}</span>
-          <span v-if="!isToday" class="text-[11px] text-amber-600">补记中</span>
-        </div>
-        <div class="flex gap-1">
-          <button
-            data-alt="next-day"
-            class="cursor-pointer rounded-lg border border-slate-300 bg-transparent px-3 py-1 text-sm text-slate-600 disabled:opacity-30 dark:border-slate-600 dark:text-slate-300"
-            :disabled="isToday"
-            @click="moveDate(1)"
-          >›</button>
-          <button
-            v-if="!isToday"
-            data-alt="back-today"
-            class="cursor-pointer rounded-lg border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-500 dark:border-slate-600"
-            @click="backToToday"
-          >今天</button>
-        </div>
-      </div>
-
-      <!-- 当日打卡 -->
+    <div
+      v-else-if="mounted && diagnosis && activeDay"
+      data-alt="life-content"
+      class="grid gap-4"
+    >
+      <!--
+        总览条：四个数字、几句判断、连续性热力图并作一块。
+        数字回答「现在什么状况」，热力图回答「这状况是不是常态」，
+        两者要对着看才有意义，分成两张卡反而割裂
+      -->
       <section
-        data-alt="day-card"
-        class="rounded-xl border bg-white p-4 dark:bg-slate-800"
-        :class="isToday ? 'border-slate-200 dark:border-slate-700' : 'border-amber-300 dark:border-amber-700'"
+        data-alt="overview"
+        class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
       >
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <div class="flex items-baseline gap-2">
-            <span
-              data-alt="day-score"
-              class="font-mono text-3xl font-semibold tabular-nums text-brand-600 dark:text-brand-300"
-            >{{ activeDay.score }}</span>
-            <span class="font-mono text-sm text-slate-400">/ {{ activeDay.fullScore || 10 }} 分</span>
-            <span
-              v-if="activeDay.minimalDay"
-              class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-700"
-            >最小日</span>
-            <span
-              v-else-if="!activeDay.workday"
-              class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-700"
-            >周末不排</span>
-          </div>
-          <span v-if="activeDay.debt > 0" class="font-mono text-xs text-amber-600">
-            欠 {{ activeDay.debt }} 单位
-          </span>
-        </div>
-        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+        <div
+          class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        >
+          <!-- 纵向比较：今天对昨天，本周对要求 -->
           <div
-            class="h-full rounded-full bg-brand-500 transition-all dark:bg-brand-300"
-            :style="{ width: dayRatio * 100 + '%' }"
-          ></div>
-        </div>
-
-        <div data-alt="punch-grid" class="mt-3 grid gap-2 sm:grid-cols-2">
-          <div
-            v-for="item in activeDay.items"
-            :key="item.nodeId"
-            data-alt="punch-item"
-            class="rounded-lg border p-3"
-            :class="
-              item.reached
-                ? 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30'
-                : 'border-slate-200 dark:border-slate-600'
-            "
+            data-alt="kpi-group-self"
+            class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
           >
-            <div class="flex items-baseline justify-between gap-2">
-              <span class="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-                {{ item.title }}
-                <span v-if="item.isMainline" class="text-[10px] text-brand-600 dark:text-brand-300">主线</span>
-              </span>
-              <span class="flex-none font-mono text-xs tabular-nums text-slate-500">
-                {{ item.minutes }}/{{ item.thresholdMinutes }}′
-              </span>
-            </div>
-            <div class="mt-2 flex items-center gap-2">
-              <span v-if="item.reached" class="text-xs text-brand-600 dark:text-brand-300">
-                已达标 +{{ item.points }}
-              </span>
-              <button
-                v-else
-                data-alt="punch-full"
-                class="cursor-pointer rounded border-0 bg-brand-500 px-2.5 py-1 text-xs text-white disabled:opacity-50"
-                :disabled="busy"
-                @click="punch(item.nodeId, item.thresholdMinutes - item.minutes)"
-              >记满 +{{ item.points }}</button>
-              <button
-                data-alt="punch-ten"
-                class="cursor-pointer rounded border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-500 disabled:opacity-50 dark:border-slate-600"
-                :disabled="busy"
-                @click="punch(item.nodeId, 10)"
-              >+10′</button>
-            </div>
-          </div>
-        </div>
+            <p
+              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
+            >
+              战胜内心的批判家：和昨天的自己比，别和今天的别人比
+            </p>
 
-        <button
-          v-if="activeDay.workday && !activeDay.minimalDay"
-          data-alt="minimal-day-button"
-          class="mt-3 cursor-pointer border-0 bg-transparent p-0 text-xs text-slate-400 underline disabled:opacity-50"
-          :disabled="busy"
-          @click="declareMinimal"
-        >这天状态差，走最小日（不计欠债）</button>
-      </section>
-
-      <!-- 连续性热力图与坚持率 -->
-      <div class="grid gap-3 lg:grid-cols-5">
-      <section
-        data-alt="heatmap"
-        class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-3 dark:border-slate-700 dark:bg-slate-800"
-      >
-        <div class="mb-2 flex items-baseline justify-between gap-2">
-          <span class="text-[11px] uppercase tracking-wider text-slate-400">近九周</span>
-          <span class="font-mono text-xs text-slate-500">
-            连续 {{ streak.current }} 天 · 工作日覆盖 {{ streak.active }}/{{ streak.total }}
-          </span>
-        </div>
-        <div class="flex gap-1.5 overflow-x-auto pb-1">
-          <div class="mr-1 grid flex-none gap-1.5" style="grid-template-rows: repeat(7, 1fr)">
-            <span
-              v-for="(w, i) in ['一', '', '三', '', '五', '', '日']"
-              :key="i"
-              class="flex h-5 items-center text-[10px] leading-none text-slate-400"
-            >{{ w }}</span>
-          </div>
-          <div
-            v-for="(col, ci) in heatColumns"
-            :key="ci"
-            data-alt="heat-column"
-            class="grid flex-none gap-1.5"
-            style="grid-template-rows: repeat(7, 1fr)"
-          >
-            <button
-              v-for="(cell, ri) in col"
-              :key="ri"
-              data-alt="heat-cell"
-              class="h-5 w-5 rounded border-0 p-0"
-              :class="[heatClass(cell), cell ? 'cursor-pointer' : 'cursor-default']"
-              :title="heatTitle(cell)"
-              :disabled="!cell"
-              @click="cell && ((activeDate = cell.date), loadActiveDay())"
-            ></button>
-          </div>
-        </div>
-        <p class="m-0 mt-2 text-[11px] leading-relaxed text-slate-400">
-          颜色越深当天得分越高，虚线格是周末（不排计划）。点任意一格可跳到那天补记。
-        </p>
-      </section>
-
-      <section
-        data-alt="persistence"
-        class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800"
-      >
-        <div class="mb-3 text-[11px] uppercase tracking-wider text-slate-400">各项坚持率</div>
-        <div v-if="persistence.length" class="grid gap-3">
-          <div v-for="p in persistence" :key="p.id" data-alt="persistence-row">
-            <div class="flex items-baseline justify-between gap-2">
-              <span class="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300">
-                {{ p.title }}
-                <span v-if="p.isMainline" class="text-[10px] text-brand-600 dark:text-brand-300">主线</span>
-              </span>
-              <span class="flex-none font-mono text-[11px] tabular-nums text-slate-400">
-                {{ p.hit }}/{{ p.total }}
-              </span>
-            </div>
-            <div class="mt-1 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-              <div
-                class="h-full rounded-full transition-all"
-                :class="p.isMainline ? 'bg-brand-600 dark:bg-brand-300' : 'bg-brand-400 dark:bg-brand-500'"
-                :style="{ width: p.ratio * 100 + '%' }"
-              ></div>
-            </div>
-          </div>
-        </div>
-        <p v-else class="m-0 py-6 text-center text-xs text-slate-400">还没有记录</p>
-        <p class="m-0 mt-3 text-[11px] leading-relaxed text-slate-400">
-          近九周工作日里各项各自达标了多少天。哪条最短，就是哪个习惯在拖当日分数。
-        </p>
-      </section>
-      </div>
-
-      <!-- 本周与账本 -->
-      <section data-alt="week-ledger" class="grid gap-3 sm:grid-cols-2">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-          <div class="text-[11px] uppercase tracking-wider text-slate-400">本周</div>
-          <div class="mt-1 flex items-baseline gap-2">
-            <span class="font-mono text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-              {{ diagnosis.week.score }}
-            </span>
-            <span class="font-mono text-xs text-slate-400">/ 50 分</span>
-          </div>
-          <div
-            class="mt-1 text-xs"
-            :class="
-              diagnosis.week.mainlineDays >= diagnosis.week.mainlineRequired
-                ? 'text-emerald-600'
-                : 'text-amber-600'
-            "
-          >
-            主线 {{ diagnosis.week.mainlineDays }}/{{ diagnosis.week.mainlineRequired }} 天
-            <span v-if="diagnosis.week.mainlineDebt > 0">· 欠 {{ diagnosis.week.mainlineDebt }} 单位</span>
-          </div>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-          <div class="text-[11px] uppercase tracking-wider text-slate-400">额度</div>
-          <div class="mt-1 flex items-baseline gap-2">
-            <span class="font-mono text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-              {{ ledger?.balance ?? 0 }}
-            </span>
-            <span class="font-mono text-xs text-slate-400">元可用</span>
-          </div>
-          <div
-            class="mt-1 text-xs"
-            :class="
-              ledger?.status === 'ALL_FROZEN'
-                ? 'text-rose-600'
-                : ledger?.status === 'GROWTH_FROZEN'
-                  ? 'text-amber-600'
-                  : 'text-slate-500'
-            "
-          >{{ ledger?.statusText }}</div>
-          <div v-if="ledger?.exerciseBank > 0" class="mt-0.5 font-mono text-[11px] text-slate-400">
-            运动储备 {{ ledger.exerciseBank }}/{{ ledger.exerciseBankCap }}
-          </div>
-        </div>
-      </section>
-
-      <!-- 接下来该做的：平铺，免去逐组展开 -->
-      <section
-        v-if="nextUps.length"
-        data-alt="next-up"
-        class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-      >
-        <div class="mb-2 flex items-baseline justify-between">
-          <span class="text-[11px] uppercase tracking-wider text-slate-400">接下来该做的</span>
-          <span class="font-mono text-xs text-slate-500">
-            必修 {{ diagnosis.checklist.requiredDone }}/{{ diagnosis.checklist.required }}
-          </span>
-        </div>
-        <div class="grid gap-1.5">
-          <div
-            v-for="n in nextUps"
-            :key="n.id"
-            data-alt="next-item"
-            class="flex items-start gap-2 rounded-lg border border-slate-100 p-2 dark:border-slate-700"
-          >
-            <button
-              data-alt="quick-check"
-              class="mt-1 h-4 w-4 flex-none cursor-pointer rounded-full border-2 border-slate-300 bg-transparent p-0 transition-colors hover:border-brand-500 hover:bg-brand-50 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-brand-900/30"
-              :disabled="busy"
-              title="勾掉：能不看资料讲清楚且验证过一次"
-              @click="checkItem(n.id)"
-            ></button>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-baseline gap-2">
-                <span class="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">{{ n.title }}</span>
-                <span class="flex-none text-[10px] text-slate-400">{{ groupShortName(n.group) }}</span>
+            <div data-alt="kpi-today">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                  isToday ? '今日' : dateLabel
+                }}</span>
+                <span
+                  v-if="vsYesterday !== null"
+                  data-alt="vs-yesterday"
+                  class="flex items-center gap-0.5 text-[11px]"
+                  :class="
+                    vsYesterday > 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : vsYesterday < 0
+                        ? 'text-rose-500 dark:text-rose-400'
+                        : 'text-slate-400'
+                  "
+                >
+                  <LifeIcon
+                    :name="
+                      vsYesterday > 0
+                        ? 'rise'
+                        : vsYesterday < 0
+                          ? 'fall'
+                          : 'flat'
+                    "
+                    class="h-3.5 w-3.5"
+                  />
+                  <span v-if="vsYesterday !== 0"
+                    >比昨天{{ vsYesterday > 0 ? '多' : '少' }}
+                    {{ Math.abs(vsYesterday) }} 分</span
+                  >
+                  <span v-else>与昨天持平</span>
+                </span>
               </div>
               <p
-                v-if="itemBrief(n.description)"
-                class="m-0 mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400"
-              >{{ itemBrief(n.description) }}</p>
+                class="text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+              >
+                {{ activeDay.score
+                }}<span class="text-sm font-normal text-slate-400"
+                  >/{{ activeDay.fullScore || 10 }} 分</span
+                >
+              </p>
+              <!-- 进度条满格是免债线而非满分，那才是当天真正的及格线 -->
+              <div
+                class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-600"
+              >
+                <div
+                  class="h-full rounded-full transition-all"
+                  :class="
+                    activeDay.debt > 0
+                      ? 'bg-amber-400'
+                      : 'bg-emerald-500 dark:bg-emerald-400'
+                  "
+                  :style="{ width: debtFreeProgress + '%' }"
+                />
+              </div>
+              <p class="mt-1 text-[11px] leading-snug text-slate-400">
+                免债线 {{ activeDay.debtFreeScore }} 分（满分的
+                {{ Math.round(diagnosis.rules.debtFreeRatio * 100) }}%）<span
+                  v-if="overMinutes > 0"
+                  class="text-slate-500 dark:text-slate-400"
+                >
+                  · 超额投入 {{ overMinutes }} 分钟，只记录不加分</span
+                >
+              </p>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- 判断 -->
-      <section
-        v-if="diagnosis.verdicts?.length"
-        data-alt="verdicts"
-        class="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
-      >
-        <p
-          v-for="(v, i) in diagnosis.verdicts"
-          :key="i"
-          class="m-0 text-sm leading-relaxed text-slate-600 dark:text-slate-300"
-        >{{ v }}</p>
-      </section>
-
-      <!-- 分栏 -->
-      <div data-alt="tabs" class="flex gap-0.5 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-700">
-        <button
-          v-for="t in [
-            { v: 'checklist', label: '全部清单' },
-            { v: 'ideas', label: `想法 ${(ideas?.cooling?.length ?? 0) + (ideas?.started?.length ?? 0)}` },
-            { v: 'stalled', label: `停滞 ${diagnosis.stalled?.length ?? 0}` },
-          ]"
-          :key="t.v"
-          data-alt="tab-button"
-          class="flex-1 cursor-pointer rounded-md border-0 px-3 py-1.5 text-xs"
-          :class="
-            tab === t.v
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
-              : 'bg-transparent text-slate-500 dark:text-slate-300'
-          "
-          @click="tab = t.v as any"
-        >{{ t.label }}</button>
-      </div>
-
-      <!-- 全部清单：进度直接可见，点组名看条目 -->
-      <section v-if="tab === 'checklist'" data-alt="checklist-section" class="grid gap-2">
-        <p class="m-0 text-xs leading-relaxed text-slate-400">
-          条目前的编号是学习顺序，前面的是后面的基础，按顺序做不要跳。
-          清单不计分，分数只来自每日打卡；清单的价值在里程碑：
-          整组勾完 +{{ diagnosis.rules.milestoneQuarterly }} 元。
-        </p>
-        <div
-          v-for="g in diagnosis.checklist.groups"
-          :key="g.id"
-          data-alt="checklist-group"
-          class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800"
-        >
-          <button
-            data-alt="group-toggle"
-            class="flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left"
-            @click="toggleGroup(g.id)"
-          >
-            <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-              {{ groupShortName(g.title) }}
-            </span>
-            <span class="flex-none font-mono text-xs tabular-nums text-slate-500">{{ g.requiredDone }}/{{ g.required }}</span>
-            <span class="flex-none text-[10px] text-slate-400">{{ openGroups[g.id] ? '收起' : '展开' }}</span>
-          </button>
-          <div class="mt-2 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-            <div
-              class="h-full rounded-full bg-brand-500 dark:bg-brand-300"
-              :style="{ width: (g.required ? (g.requiredDone / g.required) * 100 : 0) + '%' }"
-            ></div>
-          </div>
-          <div v-if="openGroups[g.id]" data-alt="group-items" class="mt-3 grid gap-2">
-            <p class="m-0 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] leading-relaxed text-slate-500 dark:bg-slate-700/50 dark:text-slate-400">
-              这组全部勾完 +{{ diagnosis.rules.milestoneQuarterly }} 元。清单项本身不计分，
-              分数只来自每日打卡；判定标准是能不看资料讲清楚「这是什么 / 什么时候用 / 有什么坑」，且动手验证过一次。
-            </p>
-            <div
-              v-for="item in groupItems(g.id)"
-              :key="item.id"
-              data-alt="checklist-item"
-              class="flex items-start gap-2 rounded-lg border p-2"
-              :class="
-                item.status === 'DONE'
-                  ? 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/30'
-                  : 'border-slate-100 dark:border-slate-700'
-              "
-            >
-              <button
-                v-if="item.status !== 'DONE'"
-                data-alt="item-check"
-                class="mt-1 h-4 w-4 flex-none cursor-pointer rounded-full border-2 border-slate-300 bg-transparent p-0 transition-colors hover:border-brand-500 hover:bg-brand-50 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-brand-900/30"
-                :disabled="busy"
-                title="勾掉：能不看资料讲清楚且验证过一次"
-                @click="checkItem(item.id)"
-              ></button>
-              <span
-                v-else
-                data-alt="item-done"
-                class="mt-1 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-brand-500 text-[10px] leading-none text-white"
-              >✓</span>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-baseline gap-2">
-                  <span
-                    class="min-w-0 flex-1 text-sm"
-                    :class="
-                      item.status === 'DONE'
-                        ? 'text-slate-400 line-through'
-                        : 'text-slate-700 dark:text-slate-200'
-                    "
-                  >{{ item.title }}</span>
-                  <span
-                    v-if="!item.required"
-                    class="flex-none rounded bg-slate-100 px-1 text-[10px] text-slate-500 dark:bg-slate-700"
-                  >选修</span>
-                  <span
-                    v-if="item.doneOn"
-                    class="flex-none font-mono text-[10px] text-slate-400"
-                  >{{ item.doneOn.slice(5) }}</span>
-                </div>
-                <p
-                  v-if="itemBrief(item.description)"
-                  class="m-0 mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400"
-                >{{ itemBrief(item.description) }}</p>
+            <div data-alt="kpi-mainline">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs text-slate-500 dark:text-slate-400"
+                  >本周主线</span
+                >
+                <span
+                  class="text-sm font-semibold tabular-nums"
+                  :class="
+                    diagnosis.week.mainlineDays >=
+                    diagnosis.week.mainlineRequired
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-slate-700 dark:text-slate-200'
+                  "
+                  >{{ diagnosis.week.mainlineDays }}/{{
+                    diagnosis.week.mainlineRequired
+                  }}
+                  天</span
+                >
+              </div>
+              <div class="mt-1.5 flex gap-1">
+                <span
+                  v-for="i in diagnosis.week.mainlineRequired"
+                  :key="i"
+                  class="h-1.5 flex-1 rounded-full"
+                  :class="
+                    i <= diagnosis.week.mainlineDays
+                      ? 'bg-emerald-500 dark:bg-emerald-400'
+                      : 'bg-slate-200 dark:bg-slate-600'
+                  "
+                />
               </div>
             </div>
-            <p v-if="!groupItems(g.id).length" class="m-0 text-xs text-slate-400">这组还没有条目</p>
           </div>
-        </div>
-      </section>
 
-      <!-- 想法池 -->
-      <section v-else-if="tab === 'ideas'" data-alt="ideas-section" class="grid gap-2">
-        <p class="m-0 text-xs text-slate-400">
-          想法记下来零成本、不计分，冷却三天还惦记再动手。只有写笔记才有 +15 元
-        </p>
-        <template
-          v-for="group in [
-            { label: '冷却中', list: ideas?.cooling ?? [] },
-            { label: '已动手', list: ideas?.started ?? [] },
-            { label: '已沉底', list: ideas?.sunk ?? [] },
-            { label: '已写笔记', list: ideas?.noted ?? [] },
-          ]"
-          :key="group.label"
-        >
-          <div v-if="group.list.length" data-alt="idea-group">
-            <div class="mb-1 text-[11px] uppercase tracking-wider text-slate-400">
-              {{ group.label }} · {{ group.list.length }}
-            </div>
-            <div
-              v-for="idea in group.list"
-              :key="idea.id"
-              data-alt="idea-row"
-              class="mb-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          <!-- 奖惩两端：额度是奖，体能债是罚，都能就地操作 -->
+          <div
+            data-alt="kpi-group-incentive"
+            class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
+          >
+            <p
+              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
             >
-              {{ idea.content }}
-              <span class="ml-1 font-mono text-[11px] text-slate-400">
-                {{ idea.status === 'PENDING' ? '冷却至 ' + idea.coolUntil : idea.createdOn }}
+              奖励与惩罚的超级反应倾向
+            </p>
+
+            <div data-alt="kpi-balance">
+              <span class="text-xs text-slate-500 dark:text-slate-400"
+                >可动用额度</span
+              >
+              <p
+                class="text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+              >
+                ¥{{ ledger.balance }}
+              </p>
+              <p class="mt-0.5 text-[11px] leading-snug text-slate-400">
+                {{ ledger.statusText }}
+              </p>
+            </div>
+
+            <div
+              data-alt="kpi-debt"
+              class="border-t border-slate-200 pt-2.5 dark:border-slate-600"
+            >
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs text-slate-500 dark:text-slate-400"
+                  >体能债</span
+                >
+                <span
+                  class="text-sm font-semibold tabular-nums"
+                  :class="
+                    ledger.debt > 0
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  "
+                  >{{ ledger.debt }} 个</span
+                >
+              </div>
+              <!--
+                一个债一个块，点哪块就问哪块怎么还。
+                用块而不是「还 1 / 还 3」的按钮，是因为债是可数的实体，
+                看见六个方块比看见数字 6 更有还掉它的冲动
+              -->
+              <div
+                v-if="ledger.debt > 0"
+                data-alt="debt-blocks"
+                class="mt-1.5 flex flex-wrap gap-1"
+              >
+                <button
+                  v-for="i in ledger.debt"
+                  :key="i"
+                  data-alt="debt-block"
+                  type="button"
+                  :disabled="busy"
+                  :title="'点开说说这一个怎么还'"
+                  class="h-6 w-6 rounded bg-rose-400 transition hover:bg-rose-500 hover:ring-2 hover:ring-rose-200 disabled:opacity-40 dark:bg-rose-500/70 dark:hover:ring-rose-500/30"
+                  @click="openDebtAsk($event, i - 1)"
+                />
+              </div>
+              <p
+                v-else
+                class="mt-1.5 text-[11px] text-emerald-600 dark:text-emerald-400"
+              >
+                没有欠债
+              </p>
+              <p
+                v-if="debtUnitText"
+                class="mt-1.5 text-[11px] leading-relaxed text-slate-400"
+              >
+                {{ debtUnitText }}
+              </p>
+
+              <div data-alt="exercise-bank" class="mt-2">
+                <span class="text-[11px] leading-snug text-slate-400"
+                  >运动储备 {{ ledger.exerciseBank }}/{{
+                    ledger.exerciseBankCap
+                  }}
+                  个，自动抵未来欠债</span
+                >
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <span
+                    v-for="i in ledger.exerciseBank"
+                    :key="'bank' + i"
+                    class="h-4 w-4 rounded bg-emerald-400 dark:bg-emerald-500/70"
+                  />
+                  <button
+                    data-alt="exercise-btn"
+                    type="button"
+                    :disabled="
+                      busy || ledger.exerciseBank >= ledger.exerciseBankCap
+                    "
+                    title="主动锻炼，存一个储备"
+                    aria-label="存运动储备"
+                    class="grid h-4 w-4 place-items-center rounded border border-dashed border-emerald-400 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+                    @click="openBankAsk($event)"
+                  >
+                    <LifeIcon name="rise" class="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 当月日历，翻月回看 -->
+          <div
+            data-alt="heatmap"
+            class="grid content-between gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <button
+                data-alt="prev-month"
+                type="button"
+                title="上个月"
+                aria-label="上个月"
+                class="grid h-7 w-7 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800"
+                @click="moveMonth(-1)"
+              >
+                <LifeIcon name="left" class="h-4 w-4" />
+              </button>
+              <span
+                class="text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200"
+                >{{ monthLabel }}</span
+              >
+              <button
+                data-alt="next-month"
+                type="button"
+                :disabled="atLatestMonth"
+                title="下个月"
+                aria-label="下个月"
+                class="grid h-7 w-7 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 disabled:opacity-30 dark:hover:bg-slate-800"
+                @click="moveMonth(1)"
+              >
+                <LifeIcon name="right" class="h-4 w-4" />
+              </button>
+            </div>
+            <div data-alt="heat-head" class="grid grid-cols-7 gap-1.5">
+              <span
+                v-for="w in WEEK_HEAD"
+                :key="w"
+                class="text-center text-[11px] leading-none text-slate-400"
+                >{{ w }}</span
+              >
+            </div>
+            <div data-alt="heat-grid" class="grid grid-cols-7 gap-1.5">
+              <div
+                v-for="(cell, i) in monthCells"
+                :key="i"
+                data-alt="heat-cell"
+                class="aspect-square w-7 rounded"
+                :class="heatClass(cell)"
+                :title="heatTitle(cell)"
+              />
+            </div>
+            <p class="text-[11px] tabular-nums leading-snug text-slate-400">
+              已连 {{ streak.current }} 天 · 本月做了 {{ monthActiveDays }} 天
+            </p>
+          </div>
+        </div>
+
+        <ul
+          v-if="diagnosis.verdicts.length"
+          data-alt="verdicts"
+          class="mt-3 grid gap-0.5"
+        >
+          <li
+            v-for="(v, i) in diagnosis.verdicts"
+            :key="i"
+            class="text-[13px] leading-relaxed text-slate-600 dark:text-slate-300"
+          >
+            {{ v }}
+          </li>
+        </ul>
+
+        <p
+          data-alt="kpi-footnote"
+          class="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400 dark:border-slate-700 dark:text-slate-500"
+        >
+          1 分 = {{ diagnosis.rules.yuanPerPoint }} 元，每月最多兑
+          {{ diagnosis.rules.monthlyPointCap }} 分 · 日历格子越深表示当天得分越高
+          · 阈值制：达标即得固定分，多做只记录不加分
+        </p>
+      </section>
+
+      <div class="grid gap-4 lg:grid-cols-3">
+        <!-- AI 栏：手机上排在最前，桌面上收到右侧常驻 -->
+        <aside
+          data-alt="ai-column"
+          class="grid gap-4 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
+        >
+          <LifeChat :api="api" :node-title-of="nodeTitleOf" @changed="loadAll" />
+
+          <LifeChanges :changes="changes" :api="api" @changed="loadAll" />
+
+          <section
+            data-alt="ideas-section"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <button
+              data-alt="ideas-toggle"
+              type="button"
+              class="flex w-full items-center justify-between text-left"
+              @click="showIdeas = !showIdeas"
+            >
+              <span
+                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                >想法池</span
+              >
+              <span class="flex items-center gap-1 text-xs text-slate-400">
+                {{ ideaCount }} 条
+                <LifeIcon :name="showIdeas ? 'up' : 'down'" class="h-3.5 w-3.5" />
               </span>
+            </button>
+            <div v-if="showIdeas" class="mt-3 grid gap-3">
+              <div v-for="g in ideaGroups" :key="g.label" data-alt="idea-group">
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                  {{ g.label }}
+                </p>
+                <p
+                  v-for="it in g.list"
+                  :key="it.id"
+                  data-alt="idea-row"
+                  class="mt-1 text-sm text-slate-600 dark:text-slate-300"
+                >
+                  {{ it.content }}
+                </p>
+              </div>
+              <p
+                v-if="!ideaGroups.length"
+                class="text-sm text-slate-400 dark:text-slate-500"
+              >
+                还没有想法
+              </p>
             </div>
-          </div>
-        </template>
-        <p
-          v-if="!ideas?.cooling?.length && !ideas?.started?.length && !ideas?.sunk?.length && !ideas?.noted?.length"
-          class="m-0 rounded-xl border border-dashed border-slate-300 py-6 text-center text-sm text-slate-400 dark:border-slate-600"
-        >还没有想法，在下面说一句点「记想法」</p>
-      </section>
+          </section>
+        </aside>
 
-      <!-- 停滞 -->
-      <section v-else data-alt="stalled-section" class="grid gap-2">
-        <div
-          v-for="s in diagnosis.stalled"
-          :key="s.id"
-          class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-800"
-        >
-          <span class="mt-1.5 h-2 w-2 flex-none rounded-full bg-amber-600"></span>
-          <div>
-            <div class="text-[11px] text-slate-400">长期未推进</div>
-            <div class="text-sm text-slate-600 dark:text-slate-300">
-              「{{ s.title }}」已 {{ s.idleDays }} 天未达标
+        <!-- 主内容 -->
+        <div data-alt="main-column" class="grid gap-4 lg:order-1 lg:col-span-2">
+          <!-- 打卡：每天重复的四项 -->
+          <section
+            data-alt="punch-card"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <div
+              data-alt="date-nav"
+              class="mb-3 flex items-center justify-between gap-2"
+            >
+              <p
+                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+              >
+                每日四项
+              </p>
+              <div class="flex items-center gap-1">
+                <button
+                  data-alt="prev-day"
+                  type="button"
+                  title="前一天"
+                  aria-label="前一天"
+                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+                  @click="moveDate(-1)"
+                >
+                  <LifeIcon name="left" class="h-4 w-4" />
+                </button>
+                <span
+                  class="min-w-[4.5rem] text-center text-sm tabular-nums text-slate-600 dark:text-slate-300"
+                  >{{ dateLabel }}</span
+                >
+                <button
+                  data-alt="next-day"
+                  type="button"
+                  :disabled="isToday"
+                  title="后一天"
+                  aria-label="后一天"
+                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-700"
+                  @click="moveDate(1)"
+                >
+                  <LifeIcon name="right" class="h-4 w-4" />
+                </button>
+                <button
+                  v-if="!isToday"
+                  data-alt="back-today"
+                  type="button"
+                  title="回到今天"
+                  aria-label="回到今天"
+                  class="ml-1 grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
+                  @click="backToToday"
+                >
+                  <LifeIcon name="undo" class="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
+
+            <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
+              <div
+                v-for="it in activeDay.items"
+                :key="it.nodeId"
+                data-alt="punch-item"
+                class="rounded-xl border p-3 transition"
+                :class="
+                  it.reached
+                    ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
+                    : 'border-slate-100 dark:border-slate-700'
+                "
+              >
+                <div class="flex items-baseline justify-between gap-2">
+                  <button
+                    data-alt="daily-ask"
+                    type="button"
+                    :title="'说一句来补记「' + it.title + '」'"
+                    class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
+                    @click="openDailyAsk($event, it)"
+                  >
+                    {{ it.title }}
+                  </button>
+                  <span class="shrink-0 text-xs text-slate-400">
+                    <span
+                      v-if="it.isMainline"
+                      class="mr-1 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                      >主线</span
+                    >{{ it.points }} 分
+                  </span>
+                </div>
+                <div
+                  class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
+                >
+                  <div
+                    class="h-full rounded-full transition-all"
+                    :class="
+                      it.reached
+                        ? 'bg-brand-500 dark:bg-brand-300'
+                        : 'bg-brand-500/50'
+                    "
+                    :style="{
+                      width:
+                        Math.min(
+                          100,
+                          (it.minutes / it.thresholdMinutes) * 100,
+                        ) + '%',
+                    }"
+                  />
+                </div>
+                <div class="mt-1.5 flex items-center justify-between gap-2">
+                  <span class="text-xs tabular-nums text-slate-500"
+                    >{{ it.minutes }}/{{ it.thresholdMinutes }} 分钟<span
+                      v-if="it.minutes > it.thresholdMinutes"
+                      class="ml-1 text-slate-400"
+                      >超 {{ it.minutes - it.thresholdMinutes }}</span
+                    ></span
+                  >
+                  <span class="flex gap-1">
+                    <button
+                      v-for="m in QUICK_MINUTES"
+                      :key="m"
+                      data-alt="punch-quick"
+                      type="button"
+                      :disabled="busy"
+                      class="rounded px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700"
+                      @click="punch(it.nodeId, m)"
+                    >
+                      +{{ m }}
+                    </button>
+                    <button
+                      v-if="it.minutes > 0"
+                      data-alt="punch-clear"
+                      type="button"
+                      :disabled="busy"
+                      :title="`清掉这一项今天的 ${it.minutes} 分钟`"
+                      aria-label="清零这一项"
+                      class="grid h-6 w-6 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
+                      @click="clearDay(it.nodeId)"
+                    >
+                      <LifeIcon name="undo" class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      v-if="!it.reached"
+                      data-alt="punch-reach"
+                      type="button"
+                      :disabled="busy"
+                      title="一次补到达标"
+                      aria-label="一次补到达标"
+                      class="grid h-6 w-6 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15"
+                      @click="punchToThreshold(it)"
+                    >
+                      <LifeIcon name="target" class="h-4 w-4" />
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- 路线图 -->
+          <section
+            data-alt="roadmap"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <div class="mb-4 flex items-baseline justify-between gap-2">
+              <p
+                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+              >
+                路线图
+              </p>
+              <span class="text-xs tabular-nums text-slate-400"
+                >必修 {{ diagnosis.checklist.requiredDone }}/{{
+                  diagnosis.checklist.required
+                }}</span
+              >
+            </div>
+            <LifePlanTree :plan="plan" @select="openNode" />
+          </section>
         </div>
-        <p
-          v-if="!diagnosis.stalled?.length"
-          class="m-0 rounded-xl border border-dashed border-slate-300 py-6 text-center text-sm text-slate-400 dark:border-slate-600"
-        >没有停滞的项目</p>
-      </section>
+      </div>
 
-      <!-- 对话 -->
-      <section
-        data-alt="chat-section"
-        class="sticky bottom-0 bg-white/90 py-3 backdrop-blur dark:bg-slate-900/90"
+      <p
+        v-if="errorMsg"
+        data-alt="board-error"
+        class="text-sm text-rose-600 dark:text-rose-400"
       >
-        <div
-          v-if="pending"
-          data-alt="pending-card"
-          class="mb-2 rounded-xl border border-brand-500 bg-white p-3 dark:bg-slate-800"
-        >
-          <div class="mb-2 text-xs text-brand-600 dark:text-brand-300">确认这一条吗</div>
-          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-            {{ pendingText }}
-          </div>
-          <div class="mt-2 flex gap-2">
-            <button
-              data-alt="confirm-button"
-              class="cursor-pointer rounded-lg border-0 bg-brand-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              :disabled="busy"
-              @click="confirmPending"
-            >确认</button>
-            <button
-              data-alt="cancel-button"
-              class="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              @click="pending = null"
-            >取消</button>
-          </div>
-        </div>
-
-        <p
-          v-if="chatReply"
-          data-alt="chat-reply"
-          class="m-0 mb-2 rounded-xl border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-        >{{ chatReply }}</p>
-
-        <div class="flex gap-2">
-          <input
-            id="life-chat-input"
-            data-alt="chat-input"
-            v-model="chatInput"
-            type="text"
-            placeholder="说一句：昨天英文读了20分钟 / A1搞定了 / 我这周怎么样"
-            class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            @keyup.enter="send"
-          />
-          <button
-            data-alt="send-button"
-            class="flex-none cursor-pointer rounded-lg border-0 bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            :disabled="busy || !chatInput"
-            @click="send"
-          >{{ busy ? '…' : '说' }}</button>
-          <button
-            data-alt="idea-button"
-            class="flex-none cursor-pointer rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-500 disabled:opacity-50 dark:border-slate-600"
-            :disabled="busy || !chatInput"
-            title="不经 AI，直接记进想法池"
-            @click="captureIdea(chatInput)"
-          >记想法</button>
-        </div>
-
-        <p v-if="errorMsg" class="m-0 mt-2 text-xs text-rose-600">{{ errorMsg }}</p>
-        <button
-          data-alt="lock-button"
-          class="mt-2 cursor-pointer border-0 bg-transparent p-0 text-xs text-slate-400 underline"
-          @click="lock"
-        >锁定</button>
-      </section>
+        {{ errorMsg }}
+      </p>
     </div>
+
+    <!-- 全页共用的就地问 AI 浮层 -->
+    <LifeAsk
+      :anchor="ask.anchor"
+      :title="ask.title"
+      :context="ask.context"
+      :placeholder="ask.placeholder"
+      :direct-label="ask.directLabel"
+      :busy="busy"
+      :reply="askReply"
+      :pending-text="askPendingText"
+      :destructive="isDestructive(askPending)"
+      :pending="askPending"
+      @close="closeAsk"
+      @send="askSend"
+      @direct="askDirect"
+      @confirm="askConfirm"
+      @discard="askPending = null"
+    />
+
+    <!-- 节点详情 -->
+    <LifeNodeModal
+      :node="picked"
+      :path="pickedPath"
+      :api="api"
+      @close="picked = null"
+      @changed="loadAll"
+    />
   </div>
 </template>
