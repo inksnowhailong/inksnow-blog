@@ -79,12 +79,34 @@ jobs:
           echo "$DEPLOY_SSH_KEY" > private_key.pem
           chmod 600 private_key.pem
 
-          # 将构建后的文件通过 SCP 上传到服务器
-          scp -i private_key.pem -r ./docs/.vuepress/dist/* $SERVER_USER@$SERVER_IP:/www/wwwroot/inksnowhl.cn  # 假设构建输出目录为 ./dist
+          # 用 rsync 增量同步，不再 scp -r 全量推。
+          # 旧做法每次把 24MB / 249 个文件从美国的 runner 逐个传到北京，
+          # 实测占掉整条流水线 76% 的时间（249s / 327s），而真正变化的通常只有几十 KB。
+          #
+          # 这一条刻意不加 --delete：服务器上有仓库里没有的文件
+          #（手动传过的图之类），全量镜像会把它们抹掉。
+          rsync -az --no-owner --no-group \
+            -e "ssh -i private_key.pem" \
+            ./docs/.vuepress/dist/ $SERVER_USER@$SERVER_IP:/www/wwwroot/inksnowhl.cn/
 
-          # 在服务器上运行命令，更新前端服务
-          ssh -i private_key.pem $SERVER_USER@$SERVER_IP << EOF
-            # 确保 Nginx 已经配置好
-            sudo systemctl reload nginx  # 如果 Nginx 配置文件有改动，重载 Nginx
+          # assets 单独做精确镜像。这里的文件名都带 content hash，每次构建都换一批，
+          # 只增不删的话会无限堆积——这个目录一度涨到 554MB，而当前构建只需要几 MB。
+          # 代价是：正好缓存着旧 HTML 的访客会短暂 404，刷新即恢复。
+          rsync -az --delete --no-owner --no-group \
+            -e "ssh -i private_key.pem" \
+            ./docs/.vuepress/dist/assets/ $SERVER_USER@$SERVER_IP:/www/wwwroot/inksnowhl.cn/assets/
+
+          # rsync 以登录用户身份落盘，属主得交还给 nginx 运行的那个用户
+          ssh -i private_key.pem $SERVER_USER@$SERVER_IP << 'EOF'
+            set -e
+            chown -R www:www /www/wwwroot/inksnowhl.cn
+            nginx -t && systemctl reload nginx
           EOF
+
+          # 部署后自检：页面回得来、应用清单也在
+          for path in "/inksnow-blog/life/" "/inksnow-blog/manifest.webmanifest"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://inksnowhl.cn$path")
+            echo "$path -> $code"
+            [ "$code" = "200" ] || exit 1
+          done
 
