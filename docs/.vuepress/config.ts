@@ -239,12 +239,7 @@ export default defineUserConfig({
   plugins: [
     articleList(),
     // readingTimePlugin({}),
-    // GA 插件版本(rc.54)比 vuepress 核心(rc.19)新，它依赖的 __GA_OPTIONS__
-    // 编译期注入在 dev 下不生效，会让整个客户端 bootstrap 崩掉、页面全白。
-    // 本地流量本来也不该进统计，因此只在生产构建时挂上。
-    ...(process.env.NODE_ENV === "production"
-      ? [googleAnalyticsPlugin({ id: "G-P3B0T91Z9B" })]
-      : []),
+    googleAnalyticsPlugin({ id: "G-P3B0T91Z9B" }),
     // redirectPlugin({
     //   config: {
     //     defaultBehavior: "homepage",

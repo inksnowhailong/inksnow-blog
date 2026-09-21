@@ -5,14 +5,20 @@
  * 打卡区管每天重复的四项，路线图管一次性的清单进度，两者不重叠。
  * 单位只认「分」这一种主货币，元与体能债都是它的换算面。
  */
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
+import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeChat from './lifeChat.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAsk from './lifeAsk.vue';
 import LifeChanges from './lifeChanges.vue';
-import { describeDraft, applyDraft, isDestructive } from './useLifeDraft';
+import {
+  describeDraft,
+  applyDraft,
+  isDestructive,
+  askStream,
+} from './useLifeDraft';
 
 /** 后端地址写成绝对路径，使本地开发与线上走同一条链路 */
 const API = 'https://inksnowhl.cn/api';
@@ -279,9 +285,25 @@ function closeAsk() {
 }
 
 /**
+ * 浮层这一次打开期间的问答
+ * @description 浮层上只显示最后一条回答，但追问要接得上，
+ * 所以这条历史照存不显示。换个地方点开就清空——
+ * 上一个话题的上下文带到下一个话题上只会帮倒忙
+ */
+const askLog = ref<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+
+// 浮层一开一关都算换了话题。盯 anchor 而不是在每个入口各清一次，
+// 是因为打开浮层的地方有五处，靠记得逐个加迟早会漏一个
+watch(
+  () => ask.value.anchor,
+  () => {
+    askLog.value = [];
+  },
+);
+
+/**
  * 把浮层里的话交给模型
- * @description 前面补一句背景，模型才知道这句话是在说哪件事——
- * 它没有对话历史，全靠这一次把上下文说全。
+ * @description 前缀补一句背景说清这是在问哪件事，历史让追问接得上。
  * 拿回来只出草稿不落库，与对话栏同一套规矩：模型永远不直接改数据。
  */
 async function askSend(text: string) {
@@ -289,13 +311,38 @@ async function askSend(text: string) {
   busy.value = true;
   askReply.value = '';
   askPending.value = null;
+
+  // 第一句要带前缀点明话题，后续追问已在上下文里，再带就啰嗦了
+  const sent = askLog.value.length ? text : ask.value.prefix + text;
+  const history = askLog.value.slice(-12);
+
   try {
-    const res = await api('/life/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message: ask.value.prefix + text }),
-    });
-    if (res.kind === 'answer') askReply.value = res.text;
-    else askPending.value = res;
+    const res = await askStream(
+      API,
+      key.value,
+      sent,
+      // 浮层空间小，只把正在吐的字显示出来，出草稿时会被替换掉
+      (delta) => {
+        askReply.value += delta;
+      },
+      history,
+    );
+    askLog.value = [...askLog.value, { role: 'user', content: sent }];
+    if (res.kind === 'answer') {
+      askReply.value = res.text || askReply.value;
+      askLog.value = [
+        ...askLog.value,
+        { role: 'assistant', content: askReply.value },
+      ];
+    } else {
+      askReply.value = '';
+      askPending.value = res;
+      // 草稿本身也是一轮回应，记下来追问"那改成 40 分钟呢"才接得住
+      askLog.value = [
+        ...askLog.value,
+        { role: 'assistant', content: describeDraft(res, nodeTitleOf) },
+      ];
+    }
   } catch (e: any) {
     askReply.value = 'AI 暂时不可用：' + e.message;
   } finally {
@@ -549,27 +596,85 @@ const streak = computed(() => {
 });
 
 /**
- * 想法池分组
- * @description 后端已按状态分好组返回，这里只做中文标签与空组过滤
+ * 想法池拉平成一条列表
+ * @description 后端按状态分组返回，但界面上按状态切成四段会让每段只剩一两条，
+ * 反而看不出全貌。拉平成一条列表、状态做成徽标，在做的排在最前——
+ * 那才是真正需要天天看见的
  */
-const ideaGroups = computed(() => {
+const ideaList = computed(() => {
   const d = ideas.value ?? {};
+  const tag = (list: any[], status: string, label: string, cls: string) =>
+    (list ?? []).map((i: any) => ({ ...i, status, label, cls }));
   return [
-    { label: '冷静期', list: d.cooling ?? [] },
-    { label: '在做', list: d.started ?? [] },
-    { label: '已成笔记', list: d.noted ?? [] },
-    { label: '沉了', list: d.sunk ?? [] },
-  ].filter((g) => g.list.length);
+    ...tag(d.started, 'STARTED', '在做', 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300'),
+    ...tag(d.cooling, 'PENDING', '冷却中', 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'),
+    ...tag(d.sunk, 'SUNK', '沉底', 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'),
+    ...tag(d.noted, 'NOTED', '已结项', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'),
+  ];
 });
 
 /** 想法总条数 */
-const ideaCount = computed(() =>
-  ideaGroups.value.reduce((n, g) => n + g.list.length, 0),
-);
+const ideaCount = computed(() => ideaList.value.length);
+
+/** 打开详情的那个想法 */
+const activeIdea = ref<any>(null);
+
+/** 新想法的输入框 */
+const ideaDraft = ref('');
+
+/**
+ * 记下一个想法
+ * @description 走确定性接口不经模型：记一行字这件事没有任何需要判断的地方，
+ * 让模型过一道手只会多一次失败的机会
+ */
+async function captureIdea() {
+  const content = ideaDraft.value.trim();
+  if (!content || busy.value) return;
+  busy.value = true;
+  try {
+    await api('/life/ideas', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    ideaDraft.value = '';
+    await loadAll();
+  } catch (e: any) {
+    errorMsg.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+// 记一条进展会把想法从"冷却中"推到"在做"，重新拉数据后
+// 弹窗里拿的还是旧对象，得按ID换成新的，否则状态显示会停在改之前
+watch(ideas, () => {
+  if (!activeIdea.value) return;
+  const fresh = ideaList.value.find((i) => i.id === activeIdea.value.id);
+  if (fresh) activeIdea.value = fresh;
+});
+
+/** 从想法弹窗里唤起问 AI 的浮层 */
+function openIdeaAsk(payload: { prefix: string; anchor: { x: number; y: number } }) {
+  ask.value = {
+    anchor: payload.anchor,
+    title: activeIdea.value?.content ?? '研究',
+    context: '可以让它帮你理下一步，或者把这次的进展记下来',
+    placeholder: '今天试了 xxx，发现 yyy',
+    directLabel: '',
+    direct: null,
+    prefix: payload.prefix,
+  };
+  askReply.value = '';
+  askPending.value = null;
+}
 
 onMounted(() => {
   mounted.value = true;
   activeDate.value = today();
+  // 主题的作者/日期信息栏是给博文用的，本页是个应用界面不需要。
+  // 它由主题全局的 author 配置渲染，frontmatter 里关不掉
+  //（写 author: '' 会被 || 回退到全局值），只能在这里摘掉
+  document.querySelector('.page-info')?.classList.add('hidden');
   try {
     const saved = localStorage.getItem(KEY_STORE);
     if (saved) {
@@ -942,7 +1047,13 @@ onMounted(() => {
           data-alt="ai-column"
           class="grid gap-4 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
         >
-          <LifeChat :api="api" :node-title-of="nodeTitleOf" @changed="loadAll" />
+          <LifeChat
+            :api="api"
+            :api-base="API"
+            :api-key="key"
+            :node-title-of="nodeTitleOf"
+            @changed="loadAll"
+          />
 
           <LifeChanges :changes="changes" :api="api" @changed="loadAll" />
 
@@ -965,25 +1076,57 @@ onMounted(() => {
                 <LifeIcon :name="showIdeas ? 'up' : 'down'" class="h-3.5 w-3.5" />
               </span>
             </button>
-            <div v-if="showIdeas" class="mt-3 grid gap-3">
-              <div v-for="g in ideaGroups" :key="g.label" data-alt="idea-group">
-                <p class="text-xs text-slate-400 dark:text-slate-500">
-                  {{ g.label }}
-                </p>
-                <p
-                  v-for="it in g.list"
+            <div v-if="showIdeas" class="mt-3">
+              <!-- 捕获不受限：记一行字零成本、不计分 -->
+              <div class="flex gap-1.5">
+                <input
+                  v-model="ideaDraft"
+                  data-alt="idea-capture-input"
+                  type="text"
+                  maxlength="200"
+                  placeholder="想试试什么"
+                  class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  @keydown.enter.prevent="captureIdea"
+                />
+                <button
+                  data-alt="idea-capture"
+                  type="button"
+                  :disabled="busy || !ideaDraft.trim()"
+                  title="记下这个想法"
+                  aria-label="记下这个想法"
+                  class="grid shrink-0 place-items-center rounded-lg bg-brand-500 px-2.5 text-white transition hover:bg-brand-600 disabled:opacity-40"
+                  @click="captureIdea"
+                >
+                  <LifeIcon name="check" class="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <ul v-if="ideaList.length" class="mt-2 grid gap-1.5">
+                <li
+                  v-for="it in ideaList"
                   :key="it.id"
                   data-alt="idea-row"
-                  class="mt-1 text-sm text-slate-600 dark:text-slate-300"
+                  class="cursor-pointer rounded-lg bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700"
+                  @click="activeIdea = it"
                 >
-                  {{ it.content }}
-                </p>
-              </div>
+                  <p class="text-sm leading-snug text-slate-700 dark:text-slate-200">
+                    {{ it.content }}
+                  </p>
+                  <p class="mt-1 flex items-center gap-1.5 text-[11px]">
+                    <span class="rounded px-1.5 py-0.5" :class="it.cls">{{ it.label }}</span>
+                    <span class="text-slate-400">{{ it.createdOn }}</span>
+                  </p>
+                </li>
+              </ul>
+              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
+                还没有想法。冒出什么念头先记一行，三天后还惦记再动手
+              </p>
+
               <p
-                v-if="!ideaGroups.length"
-                class="text-sm text-slate-400 dark:text-slate-500"
+                v-if="ideas?.noteYuan"
+                class="mt-2 text-[11px] text-slate-400 dark:text-slate-500"
               >
-                还没有想法
+                已结项的研究累计 {{ ideas.noteYuan }} 元
               </p>
             </div>
           </section>
@@ -1193,6 +1336,16 @@ onMounted(() => {
       @direct="askDirect"
       @confirm="askConfirm"
       @discard="askPending = null"
+    />
+
+    <!-- 研究详情 -->
+    <LifeIdeaModal
+      :idea="activeIdea"
+      :api="api"
+      :note-yuan="diagnosis?.rules?.researchNoteYuan ?? 15"
+      @close="activeIdea = null"
+      @changed="loadAll"
+      @ask="openIdeaAsk"
     />
 
     <!-- 节点详情 -->
