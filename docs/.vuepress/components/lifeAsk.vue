@@ -54,28 +54,60 @@ onMounted(() => {
 
 /** 浮层宽度，定位时要用它算左边界 */
 const WIDTH = 288;
+/** 距视口边缘留出的空隙 */
+const GAP = 8;
+
+/** 内容撑开后的实际高度，定位要据此决定往上翻还是往下挂 */
+const boxHeight = ref(0);
 
 /**
  * 锚定位置
- * @description 贴在点击点的右下方，撞到视口右边或下边就往回收，
- * 保证整块始终在屏内
+ * @description 贴在点击点的右下方；撞到右边就往左收，
+ * 下方放不下就翻到点击点上方，仍放不下就贴顶并让内容自己滚。
+ * 只夹左边界是不够的——草稿明细一出现高度就翻倍，
+ * 确认按钮会被顶到屏幕外点不到
  */
 const style = computed(() => {
   if (!props.anchor) return {};
   const vw = typeof window === 'undefined' ? 1200 : window.innerWidth;
-  const left = Math.min(Math.max(8, props.anchor.x), vw - WIDTH - 8);
-  return { left: `${left}px`, top: `${props.anchor.y + 8}px` };
+  const vh = typeof window === 'undefined' ? 800 : window.innerHeight;
+  const left = Math.min(Math.max(GAP, props.anchor.x), vw - WIDTH - GAP);
+
+  const h = boxHeight.value || 160;
+  const below = props.anchor.y + GAP;
+  const top =
+    below + h <= vh - GAP
+      ? below
+      : // 下面放不下就翻到上方；上方也放不下就贴顶
+        Math.max(GAP, Math.min(props.anchor.y - h - GAP, vh - h - GAP));
+
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    maxHeight: `${vh - GAP * 2}px`,
+  };
 });
+
+/** 内容变了就重新量高度，否则翻转判断用的是上一次的尺寸 */
+async function measure() {
+  await nextTick();
+  boxHeight.value = box.value?.offsetHeight ?? 0;
+}
 
 watch(
   () => props.anchor,
   async (v) => {
     if (!v) return;
     text.value = '';
+    boxHeight.value = 0;
     await nextTick();
     box.value?.querySelector('input')?.focus();
+    await measure();
   },
 );
+
+// 草稿与回话都会让高度翻倍，变了就重新定位
+watch(() => [props.pendingText, props.reply, props.busy], measure);
 
 function send() {
   if (!text.value.trim() || props.busy) return;
@@ -95,7 +127,7 @@ function send() {
       <div
         ref="box"
         data-alt="ask-box"
-        class="fixed bottom-0 left-0 right-0 rounded-t-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-600 dark:bg-slate-800 sm:bottom-auto sm:right-auto sm:w-72 sm:rounded-xl"
+        class="fixed bottom-0 left-0 right-0 overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-600 dark:bg-slate-800 sm:bottom-auto sm:right-auto sm:w-72 sm:rounded-xl [&_li]:!my-0 [&_p]:!my-0 [&_ul]:!m-0 [&_ul]:!list-none [&_ul]:!p-0"
         :style="style"
       >
         <div class="mb-2 flex items-start justify-between gap-2">
@@ -148,6 +180,17 @@ function send() {
             />
           </button>
         </div>
+
+        <!-- 等模型回话时给个明确的状态，光靠按钮上的小图标看不出来 -->
+        <p
+          v-if="busy"
+          data-alt="ask-thinking"
+          class="mt-2 flex items-center gap-1.5 text-xs text-slate-400"
+        >
+          <span
+            class="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400"
+          />正在想…
+        </p>
 
         <!-- 待确认：模型的理解摆出来，点了才算 -->
         <div

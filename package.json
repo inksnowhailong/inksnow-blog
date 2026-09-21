@@ -6,11 +6,12 @@
   "author": "inksnow海龙 <inksnowhailong@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": " vuepress dev docs",
+    "dev": "npm run clean:cache && vuepress dev docs",
     "dev:netlify": "cross-env NODE_ENV=netlify vuepress dev docs",
-    "start": "vuepress dev docs",
+    "start": "npm run clean:cache && vuepress dev docs",
     "build": "vuepress build docs",
-    "build:netlify": "cross-env NODE_ENV=netlify vuepress build docs"
+    "build:netlify": "cross-env NODE_ENV=netlify vuepress build docs",
+    "clean:cache": "node -e \"require('fs').rmSync('docs/.vuepress/.cache',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@types/three": "^0.177.0",
