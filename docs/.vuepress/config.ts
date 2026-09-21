@@ -45,48 +45,9 @@ const Days = mdPathFormat(
   "days/"
 );
 
-/** 站点根路径，PWA 的清单与 Service Worker 都挂在它下面 */
-const BASE = process.env.NODE_ENV == "netlify" ? "/" : "/inksnow-blog/";
-
 export default defineUserConfig({
-  base: BASE,
-  head: [
-    ['link', { rel: 'icon', href: `${BASE}logo.png` }],
-    ['meta', { name: 'theme-color', content: '#4d78cc' }],
-    ['link', { rel: 'apple-touch-icon', href: `${BASE}icon-192.png` }],
-    // 注册一个不缓存任何东西的 Service Worker。浏览器判定"这是个应用"
-    // 时仍会看有没有 fetch 处理器，而做真正的离线缓存要连带处理
-    // "发了新版本但用户还看着旧的"，那是只有真需要离线时才值得付的开销
-    [
-      'script',
-      {},
-      `if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('${BASE}sw.js').catch(function () {});
-        });
-      }`,
-    ],
-  ],
-
-  /**
-   * 按页面挂不同的应用清单
-   * @description 一个文档里只有第一个 rel="manifest" 生效，因此清单不能放进
-   * 全局 head——那样 life 页会先读到博客那份，装出来的还是整个博客。
-   * 在这里按路径二选一，保证每页恰好一份
-   */
-  extendsPage(page) {
-    const isLife = page.path.startsWith('/life/');
-    page.frontmatter.head = [
-      ...((page.frontmatter.head as unknown[]) ?? []),
-      [
-        'link',
-        {
-          rel: 'manifest',
-          href: `${BASE}${isLife ? 'life' : 'manifest'}.webmanifest`,
-        },
-      ],
-    ] as typeof page.frontmatter.head;
-  },
+  base: process.env.NODE_ENV == "netlify" ? "/" : "/inksnow-blog/",
+  head: [['link', { rel: 'icon', href: '/inksnow-blog/logo.png' }]],
   title: "海龙的博客",
   description: "海龙的博客",
   lang: "zh-CN",
