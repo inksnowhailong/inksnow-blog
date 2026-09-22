@@ -14,7 +14,8 @@
  *
  * 两个模式长得不一样，是为了让人一眼分清这句话会不会经过模型：
  * ask 有边框、按钮是纸飞机；note 无框只有一层底色、按钮直接写着「记下」——
- * 写完就落库，没有第二步。
+ * 写完就落库，没有第二步。note 的按钮文字与底色可由调用处改（actionText / tone），
+ * 因为「记进展」和「结项 +15 元」是同一条输入栏的两种去向，换个框会让人以为换了地方。
  */
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import LifeIcon from './lifeIcon.vue';
@@ -30,6 +31,10 @@ const props = withDefaults(
     maxlength?: number;
     /** 按钮的 title 与 aria-label，不给则按 mode 取默认文案 */
     label?: string;
+    /** note 模式按钮上的文字，不给则「记下」 */
+    actionText?: string;
+    /** note 模式底色：warn 转琥珀，提示这一条提交下去会改状态（如结项） */
+    tone?: 'default' | 'warn';
   }>(),
   {
     mode: 'ask',
@@ -45,8 +50,9 @@ const emit = defineEmits<{
 
 const isAsk = computed(() => props.mode === 'ask');
 const disabled = computed(() => props.busy || !props.modelValue.trim());
+const noteText = computed(() => props.actionText || '记下');
 const buttonLabel = computed(
-  () => props.label || (isAsk.value ? '交给 AI' : '记下这一条')
+  () => props.label || (isAsk.value ? '交给 AI' : noteText.value)
 );
 
 /** 跑着的时候换成横线，让「在等结果」和「可以点」在图标上就分得开 */
@@ -99,6 +105,8 @@ function onEnter(e: KeyboardEvent) {
     :class="
       isAsk
         ? 'border border-slate-200 bg-white focus-within:border-brand-400 dark:border-slate-600 dark:bg-slate-900'
+        : tone === 'warn'
+        ? 'bg-amber-50 dark:bg-amber-500/10'
         : 'bg-slate-50 dark:bg-slate-700/40'
     "
   >
@@ -138,7 +146,7 @@ function onEnter(e: KeyboardEvent) {
         class="h-4 w-4 sm:h-3.5 sm:w-3.5"
         :class="busy && 'animate-pulse'"
       />
-      <template v-else>{{ busy ? '记下…' : '记下' }}</template>
+      <template v-else>{{ busy ? noteText + '…' : noteText }}</template>
     </button>
   </div>
 </template>
