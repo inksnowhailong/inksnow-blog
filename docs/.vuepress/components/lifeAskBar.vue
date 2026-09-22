@@ -81,6 +81,18 @@ function submit() {
 }
 
 /**
+ * 把光标放进来
+ * @description 给「把人送到某条输入条上」的入口用（如打卡项那行「还没记书」）。
+ * 暴露一个方法而不是让调用处自己去 querySelector 里面那个 textarea：
+ * 框内结构是这个组件的私事，改了不该连累外面
+ */
+function focus() {
+  ta.value?.focus();
+}
+
+defineExpose({ focus });
+
+/**
  * Enter 的处理
  * @description 没有用 @keydown.enter.exact.prevent 这类修饰符写法，因为
  * .prevent 是无条件执行的：note 模式下敲普通 Enter 本该换行，修饰符写法会把

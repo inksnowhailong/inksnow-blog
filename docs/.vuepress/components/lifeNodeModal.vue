@@ -56,6 +56,14 @@ function startDrop() {
   dropping.value = true;
 }
 
+/**
+ * 常驻项
+ * @description 后端给这类节点打了 pinned：天天排、砍不掉、排期也改不了
+ *（如「读书」）。前端据此收掉砍掉入口，免得点下去只换回一句报错。
+ * 用 ?. 兜底：后端还没带上这个字段时按普通节点处理
+ */
+const isPinned = computed(() => !!props.node?.pinned);
+
 /** 每日项才有的计分设定 */
 const threshold = ref(0);
 const points = ref(0);
@@ -276,6 +284,7 @@ function drop() {
         class="absolute right-0 top-10 z-10 w-44 rounded-xl border border-slate-100 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
       >
         <button
+          v-if="!isPinned"
           data-alt="drop-start"
           type="button"
           class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
@@ -283,6 +292,14 @@ function drop() {
         >
           砍掉这条
         </button>
+        <!-- 菜单里本来只有砍掉一项，常驻项换成一句话，别留一个空菜单 -->
+        <p
+          v-else
+          data-alt="node-pinned-note"
+          class="px-2.5 py-2 text-xs leading-snug text-slate-500 dark:text-slate-400"
+        >
+          这一项是常驻的，天天排，砍不掉也改不了排期
+        </p>
       </div>
     </template>
 

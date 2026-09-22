@@ -5,7 +5,7 @@
  * 打卡区管每天重复的四项，路线图管一次性的清单进度，两者不重叠。
  * 单位只认「分」这一种主货币，元与体能债都是它的换算面。
  */
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
@@ -893,6 +893,30 @@ async function captureBook() {
 /** 打开详情的那本书 */
 const activeBook = ref<any>(null);
 
+/** 打卡项那行「在读」指向手上第一本书 */
+const firstReadingBook = computed<any>(() => readingBooks.value[0] ?? null);
+
+/** 读书卡与卡里那条输入条，打卡项那行「还没记书」要把人送过去 */
+const booksSection = ref<HTMLElement | null>(null);
+const bookBar = ref<InstanceType<typeof LifeAskBar> | null>(null);
+
+/**
+ * 点打卡项下面那行「在读」
+ * @description 有书就开书弹窗；一本都没有时不弹空窗，把人送到读书卡的输入条上——
+ * 这一行要解决的是「该记一本书了」，光提示没有用
+ */
+async function openReading() {
+  if (firstReadingBook.value) {
+    activeBook.value = firstReadingBook.value;
+    return;
+  }
+  // 手机上读书卡折在「更多」里，先展开再滚，否则滚向一个 display:none 的元素
+  showMore.value = true;
+  await nextTick();
+  booksSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  bookBar.value?.focus();
+}
+
 // 记笔记或读完之后重新拉数据，弹窗里拿的还是旧对象，
 // 得按ID换成新的，否则头部那行小字会停在改之前
 watch(books, () => {
@@ -1483,6 +1507,40 @@ onMounted(() => {
                     class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
                   />
                 </button>
+
+                <!--
+                  「在读」：常驻的那一项手上正在读哪本书。
+                  按 pinned 认而不按标题——标题是可以改的，改完这一行就不见了
+                -->
+                <button
+                  v-if="it.pinned"
+                  data-alt="punch-reading"
+                  type="button"
+                  :title="
+                    firstReadingBook
+                      ? '打开《' + firstReadingBook.title + '》'
+                      : '去记一本在读的书'
+                  "
+                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  @click="openReading"
+                >
+                  <span
+                    class="shrink-0 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                    >在读</span
+                  >
+                  <span
+                    class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300"
+                    >{{
+                      firstReadingBook
+                        ? '《' + firstReadingBook.title + '》'
+                        : '还没记书'
+                    }}</span
+                  >
+                  <LifeIcon
+                    name="right"
+                    class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
+                  />
+                </button>
               </div>
             </div>
 
@@ -1493,6 +1551,7 @@ onMounted(() => {
             研究线是想起来才记一句的地方——天天要看的那摊摆在手边
           -->
           <section
+            ref="booksSection"
             data-alt="books-section"
             :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
@@ -1512,6 +1571,7 @@ onMounted(() => {
             <div class="mt-3">
               <!-- 上限对齐后端的 200，多打的字不该被悄悄吃掉 -->
               <LifeAskBar
+                ref="bookBar"
                 v-model="bookDraft"
                 mode="note"
                 :busy="busy"
