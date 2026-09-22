@@ -1,12 +1,9 @@
 <script setup lang="ts">
 /**
  * 问 AI 的面板本体
- * @description life 页 AI 对话的统一外壳。它只管「输入 → 等待 → 摆出草稿 → 确认」
- * 这条链，不管自己被摆在哪里——外面套什么由调用方决定，于是同一套标记有两个态：
- *   锚定态  lifeAsk 把它塞进浮层，贴着点击的东西弹出
- *   常驻态  lifeChat 把它铺在卡片里，一直摆着
- * 抽出来的原因和 lifeAskBar 一样：这段原先在两处各抄了一份，
- * 草稿确认按钮抄歪成了 h-11/sm:h-7 与 h-8 两种，后者在手机上够不到 44px。
+ * @description 只管「输入 → 等待 → 摆出草稿 → 确认」这条链，不管自己被摆在哪里。
+ * 现在只有 lifeAskModal 一个调用方，仍单独成文件是因为这条链与弹窗的形态无关：
+ * 弹窗管遮罩、定位、多轮记录，它管这四步，两件事各改各的。
  */
 import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
@@ -17,8 +14,6 @@ withDefaults(
     modelValue: string;
     busy?: boolean;
     placeholder?: string;
-    /** 发送按钮的无障碍文案 */
-    label?: string;
     /** 待确认草稿的人话描述，非空时必须点头才落库 */
     pendingText?: string;
     /** 草稿原件，摊开给人做前后对照 */
@@ -29,8 +24,6 @@ withDefaults(
     pendingNote?: string;
     /** 不经模型的直接动作，如「直接记为已还」 */
     directLabel?: string;
-    /** 出错时的红字 */
-    errorMsg?: string;
   }>(),
   {
     busy: false,
@@ -54,7 +47,6 @@ const emit = defineEmits<{
       mode="ask"
       :busy="busy"
       :placeholder="placeholder"
-      :label="label"
       @update:model-value="emit('update:modelValue', $event)"
       @submit="emit('submit')"
     />
@@ -144,16 +136,5 @@ const emit = defineEmits<{
       <LifeIcon name="check" class="h-3.5 w-3.5" />
       {{ directLabel }}
     </button>
-
-    <p
-      v-if="errorMsg"
-      data-alt="ask-error"
-      class="text-sm text-rose-600 dark:text-rose-400 sm:text-xs"
-    >
-      {{ errorMsg }}
-    </p>
-
-    <!-- 回话区：锚定态放单条回复，常驻态放多轮记录，形态不同故交给调用方 -->
-    <slot />
   </div>
 </template>

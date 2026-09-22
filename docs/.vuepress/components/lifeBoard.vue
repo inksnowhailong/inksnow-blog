@@ -5,19 +5,24 @@
  * 打卡区管每天重复的四项，路线图管一次性的清单进度，两者不重叠。
  * 单位只认「分」这一种主货币，元与体能债都是它的换算面。
  */
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
-import LifeChat from './lifeChat.vue';
-import LifeStarSky from './lifeStarSky.vue';
+import LifeIdeaRow from './lifeIdeaRow.vue';
+import LifeBookRow from './lifeBookRow.vue';
+import LifeBookModal from './lifeBookModal.vue';
 import LifeIcon from './lifeIcon.vue';
-import LifeAsk from './lifeAsk.vue';
+import LifeAskButton from './lifeAskButton.vue';
+import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import { planSections } from './usePlanSections';
+import { today, shiftDays, weekdayOf } from './lifeFormat';
 import {
   describeDraft,
   applyDraft,
   isDestructive,
+  touchesPlan,
   askStream,
 } from './useLifeDraft';
 
@@ -39,9 +44,9 @@ const errorMsg = ref('');
 const diagnosis = ref<any>(null);
 const ledger = ref<any>(null);
 const ideas = ref<any>(null);
+const books = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
-const sky = ref<any>(null);
 
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
@@ -50,9 +55,11 @@ const activeDay = ref<any>(null);
 /** 弹窗里正在看的节点 */
 const picked = ref<any>(null);
 const pickedPath = ref('');
-const showIdeas = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、AI 栏其余、路线图 */
+/** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
+const showDone = ref(false);
+
+/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、读书与研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -76,54 +83,56 @@ async function api(path: string, init: RequestInit = {}) {
   return await res.json();
 }
 
-/** 今天的日期 YYYY-MM-DD，按本地时区 */
-function today(): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(
-    new Date(),
-  );
-}
-
-/** 日期加减天数 */
-function shiftDays(date: string, days: number): string {
-  const d = new Date(date + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** 取某日期是星期几 */
-function weekdayOf(date: string): number {
-  return new Date(date + 'T00:00:00Z').getUTCDay();
-}
-
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-/** 拉取面板所需数据 */
+/**
+ * 打卡与计划这一摊：诊断、账本、热力图、路线图与当日结算
+ * @description 它们是同一笔记录的几个侧面——记一次打卡，五个数都会变，
+ * 所以要一起拉。研究线不在其中，故单独一个函数
+ */
+async function loadCore() {
+  const to = today();
+  const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
+  const [d, l, h, p] = await Promise.all([
+    api('/life/diagnosis'),
+    api('/life/ledger'),
+    api(`/life/settlement/range?from=${from}&to=${to}`),
+    api('/life/plan'),
+  ]);
+  diagnosis.value = d;
+  ledger.value = l;
+  heat.value = h;
+  plan.value = p;
+  if (!activeDate.value) activeDate.value = to;
+  if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
+  await Promise.all([loadActiveDay(), loadMonth()]);
+  // 弹窗开着时同步刷新里面那份，否则改完还显示旧内容
+  if (picked.value) picked.value = findNode(picked.value.id);
+}
+
+/**
+ * 研究线
+ * @description 与打卡、计划互不相干：记一条研究线不会改分数也不会动额度，
+ * 没有理由顺带把上面那五个接口再拉一遍
+ */
+async function loadIdeas() {
+  ideas.value = await api('/life/ideas');
+}
+
+/**
+ * 读书
+ * @description 和研究线同理，自成一摊：记一本书、记一条笔记都不改分数也不动额度
+ */
+async function loadBooks() {
+  books.value = await api('/life/books');
+}
+
+/** 开锁时的首次拉取，三摊都要 */
 async function loadAll() {
   loading.value = true;
   errorMsg.value = '';
   try {
-    const to = today();
-    const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p, s] = await Promise.all([
-      api('/life/diagnosis'),
-      api('/life/ledger'),
-      api('/life/ideas'),
-      api(`/life/settlement/range?from=${from}&to=${to}`),
-      api('/life/plan'),
-      // 星图只是锦上添花，取不到不该让整个面板打不开
-      api('/life/learning/sky').catch(() => null),
-    ]);
-    diagnosis.value = d;
-    ledger.value = l;
-    ideas.value = i;
-    heat.value = h;
-    plan.value = p;
-    sky.value = s;
-    if (!activeDate.value) activeDate.value = to;
-    if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
-    await Promise.all([loadActiveDay(), loadMonth()]);
-    // 弹窗开着时同步刷新里面那份，否则改完还显示旧内容
-    if (picked.value) picked.value = findNode(picked.value.id);
+    await Promise.all([loadCore(), loadIdeas(), loadBooks()]);
     unlocked.value = true;
     try {
       localStorage.setItem(KEY_STORE, key.value);
@@ -133,6 +142,18 @@ async function loadAll() {
   } finally {
     loading.value = false;
   }
+}
+
+/**
+ * 动作之后刷新一块数据
+ * @description 与开锁那次不一样：那次拿不到要退回密钥页，
+ * 这里只是让页面跟上，失败写到错误条上就够了，不该把人踢出去
+ * @param load 要重拉的那一块
+ */
+function refresh(load: () => Promise<void>) {
+  load().catch((e: any) => {
+    errorMsg.value = e.message || '刷新失败';
+  });
 }
 
 /** 取当前选中日期的结算；选中今天时直接复用诊断里的结果 */
@@ -183,7 +204,7 @@ async function punch(nodeId: string, minutes: number) {
       method: 'POST',
       body: JSON.stringify({ nodeId, minutes, occurredOn: activeDate.value }),
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -209,13 +230,16 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
       method: 'POST',
       body: JSON.stringify({ kind, amount, occurredOn: today() }),
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
     busy.value = false;
   }
 }
+
+/** 当前这天是不是休息日，由当日结算下发 */
+const activeRest = computed(() => activeDay.value?.dayKind === 'REST');
 
 /**
  * 打卡区的标题
@@ -224,6 +248,10 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
  * 免得看见一个空列表以为是加载失败
  */
 const dailyTitle = computed(() => {
+  // 休息日只排常驻项，先说清「不做也不欠」，报项数反而像是又欠了几样。
+  // 翻到往日时说「今天」就成了错话，补记那天看着像在说当下
+  if (activeRest.value)
+    return `${isToday.value ? '今天' : '这天'}休息 · 做了算白赚`;
   const n = activeDay.value?.items?.length ?? 0;
   if (!n) return '今天没排计划';
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -262,13 +290,9 @@ const overMinutes = computed(() => {
   );
 });
 
-/**
- * 就地问 AI 的浮层状态
- * @description 全页共用一个浮层：谁唤起它，谁就把自己的上下文塞进来。
- * 这样"AI 能操作的地方"等于"哪里挂了这个组件"，不必到处铺输入框
- */
-const ask = ref<{
-  anchor: { x: number; y: number } | null;
+/** 问 AI 弹窗的一次上下文 */
+interface AskState {
+  open: boolean;
   title: string;
   context: string;
   placeholder: string;
@@ -277,52 +301,63 @@ const ask = ref<{
   direct: (() => Promise<void>) | null;
   /** 交给模型前，在用户原话前面补的一句背景 */
   prefix: string;
-}>({
-  anchor: null,
+  /** 这一次问的是哪一天，空则不限定某天 */
+  focusDate: string;
+}
+
+/** 这一次打开时的空白状态，openAsk 拿它兜住 patch 没给的字段 */
+const BLANK_ASK: AskState = {
+  open: false,
   title: '',
   context: '',
   placeholder: '',
   directLabel: '',
   direct: null,
   prefix: '',
-});
+  focusDate: '',
+};
+
+/**
+ * 问 AI 弹窗的状态
+ * @description 全页共用一个弹窗：谁唤起它，谁就把自己的上下文塞进来。
+ * 这样"AI 能操作的地方"等于"谁调了 openAsk"，不必到处铺输入框
+ */
+const ask = ref<AskState>({ ...BLANK_ASK });
 const askReply = ref('');
 const askPending = ref<any>(null);
 
-/** 从点击事件里取锚点坐标 */
-function anchorOf(e: MouseEvent) {
-  const el = e.currentTarget as HTMLElement;
-  const r = el.getBoundingClientRect();
-  return { x: r.left, y: r.bottom };
-}
-
-function closeAsk() {
-  ask.value = { ...ask.value, anchor: null, direct: null };
-  askReply.value = '';
-  askPending.value = null;
-}
-
 /**
- * 浮层这一次打开期间的问答
- * @description 浮层上只显示最后一条回答，但追问要接得上，
- * 所以这条历史照存不显示。换个地方点开就清空——
- * 上一个话题的上下文带到下一个话题上只会帮倒忙
+ * 弹窗这一次打开期间的问答
+ * @description 追问要接得上，所以整段历史都留着。
+ * 换个地方点开就清空——上一个话题的上下文带到下一个话题上只会帮倒忙
  */
 const askLog = ref<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-// 浮层一开一关都算换了话题。盯 anchor 而不是在每个入口各清一次，
-// 是因为打开浮层的地方有五处，靠记得逐个加迟早会漏一个
-watch(
-  () => ask.value.anchor,
-  () => {
-    askLog.value = [];
-  },
-);
+/**
+ * 打开问 AI 弹窗
+ * @description 六个入口都从这儿进，清场与赋值收在一处。
+ * 清场不挂在 open 的翻转上：弹窗已经开着时再点另一个入口，open 不变，
+ * 但话题已经换了，上一轮的记录和草稿必须跟着走
+ * @param patch 这一次的上下文，没给的字段回到空值
+ */
+function openAsk(patch: Partial<Omit<AskState, 'open'>>) {
+  askReply.value = '';
+  askPending.value = null;
+  askLog.value = [];
+  ask.value = { ...BLANK_ASK, ...patch, open: true };
+}
+
+function closeAsk() {
+  ask.value = { ...ask.value, open: false, direct: null };
+  askReply.value = '';
+  askPending.value = null;
+  askLog.value = [];
+}
 
 /**
- * 把浮层里的话交给模型
+ * 把弹窗里的话交给模型
  * @description 前缀补一句背景说清这是在问哪件事，历史让追问接得上。
- * 拿回来只出草稿不落库，与对话栏同一套规矩：模型永远不直接改数据。
+ * 拿回来只出草稿不落库：模型永远不直接改数据。
  */
 async function askSend(text: string) {
   if (busy.value) return;
@@ -332,26 +367,29 @@ async function askSend(text: string) {
 
   // 第一句要带前缀点明话题，后续追问已在上下文里，再带就啰嗦了
   const sent = askLog.value.length ? text : ask.value.prefix + text;
+  // 历史要在这句入列之前取，否则这次的问题会在上下文里重复一遍
   const history = askLog.value.slice(-12);
+  // 发出就入列：输入框此时已经清空，不先摆上去的话屏幕上只剩 AI 在吐字，
+  // 看不见自己刚说了什么
+  askLog.value = [...askLog.value, { role: 'user', content: sent }];
 
   try {
     const res = await askStream(
       API,
       key.value,
       sent,
-      // 浮层空间小，只把正在吐的字显示出来，出草稿时会被替换掉
+      // 边吐边显示，让人立刻看到有反应；这段字还没进记录，故单独放
       (delta) => {
         askReply.value += delta;
       },
       history,
+      ask.value.focusDate,
     );
-    askLog.value = [...askLog.value, { role: 'user', content: sent }];
     if (res.kind === 'answer') {
-      askReply.value = res.text || askReply.value;
-      askLog.value = [
-        ...askLog.value,
-        { role: 'assistant', content: askReply.value },
-      ];
+      // 说完整了就并进记录，否则同一段话会在记录里和吐字区各显示一遍
+      const answer = res.text || askReply.value;
+      askReply.value = '';
+      askLog.value = [...askLog.value, { role: 'assistant', content: answer }];
     } else {
       askReply.value = '';
       askPending.value = res;
@@ -362,13 +400,16 @@ async function askSend(text: string) {
       ];
     }
   } catch (e: any) {
+    // 没问出去的那句要从记录里撤掉，否则下次发送历史会以两句 user 连着结尾，
+    // 且第二句不再补前缀
+    askLog.value = askLog.value.slice(0, -1);
     askReply.value = 'AI 暂时不可用：' + e.message;
   } finally {
     busy.value = false;
   }
 }
 
-/** 浮层里点头之后才写入 */
+/** 弹窗里点头之后才写入 */
 async function askConfirm() {
   const p = askPending.value;
   if (!p || busy.value) return;
@@ -377,7 +418,11 @@ async function askConfirm() {
     await applyDraft(p, api);
     askPending.value = null;
     askReply.value = '已记下';
-    await loadAll();
+    // 草稿什么都可能改，三摊都得重拉。不走 loadAll：那条路是开锁用的，
+    // 会重写密钥、把整页推回加载态，还会把刷新失败吞进错误条当成加载失败
+    refresh(loadCore);
+    refresh(loadIdeas);
+    refresh(loadBooks);
   } catch (e: any) {
     askReply.value = e.message;
   } finally {
@@ -385,12 +430,19 @@ async function askConfirm() {
   }
 }
 
-/** 草稿的一句话描述，交给浮层展示 */
+/** 草稿的一句话描述，交给弹窗展示 */
 const askPendingText = computed(() =>
   askPending.value ? describeDraft(askPending.value, nodeTitleOf) : '',
 );
 
-/** 点浮层里的「直接记下」 */
+/** 会动计划本身的草稿要多说一句，它改的不是一笔流水而是计划表 */
+const askPendingNote = computed(() =>
+  touchesPlan(askPending.value)
+    ? '这条会动计划本身，确认前看清楚。改错了可以在「最近改动」里撤销'
+    : '',
+);
+
+/** 点弹窗里的「直接记下」 */
 async function askDirect() {
   const fn = ask.value.direct;
   if (!fn || busy.value) return;
@@ -398,34 +450,68 @@ async function askDirect() {
   closeAsk();
 }
 
+/** 没有上下文的随便问，从右下角悬浮按钮进来 */
+function openFreeAsk() {
+  openAsk({
+    context: '记一笔、问一句、或者让它改计划，都在这儿说',
+    placeholder: '例如：主线写了 40 分钟，或问它任何事',
+  });
+}
+
+/** 总览「战胜内心的批判家」那一卡的入口：今天投了多少、拿了几分 */
+function openScoreAsk() {
+  openAsk({
+    title: '今天的分数',
+    prefix: '关于今天的投入和分数：',
+  });
+}
+
 /** 点某一个体能债方块 */
-function openDebtAsk(e: MouseEvent, index: number) {
-  ask.value = {
-    anchor: anchorOf(e),
+function openDebtAsk(index: number) {
+  openAsk({
     title: `还掉第 ${index + 1} 个体能债`,
     context: debtUnitText.value,
     placeholder: '我刚做了 10 个俯卧撑',
     directLabel: '直接记为已还 1 个',
     direct: () => ledgerAction('REPAY', 1),
     prefix: '关于还体能债：',
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 点运动储备的空位，存一个 */
-function openBankAsk(e: MouseEvent) {
-  ask.value = {
-    anchor: anchorOf(e),
+function openBankAsk() {
+  openAsk({
     title: '存 1 个运动储备',
     context: '提前锻炼存起来，以后产生欠债自动抵扣',
     placeholder: '刚做了 20 个深蹲',
     directLabel: '直接记为存 1 个',
     direct: () => ledgerAction('EXERCISE', 1),
     prefix: '关于主动锻炼存运动储备：',
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
+}
+
+/** 路线图那一卡的入口 */
+function openRoadmapAsk() {
+  openAsk({
+    title: '路线图',
+    prefix: '关于我的学习路线图：',
+  });
+}
+
+/** 研究线那一卡的入口，问的是整摊线而不是某一条 */
+function openIdeasAsk() {
+  openAsk({
+    title: '研究线',
+    prefix: '关于我的研究线：',
+  });
+}
+
+/** 读书那一卡的入口，问的是整摊书而不是某一本 */
+function openBooksAsk() {
+  openAsk({
+    title: '读书',
+    prefix: '关于我在读的书：',
+  });
 }
 
 /** 清掉某项某天的记录，不经模型 */
@@ -436,7 +522,7 @@ async function clearDay(nodeId: string) {
     await api(`/life/plan/${nodeId}/records?date=${activeDate.value}`, {
       method: 'DELETE',
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -449,18 +535,13 @@ async function clearDay(nodeId: string) {
  * @description 前缀只说是哪一项哪一天，不报已投入多少分钟——
  * 实测把分钟数写进上下文会把模型带偏，它会照着那个数再记一笔
  */
-function openDailyAsk(e: MouseEvent, item: any) {
-  ask.value = {
-    anchor: anchorOf(e),
+function openDailyAsk(item: any) {
+  openAsk({
     title: item.title,
     context: `${item.minutes}/${item.thresholdMinutes} 分钟 · 达标得 ${item.points} 分`,
     placeholder: '刚又做了半小时',
-    directLabel: '',
-    direct: null,
     prefix: `关于「${item.title}」这一项，日期 ${activeDate.value}：`,
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 在计划树里按ID找节点，弹窗刷新后要用 */
@@ -487,11 +568,36 @@ function openNode(node: any, path: string) {
   pickedPath.value = path;
 }
 
-/** 点星座进方向节点 */
-function openConstellation(id: string) {
-  const node = findNode(id);
-  if (node) openNode(node, node.title);
-}
+/**
+ * 每日项 → 它所属方向当前该做的那条清单项
+ * @description 手机上路线图折在「更多」里，打卡的时候看不见今天该学哪一项。
+ * 解法不是把整张路线图搬回首屏，而是让每个打卡项自己带上那一条。
+ * 算法直接用 planSections，与路线图是同一份——各算一份的话，
+ * 做完一项会变成一边跳下一项、另一边还停在原处
+ */
+const hereByNode = computed(() => {
+  const map = new Map<string, { item: any; path: string }>();
+  for (const s of planSections(plan.value)) {
+    if (!s.currentId) continue;
+    const group = s.groups.find((g: any) =>
+      g.items.some((i: any) => i.id === s.currentId),
+    );
+    if (!group) continue;
+    const item = group.items.find((i: any) => i.id === s.currentId);
+    const path = [s.title, group.title].filter(Boolean).join(' › ');
+    // 同一个方向下的每日项指向同一条「在这」
+    for (const d of s.daily) map.set(d.id, { item, path });
+  }
+  return map;
+});
+
+/** 打卡项配上它的「在这」，模板里就不必反复查表 */
+const punchItems = computed(() =>
+  (activeDay.value?.items ?? []).map((i: any) => ({
+    ...i,
+    here: hereByNode.value.get(i.nodeId) ?? null,
+  })),
+);
 
 const isToday = computed(() => activeDate.value === today());
 
@@ -561,7 +667,8 @@ const monthLabel = computed(() => {
 /**
  * 当月日历的格子
  * @description 周一起排，月初补空位使星期列对齐。
- * 三态：有记录的日子、该日无记录、只是为对齐补的空位
+ * 三态：有记录的日子、该日无记录、只是为对齐补的空位。
+ * 无记录的日子也带上日期——格子要能点开问那天，没有日期就问不了
  */
 const monthCells = computed(() => {
   if (!heatMonth.value) return [];
@@ -573,38 +680,79 @@ const monthCells = computed(() => {
   const cells: any[] = Array(lead).fill(undefined);
   for (let d = 1; d <= days; d++) {
     const date = `${heatMonth.value}-${String(d).padStart(2, '0')}`;
-    cells.push(byDate.get(date) ?? null);
+    cells.push(byDate.get(date) ?? { date });
   }
   return cells;
 });
 
 /**
+ * 这格能不能点开问 AI
+ * @description 对齐用的空位没有日期，未来的日子还没发生，都没什么可问
+ */
+function canAskDay(cell: any): boolean {
+  return !!cell?.date && cell.date <= today();
+}
+
+/**
+ * 点日历格子，问这一天
+ * @description 格子只画得出分数高低，答不了「那天到底干了什么」。
+ * 带上 focusDate 让后端把那天的结算与全部事件塞进提示，模型才有据可依
+ */
+function openDayAsk(cell: any) {
+  if (!canAskDay(cell)) return;
+  const [, m, d] = cell.date.split('-');
+  openAsk({
+    title: `${Number(m)} 月 ${Number(d)} 日`,
+    context: '问这一天做了什么、为什么欠债都行',
+    placeholder: '那天做了什么',
+    prefix: `关于 ${cell.date} 这一天：`,
+    focusDate: cell.date,
+  });
+}
+
+/** 休息日格子的虚线边框，休不休由后端的 dayKind 说了算 */
+const REST_BORDER =
+  'border border-dashed border-slate-300 dark:border-slate-600';
+
+/**
  * 某格的配色
- * @description 分四档深浅；周末无义务，做了才着色，没做显示为空底
+ * @description 分四档深浅；休息日与没排计划的日子无义务，做了才着色，没做显示为空底。
+ * 休息日额外描一圈虚线边框——调休上班的周末与放假的工作日光看底色分不出来
  */
 function heatClass(cell: any): string {
-  // undefined 表示该月没有这一天，整格不画；null 表示这天不在统计范围内
-  if (cell === undefined) return 'invisible';
-  if (!cell) return 'bg-transparent';
+  // 对齐空位不走这里，进来的都是真有这一天；没有 score 表示不在统计范围内
+  if (cell.score == null) return 'bg-transparent';
+  const rest = cell.dayKind === 'REST';
   // 看的是「这天排没排计划」而不是「是不是周末」：出差请假同样是没排
   if (cell.score <= 0) {
-    return cell.planned
+    return cell.planned && !rest
       ? 'bg-slate-100 dark:bg-slate-700'
-      : 'bg-transparent border border-dashed border-slate-200 dark:border-slate-700';
+      : `bg-transparent ${REST_BORDER}`;
   }
   // 按达成率着色而非绝对分：每天排几项会变，绝对分之间不再可比
   const ratio = cell.fullScore > 0 ? cell.score / cell.fullScore : 0;
-  if (ratio >= 1) return 'bg-brand-500 dark:bg-brand-300';
-  if (ratio >= 0.6) return 'bg-brand-500/75 dark:bg-brand-300/75';
-  if (ratio >= 0.3) return 'bg-brand-500/50 dark:bg-brand-300/50';
-  return 'bg-brand-500/25 dark:bg-brand-300/30';
+  const tone =
+    ratio >= 1
+      ? 'bg-brand-500 dark:bg-brand-300'
+      : ratio >= 0.6
+        ? 'bg-brand-500/75 dark:bg-brand-300/75'
+        : ratio >= 0.3
+          ? 'bg-brand-500/50 dark:bg-brand-300/50'
+          : 'bg-brand-500/25 dark:bg-brand-300/30';
+  // 休息日做了事照样着色：白赚的分抹掉了，这天就成了一片空白
+  return rest ? `${tone} ${REST_BORDER}` : tone;
 }
 
 function heatTitle(cell: any): string {
-  if (!cell) return '';
-  if (!cell.planned) return `${cell.date} 未排计划`;
+  if (!cell || cell.score == null) return '';
+  // 备注是这天为什么休息的唯一解释，如「国庆」，没有它虚格看着像漏记
+  const rest =
+    cell.dayKind === 'REST'
+      ? ` · 休息${cell.note ? `（${cell.note}）` : ''}`
+      : '';
+  if (!cell.planned) return `${cell.date} 未排计划${rest}`;
   const pass = cell.debtFreeScore > 0 && cell.score >= cell.debtFreeScore;
-  return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}`;
+  return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}${rest}`;
 }
 
 /**
@@ -628,43 +776,58 @@ const streak = computed(() => {
 });
 
 /**
- * 想法池列表
- * @description 后端已按「进行中 → 搁着 → 已结」排好，这里只配徽标文案与配色。
- * 状态是后端从结论与最近动静算出来的，前端不再自己推
+ * 研究线列表
+ * @description 状态是后端从结论与最近动静算出来的，前端不再自己推，
+ * 也不再逐条配徽标——状态改由分段标题与行首色条表达
  */
-const IDEA_STATES: Record<string, { label: string; cls: string }> = {
-  OPEN: {
-    label: '进行中',
-    cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
-  },
-  STALE: {
-    label: '搁着',
-    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-  },
-  DONE: {
-    label: '已结',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-  },
-};
-const ideaList = computed(() =>
-  (ideas.value?.threads ?? []).map((t: any) => ({
-    ...t,
-    // 后端若送来认不得的 state，红色显出来，不要静默渲染成空徽标
-    ...(IDEA_STATES[t.state] ?? { label: t.state ?? '未知', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' }),
-  })),
+const ideaList = computed<any[]>(() => ideas.value?.threads ?? []);
+
+/** 分段的顺序与中文说法，键与后端的 state 一致 */
+const IDEA_SEGMENTS = [
+  { key: 'OPEN', label: '在动' },
+  { key: 'STALE', label: '搁着' },
+  { key: 'DONE', label: '已结' },
+];
+
+/**
+ * 按状态切成三段
+ * @description 认不得的 state 兜到末尾单独一段，不能让它静默消失——
+ * 列表按状态分组之后，漏掉的那条在界面上是查无此人
+ */
+const ideaSegments = computed(() => {
+  const known = IDEA_SEGMENTS.map((s) => ({
+    ...s,
+    items: ideaList.value.filter((t) => t.state === s.key),
+  }));
+  const rest = ideaList.value.filter(
+    (t) => !IDEA_SEGMENTS.some((s) => s.key === t.state),
+  );
+  return rest.length
+    ? [...known, { key: 'OTHER', label: '状态不明', items: rest }]
+    : known;
+});
+
+/**
+ * 标题行右侧的分段计数，如「2 在动 · 1 搁着」
+ * @description 空段不占位置；一条都没有时给句固定文案，
+ * 否则折叠状态下标题行右边只剩一个箭头，像是没加载出来
+ */
+const ideaCountText = computed(
+  () =>
+    ideaSegments.value
+      .filter((s) => s.items.length)
+      .map((s) => `${s.items.length} ${s.label}`)
+      .join(' · ') || '还没有',
 );
 
-/** 想法总条数 */
-const ideaCount = computed(() => ideaList.value.length);
-
-/** 打开详情的那个想法 */
+/** 打开详情的那条研究线 */
 const activeIdea = ref<any>(null);
 
-/** 新想法的输入框 */
+/** 新研究线的输入框 */
 const ideaDraft = ref('');
 
 /**
- * 记下一个想法
+ * 记下一条研究线
  * @description 走确定性接口不经模型：记一行字这件事没有任何需要判断的地方，
  * 让模型过一道手只会多一次失败的机会
  */
@@ -678,7 +841,7 @@ async function captureIdea() {
       body: JSON.stringify({ content }),
     });
     ideaDraft.value = '';
-    await loadAll();
+    await loadIdeas();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -694,19 +857,131 @@ watch(ideas, () => {
   if (fresh) activeIdea.value = fresh;
 });
 
-/** 从想法弹窗里唤起问 AI 的浮层 */
-function openIdeaAsk(payload: { prefix: string; anchor: { x: number; y: number } }) {
-  ask.value = {
-    anchor: payload.anchor,
+/**
+ * 研究线弹窗改完之后
+ * @param scope 这次改动波及哪一摊：记进展只动研究线，
+ * 写结论和删除会连带改额度，那一摊也得重拉
+ */
+function onIdeaChanged(scope: 'ideas' | 'all') {
+  refresh(loadIdeas);
+  if (scope === 'all') refresh(loadCore);
+}
+
+/** 从研究线弹窗里唤起问 AI */
+function openIdeaAsk(payload: { prefix: string }) {
+  openAsk({
     title: activeIdea.value?.content ?? '研究',
     context: '可以让它帮你理下一步，或者把这次的进展记下来',
     placeholder: '今天试了 xxx，发现 yyy',
-    directLabel: '',
-    direct: null,
     prefix: payload.prefix,
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
+}
+
+/** 在读的书；读完的收在折叠段里 */
+const readingBooks = computed<any[]>(() => books.value?.reading ?? []);
+const doneBooks = computed<any[]>(() => books.value?.done ?? []);
+
+/**
+ * 标题行右侧的计数
+ * @description 空的那一段不占位置；一本都没有时给句固定文案，
+ * 否则标题行右边只剩一颗星芒，像是没加载出来
+ */
+const bookCountText = computed(
+  () =>
+    [
+      readingBooks.value.length ? `在读 ${readingBooks.value.length}` : '',
+      doneBooks.value.length ? `读完 ${doneBooks.value.length}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ') || '还没有',
+);
+
+/** 读完的书默认折起来：它们是存量，日常要看的是手上这几本 */
+const showDoneBooks = ref(false);
+
+/** 新书的输入框 */
+const bookDraft = ref('');
+
+/**
+ * 记下一本在读的书
+ * @description 与记研究线同理走确定性接口：书名就是一行字，
+ * 让模型过一道手只会多一次失败的机会
+ */
+async function captureBook() {
+  const title = bookDraft.value.trim();
+  if (!title || busy.value) return;
+  busy.value = true;
+  try {
+    await api('/life/books', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+    bookDraft.value = '';
+    await loadBooks();
+  } catch (e: any) {
+    errorMsg.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** 打开详情的那本书 */
+const activeBook = ref<any>(null);
+
+/** 打卡项那行「在读」指向手上第一本书 */
+const firstReadingBook = computed<any>(() => readingBooks.value[0] ?? null);
+
+/** 读书卡与卡里那条输入条，打卡项那行「还没记书」要把人送过去 */
+const booksSection = ref<HTMLElement | null>(null);
+const bookBar = ref<InstanceType<typeof LifeAskBar> | null>(null);
+
+/**
+ * 点打卡项下面那行「在读」
+ * @description 有书就开书弹窗；一本都没有时不弹空窗，把人送到读书卡的输入条上——
+ * 这一行要解决的是「该记一本书了」，光提示没有用
+ */
+async function openReading() {
+  if (firstReadingBook.value) {
+    activeBook.value = firstReadingBook.value;
+    return;
+  }
+  // 手机上读书卡折在「更多」里，先展开再滚，否则滚向一个 display:none 的元素
+  showMore.value = true;
+  await nextTick();
+  booksSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  bookBar.value?.focus();
+}
+
+// 记笔记或读完之后重新拉数据，弹窗里拿的还是旧对象，
+// 得按ID换成新的，否则头部那行小字会停在改之前。
+// 找不到说明这本书已经没了（如经 AI 删掉），关掉弹窗——
+// 留着它等于对着一本不存在的书记笔记，每一下都只换回一句报错
+watch(books, () => {
+  if (!activeBook.value) return;
+  activeBook.value =
+    [...readingBooks.value, ...doneBooks.value].find(
+      (b) => b.id === activeBook.value.id,
+    ) ?? null;
+});
+
+/** 从书弹窗里唤起问 AI */
+function openBookAsk(payload: { prefix: string }) {
+  openAsk({
+    title: activeBook.value?.title ?? '读书',
+    context: '可以让它跟你聊这本书，或者把刚读到的记下来',
+    placeholder: '今天读了第三章，讲了 xxx',
+    prefix: payload.prefix,
+  });
+}
+
+/** 从节点弹窗里唤起问 AI，让它改写这条计划 */
+function openNodeAsk(payload: { prefix: string }) {
+  openAsk({
+    title: picked.value?.title ?? '计划项',
+    context: '说想改成什么样，它出一份草稿，点头才落库',
+    placeholder: '把做完的标准写具体点',
+    prefix: payload.prefix,
+  });
 }
 
 onMounted(() => {
@@ -788,11 +1063,14 @@ onMounted(() => {
             data-alt="kpi-group-self"
             class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
           >
-            <p
-              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
-            >
-              战胜内心的批判家：和昨天的自己比，别和今天的别人比
-            </p>
+            <div class="flex items-start justify-between gap-2">
+              <p
+                class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
+              >
+                战胜内心的批判家：和昨天的自己比，别和今天的别人比
+              </p>
+              <LifeAskButton title="就今天的分数问 AI" @click="openScoreAsk" />
+            </div>
 
             <div data-alt="kpi-today">
               <div class="flex items-baseline justify-between gap-2">
@@ -900,11 +1178,14 @@ onMounted(() => {
             data-alt="kpi-group-incentive"
             class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
           >
-            <p
-              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
-            >
-              奖励与惩罚的超级反应倾向
-            </p>
+            <div class="flex items-start justify-between gap-2">
+              <p
+                class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
+              >
+                奖励与惩罚的超级反应倾向
+              </p>
+              <LifeAskButton title="存一个运动储备" @click="openBankAsk()" />
+            </div>
 
             <div data-alt="kpi-balance">
               <span class="text-xs text-slate-500 dark:text-slate-400"
@@ -956,7 +1237,7 @@ onMounted(() => {
                   :disabled="busy"
                   :title="'点开说说这一个怎么还'"
                   class="h-6 w-6 rounded bg-rose-400 transition hover:bg-rose-500 hover:ring-2 hover:ring-rose-200 disabled:opacity-40 dark:bg-rose-500/70 dark:hover:ring-rose-500/30"
-                  @click="openDebtAsk($event, i - 1)"
+                  @click="openDebtAsk(i - 1)"
                 />
               </div>
               <p
@@ -994,7 +1275,7 @@ onMounted(() => {
                     title="主动锻炼，存一个储备"
                     aria-label="存运动储备"
                     class="grid h-4 w-4 place-items-center rounded border border-dashed border-emerald-400 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
-                    @click="openBankAsk($event)"
+                    @click="openBankAsk()"
                   >
                     <LifeIcon name="rise" class="h-2.5 w-2.5" />
                   </button>
@@ -1044,14 +1325,25 @@ onMounted(() => {
               >
             </div>
             <div data-alt="heat-grid" class="grid grid-cols-7 gap-1.5">
-              <div
-                v-for="(cell, i) in monthCells"
-                :key="i"
-                data-alt="heat-cell"
-                class="aspect-square w-7 rounded"
-                :class="heatClass(cell)"
-                :title="heatTitle(cell)"
-              />
+              <template v-for="(cell, i) in monthCells" :key="i">
+                <!-- 月初对齐用的空位只是占地方，不进 Tab 键的顺序 -->
+                <div
+                  v-if="cell === undefined"
+                  data-alt="heat-pad"
+                  class="invisible aspect-square w-7"
+                />
+                <button
+                  v-else
+                  data-alt="heat-cell"
+                  type="button"
+                  :disabled="!canAskDay(cell)"
+                  :title="heatTitle(cell)"
+                  :aria-label="`问 ${cell.date} 这一天`"
+                  class="aspect-square w-7 rounded outline-none ring-brand-400 ring-offset-1 transition focus-visible:ring-2 enabled:hover:ring-2 dark:ring-offset-slate-800"
+                  :class="heatClass(cell)"
+                  @click="openDayAsk(cell)"
+                />
+              </template>
             </div>
             <p class="text-[11px] tabular-nums leading-snug text-slate-400">
               已连 {{ streak.current }} 天 · 本月做了 {{ monthActiveDays }} 天
@@ -1079,106 +1371,17 @@ onMounted(() => {
         >
           1 分 = {{ diagnosis.rules.yuanPerPoint }} 元，每月最多兑
           {{ diagnosis.rules.monthlyPointCap }} 分 · 日历格子越深表示当天得分越高
+          · 虚线格是休息日或没排计划的日子 · 点格子可以问那天
           · 阈值制：达标即得固定分，多做只记录不加分
         </p>
       </section>
 
-      <div class="grid gap-4 lg:grid-cols-3">
-        <!-- AI 栏：手机上排在今日卡之后，桌面上收到右侧常驻 -->
-        <aside
-          data-alt="ai-column"
-          class="grid gap-4 order-2 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
+      <div class="grid gap-4 lg:grid-cols-2">
+        <!-- 左列：打卡与研究线都不高，吸顶跟着右边那条长列滚 -->
+        <div
+          data-alt="left-column"
+          class="order-1 grid gap-4 lg:sticky lg:top-4 lg:self-start"
         >
-          <LifeChat
-            :api="api"
-            :api-base="API"
-            :api-key="key"
-            :node-title-of="nodeTitleOf"
-            @changed="loadAll"
-          />
-
-          <section
-            data-alt="ideas-section"
-            :class="showMore ? '' : 'hidden lg:block'"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <button
-              data-alt="ideas-toggle"
-              type="button"
-              class="flex w-full items-center justify-between text-left"
-              @click="showIdeas = !showIdeas"
-            >
-              <span
-                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-                >想法池</span
-              >
-              <span class="flex items-center gap-1 text-xs text-slate-400">
-                {{ ideaCount }} 条
-                <LifeIcon :name="showIdeas ? 'up' : 'down'" class="h-3.5 w-3.5" />
-              </span>
-            </button>
-            <div v-if="showIdeas" class="mt-3">
-              <!-- 捕获不受限：记一行字零成本、不计分 -->
-              <!--
-                上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
-                而后端其实收得下
-              -->
-              <LifeAskBar
-                v-model="ideaDraft"
-                mode="note"
-                :busy="busy"
-                :maxlength="500"
-                placeholder="想试试什么"
-                label="记下这个想法"
-                @submit="captureIdea"
-              />
-
-              <ul v-if="ideaList.length" class="mt-2 grid gap-1.5">
-                <li
-                  v-for="it in ideaList"
-                  :key="it.id"
-                  data-alt="idea-row"
-                  class="cursor-pointer rounded-lg bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700"
-                  @click="activeIdea = it"
-                >
-                  <p
-                    class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
-                  >
-                    {{ it.content }}
-                  </p>
-                  <p class="mt-1 flex items-center gap-1.5 text-[11px]">
-                    <span class="rounded px-1.5 py-0.5" :class="it.cls">{{ it.label }}</span>
-                    <span class="text-slate-400">{{ it.createdOn }}</span>
-                  </p>
-                </li>
-              </ul>
-              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
-                还没有想法。冒出什么念头先记一行，有进展就往里追一句
-              </p>
-
-              <p
-                v-if="ideas?.noteYuan"
-                class="mt-2 text-[11px] text-slate-400 dark:text-slate-500"
-              >
-                已结项的研究累计 {{ ideas.noteYuan }} 元
-              </p>
-            </div>
-          </section>
-        </aside>
-
-        <!-- 主内容 -->
-        <div data-alt="main-column" class="grid gap-4 order-1 lg:order-1 lg:col-span-2">
-          <!-- 总体向上那一眼：星图。手机上折在「更多」里，PC 常驻主列顶部 -->
-          <section
-            data-alt="sky-section"
-            :class="showMore ? '' : 'hidden lg:block'"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <p class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">星图</p>
-            <LifeStarSky v-if="sky" :sky="sky" @select="openConstellation" />
-          </section>
-
-          <!-- 打卡：每天重复的四项 -->
           <section
             data-alt="punch-card"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
@@ -1235,7 +1438,7 @@ onMounted(() => {
 
             <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
               <div
-                v-for="it in activeDay.items"
+                v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
                 class="rounded-xl border p-3 transition"
@@ -1245,22 +1448,24 @@ onMounted(() => {
                     : 'border-slate-100 dark:border-slate-700'
                 "
               >
-                <div class="flex items-baseline justify-between gap-2">
-                  <button
-                    data-alt="daily-ask"
-                    type="button"
-                    :title="'说一句来补记「' + it.title + '」'"
-                    class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
-                    @click="openDailyAsk($event, it)"
+                <div class="flex items-center justify-between gap-2">
+                  <p
+                    class="min-w-0 flex-1 text-sm font-medium text-slate-700 dark:text-slate-200"
                   >
                     {{ it.title }}
-                  </button>
-                  <span class="shrink-0 text-xs text-slate-400">
+                  </p>
+                  <span
+                    class="flex shrink-0 items-center gap-1 text-xs text-slate-400"
+                  >
                     <span
                       v-if="it.isMainline"
-                      class="mr-1 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                      class="rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                       >主线</span
                     >{{ it.points }} 分
+                    <LifeAskButton
+                      :title="'说一句来补记「' + it.title + '」'"
+                      @click="openDailyAsk(it)"
+                    />
                   </span>
                 </div>
                 <div
@@ -1328,32 +1533,259 @@ onMounted(() => {
                     </button>
                   </span>
                 </div>
+
+                <!-- 「在这」：这一项属于哪个方向，那个方向现在该学的是哪条 -->
+                <button
+                  v-if="it.here"
+                  data-alt="punch-here"
+                  type="button"
+                  :title="'打开清单项「' + it.here.item.title + '」'"
+                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  @click="openNode(it.here.item, it.here.path)"
+                >
+                  <span
+                    class="shrink-0 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                    >在这</span
+                  >
+                  <span
+                    class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300"
+                    >{{ it.here.item.title }}</span
+                  >
+                  <LifeIcon
+                    name="right"
+                    class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
+                  />
+                </button>
+
+                <!--
+                  「在读」：常驻的那一项手上正在读哪本书。
+                  按 pinned 认而不按标题——标题是可以改的，改完这一行就不见了
+                -->
+                <button
+                  v-if="it.pinned"
+                  data-alt="punch-reading"
+                  type="button"
+                  :title="
+                    firstReadingBook
+                      ? '打开《' + firstReadingBook.title + '》'
+                      : '去记一本在读的书'
+                  "
+                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  @click="openReading"
+                >
+                  <span
+                    class="shrink-0 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                    >在读</span
+                  >
+                  <span
+                    class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300"
+                    >{{
+                      firstReadingBook
+                        ? '《' + firstReadingBook.title + '》'
+                        : '还没记书'
+                    }}</span
+                  >
+                  <LifeIcon
+                    name="right"
+                    class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
+                  />
+                </button>
               </div>
             </div>
 
           </section>
 
-          <!-- 路线图 -->
+          <!--
+            读书排在研究线上面：读书是每天都排、砍不掉的那一项，
+            研究线是想起来才记一句的地方——天天要看的那摊摆在手边
+          -->
           <section
-            data-alt="roadmap"
+            ref="booksSection"
+            data-alt="books-section"
             :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
           >
-            <div class="mb-4 flex items-baseline justify-between gap-2">
-              <p
-                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-              >
-                路线图
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                读书
               </p>
-              <span class="text-xs tabular-nums text-slate-400"
-                >必修 {{ diagnosis.checklist.requiredDone }}/{{
-                  diagnosis.checklist.required
-                }}</span
+              <span
+                data-alt="books-counts"
+                class="flex items-center gap-1 text-xs text-slate-400"
               >
+                {{ bookCountText }}
+                <LifeAskButton title="就读书问 AI" @click="openBooksAsk" />
+              </span>
             </div>
-            <LifePlanTree :plan="plan" @select="openNode" />
+            <div class="mt-3">
+              <!-- 上限对齐后端的 200，多打的字不该被悄悄吃掉 -->
+              <LifeAskBar
+                ref="bookBar"
+                v-model="bookDraft"
+                mode="note"
+                :busy="busy"
+                :maxlength="200"
+                placeholder="记一本书"
+                label="记下这本书"
+                @submit="captureBook"
+              />
+
+              <ul
+                v-if="readingBooks.length"
+                data-alt="book-list"
+                class="mt-3 grid"
+              >
+                <LifeBookRow
+                  v-for="b in readingBooks"
+                  :key="b.id"
+                  :book="b"
+                  @click="activeBook = b"
+                />
+              </ul>
+              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
+                还没在读的书
+              </p>
+
+              <!-- 读完的收起来，点一下才摊开 -->
+              <div v-if="doneBooks.length" data-alt="books-done" class="mt-2">
+                <button
+                  data-alt="books-done-toggle"
+                  type="button"
+                  class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
+                  @click="showDoneBooks = !showDoneBooks"
+                >
+                  读完 ({{ doneBooks.length }})
+                  <LifeIcon
+                    :name="showDoneBooks ? 'up' : 'down'"
+                    class="h-3 w-3"
+                  />
+                </button>
+                <ul v-if="showDoneBooks" data-alt="book-done-list" class="mt-1 grid">
+                  <LifeBookRow
+                    v-for="b in doneBooks"
+                    :key="b.id"
+                    :book="b"
+                    @click="activeBook = b"
+                  />
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section
+            data-alt="ideas-section"
+            :class="showMore ? '' : 'hidden lg:block'"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <!--
+              这一摊不再折叠：折起来的东西等于不存在，而研究线本来就是
+              想起来才记一句的地方——要先点开才看得见，就永远想不起来。
+              在动那一段给个高度封顶自己滚，长了也不会把下面的路线图顶走
+            -->
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                研究线
+              </p>
+              <span
+                data-alt="ideas-counts"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                {{ ideaCountText }}
+                <LifeAskButton title="就研究线问 AI" @click="openIdeasAsk" />
+              </span>
+            </div>
+            <div class="mt-3">
+              <!-- 捕获不受限：记一行字零成本、不计分 -->
+              <!--
+                上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
+                而后端其实收得下
+              -->
+              <LifeAskBar
+                v-model="ideaDraft"
+                mode="note"
+                :busy="busy"
+                :maxlength="500"
+                placeholder="记一条研究线"
+                label="记下这条研究线"
+                @submit="captureIdea"
+              />
+
+              <!-- 按状态分段；空段连标题一起不渲染，免得一排「暂无」占着地方 -->
+              <div v-if="ideaList.length" class="mt-3 grid gap-1.5">
+                <template v-for="seg in ideaSegments" :key="seg.key">
+                  <div v-if="seg.items.length" data-alt="idea-segment">
+                    <button
+                      v-if="seg.key === 'DONE'"
+                      data-alt="idea-done-toggle"
+                      type="button"
+                      class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
+                      @click="showDone = !showDone"
+                    >
+                      {{ seg.label }} ({{ seg.items.length }})
+                      <LifeIcon :name="showDone ? 'up' : 'down'" class="h-3 w-3" />
+                    </button>
+                    <p
+                      v-else
+                      data-alt="idea-segment-title"
+                      class="text-[11px] text-slate-400 dark:text-slate-500"
+                    >
+                      {{ seg.label }}
+                    </p>
+                    <ul
+                      v-if="seg.key !== 'DONE' || showDone"
+                      data-alt="idea-list"
+                      class="mt-1 grid"
+                      :class="
+                        seg.key === 'OPEN' ? 'max-h-64 overflow-y-auto' : ''
+                      "
+                    >
+                      <LifeIdeaRow
+                        v-for="it in seg.items"
+                        :key="it.id"
+                        :idea="it"
+                        @click="activeIdea = it"
+                      />
+                    </ul>
+                  </div>
+                </template>
+              </div>
+              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
+                还没有研究线。冒出什么念头先记一行，有进展就往里追一句
+              </p>
+
+              <p
+                v-if="ideas?.noteYuan"
+                class="mt-2 text-[11px] text-slate-400 dark:text-slate-500"
+              >
+                已结项的研究累计 {{ ideas.noteYuan }} 元
+              </p>
+            </div>
           </section>
         </div>
+
+        <!-- 右列：路线图。四十多项拉得很长，单独占一列 -->
+        <section
+          data-alt="roadmap"
+          :class="showMore ? '' : 'hidden lg:block'"
+          class="order-2 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+        >
+          <div class="mb-4 flex items-center justify-between gap-2">
+            <p
+              class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+            >
+              路线图
+            </p>
+            <span
+              class="flex items-center gap-1 text-xs tabular-nums text-slate-400"
+            >
+              必修 {{ diagnosis.checklist.requiredDone }}/{{
+                diagnosis.checklist.required
+              }}
+              <LifeAskButton title="就路线图问 AI" @click="openRoadmapAsk" />
+            </span>
+          </div>
+          <LifePlanTree :plan="plan" @select="openNode" />
+        </section>
 
         <button
           data-alt="show-more"
@@ -1361,7 +1793,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：星图 · 总览 · 路线图 · 想法池' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 读书 · 研究线' }}
         </button>
       </div>
 
@@ -1372,18 +1804,41 @@ onMounted(() => {
       >
         {{ errorMsg }}
       </p>
+
+      <!--
+        常驻入口：没有上下文的随便问从这里进。
+        mb 而不是 pb 撑安全区——按钮是 fixed 定位的，加内边距只会把它撑大，
+        要的是整体往上抬开 iPhone 底部那条横杠
+      -->
+      <!--
+        右下角这一带本来被主题的「回到顶部」按钮占着，现已由本页 frontmatter 的
+        backToTop: false 关掉，所以这颗可以回到角落里。z 仍留在主题那层之上
+        （它是 z-index:100），万一哪天又被打开也不会盖住这颗
+      -->
+      <button
+        data-alt="ask-fab"
+        type="button"
+        title="问 AI"
+        aria-label="问 AI"
+        class="fixed bottom-5 right-5 z-[101] mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
+        @click="openFreeAsk"
+      >
+        <LifeIcon name="send" class="h-5 w-5" />
+      </button>
     </div>
 
-    <!-- 全页共用的就地问 AI 浮层 -->
-    <LifeAsk
-      :anchor="ask.anchor"
+    <!-- 全页唯一的经 AI 对话外壳 -->
+    <LifeAskModal
+      :open="ask.open"
       :title="ask.title"
       :context="ask.context"
       :placeholder="ask.placeholder"
       :direct-label="ask.directLabel"
       :busy="busy"
       :reply="askReply"
+      :log="askLog"
       :pending-text="askPendingText"
+      :pending-note="askPendingNote"
       :destructive="isDestructive(askPending)"
       :pending="askPending"
       @close="closeAsk"
@@ -1399,8 +1854,17 @@ onMounted(() => {
       :api="api"
       :note-yuan="diagnosis?.rules?.researchNoteYuan ?? 15"
       @close="activeIdea = null"
-      @changed="loadAll"
+      @changed="onIdeaChanged"
       @ask="openIdeaAsk"
+    />
+
+    <!-- 书详情 -->
+    <LifeBookModal
+      :book="activeBook"
+      :api="api"
+      @close="activeBook = null"
+      @changed="refresh(loadBooks)"
+      @ask="openBookAsk"
     />
 
     <!-- 节点详情 -->
@@ -1409,7 +1873,8 @@ onMounted(() => {
       :path="pickedPath"
       :api="api"
       @close="picked = null"
-      @changed="loadAll"
+      @changed="refresh(loadCore)"
+      @ask="openNodeAsk"
     />
   </div>
 </template>

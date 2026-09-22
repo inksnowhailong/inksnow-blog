@@ -7,6 +7,7 @@
  */
 import { computed, ref } from 'vue';
 import LifeIcon from './lifeIcon.vue';
+import { planSections } from './usePlanSections';
 
 const props = defineProps<{
   /** /life/plan 返回的嵌套树 */
@@ -20,73 +21,8 @@ const emit = defineEmits<{
 /** 已完成的组默认折起，它们不再需要注意力 */
 const expanded = ref<Record<string, boolean>>({});
 
-const byOrder = (a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-const isDone = (n: any) => n.status === 'DONE';
-const isDropped = (n: any) => n.status === 'DROPPED';
-
-/**
- * 给一组清单项算出进度与"当前该做的那一个"
- * @description 手册规定清单顺序即依赖顺序，所以当前项不需要挑，
- * 就是第一个还没做完的
- */
-function withProgress(group: { id: string; title: string; items: any[] }) {
-  const live = group.items.filter((i) => !isDropped(i));
-  const done = live.filter(isDone).length;
-  const current = live.find((i) => !isDone(i));
-  return {
-    ...group,
-    done,
-    total: live.length,
-    currentId: current?.id ?? '',
-    allDone: live.length > 0 && done === live.length,
-  };
-}
-
-/**
- * 把树拍平成"路段 → 组 → 项"三层
- * @description 数据里有两种形状：方向下直接挂清单项（数据库），
- * 或方向下先分组再挂项（AI 控制能力）。这里统一成后者，
- * 直挂的情况归入一个无名组，模板便不必再分情况
- */
-const sections = computed(() => {
-  return (props.plan ?? [])
-    .filter((n) => n.level === 'DIRECTION' && !isDropped(n))
-    .sort(byOrder)
-    .map((dir) => {
-      const kids = [...(dir.children ?? [])].sort(byOrder);
-      const loose = kids.filter((k) => k.level === 'CHECKLIST' && !isDropped(k));
-      const subs = kids.filter((k) => k.level === 'DIRECTION' && !isDropped(k));
-      const groups = [
-        ...(loose.length
-          ? [{ id: dir.id + ':direct', title: '', items: loose }]
-          : []),
-        ...subs.map((g) => ({
-          id: g.id,
-          title: g.title,
-          items: (g.children ?? [])
-            .filter((c: any) => c.level === 'CHECKLIST' && !isDropped(c))
-            .sort(byOrder),
-        })),
-      ].map(withProgress);
-
-      // 组间顺序同样是推进顺序，所以「在这」只落在第一个没做完的组里，
-      // 每个方向只有一个当前点——满屏都是「在这」等于没有标记
-      const activeGroup = groups.find((g) => !g.allDone);
-
-      return {
-        id: dir.id,
-        title: dir.title,
-        node: dir,
-        currentId: activeGroup?.currentId ?? '',
-        /** 挂在这个方向下的每日项，只作一行标注 */
-        daily: kids.filter((k) => k.level === 'DAILY'),
-        groups,
-        done: groups.reduce((s, g) => s + g.done, 0),
-        total: groups.reduce((s, g) => s + g.total, 0),
-      };
-    })
-    .filter((s) => s.total > 0);
-});
+/** 路段与当前项的算法与打卡卡共用，见 usePlanSections */
+const sections = computed(() => planSections(props.plan));
 
 /** 组是否展开：做完的默认收起，其余默认展开 */
 function isOpen(g: any): boolean {
