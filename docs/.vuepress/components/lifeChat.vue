@@ -12,8 +12,7 @@ import {
   touchesPlan as draftTouchesPlan,
   askStream,
 } from './useLifeDraft';
-import LifeIcon from './lifeIcon.vue';
-import LifeDraftDetail from './lifeDraftDetail.vue';
+import LifeAskPanel from './lifeAskPanel.vue';
 
 const props = defineProps<{
   api: (path: string, init?: RequestInit) => Promise<any>;
@@ -136,125 +135,49 @@ async function confirm() {
     data-alt="life-chat"
     class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
   >
-    <!-- 输入放在最上面：它是这个页面用得最多的东西 -->
-    <div data-alt="chat-input-row" class="flex items-start gap-2">
-      <!--
-        聊天框沿用 Enter 发送（这是聊天的通用预期），换行给 Shift+Enter。
-        换成 textarea 是为了让长指令写的时候看得见，而不是憋在一行里
-      -->
-      <textarea
-        v-model="input"
-        data-alt="chat-input"
-        rows="2"
-        placeholder="今天主线写了 40 分钟"
-        class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:py-2 sm:text-sm"
-        @keydown.enter.exact.prevent="send"
-      />
-      <button
-        data-alt="chat-send"
-        type="button"
-        :disabled="busy || !input.trim()"
-        title="发送"
-        aria-label="发送"
-        class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:h-auto sm:w-auto sm:px-3"
-        @click="send"
-      >
-        <LifeIcon
-          :name="busy ? 'flat' : 'send'"
-          class="h-4 w-4"
-          :class="busy && 'animate-pulse'"
-        />
-      </button>
-    </div>
-
-    <!-- 待确认：模型的理解摆出来，点了才算 -->
-    <div
-      v-if="pending"
-      data-alt="chat-pending"
-      class="rounded-xl border p-3"
-      :class="
+    <!--
+      常驻态：和锚定浮层共用同一个面板，只是不套浮层、一直摆着。
+      输入在最上面，因为它是这个页面用得最多的东西
+    -->
+    <LifeAskPanel
+      v-model="input"
+      :busy="busy"
+      placeholder="今天主线写了 40 分钟"
+      label="发送"
+      :pending-text="pending ? describe(pending) : ''"
+      :pending="pending"
+      :destructive="touchesPlan"
+      :pending-note="
         touchesPlan
-          ? 'border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10'
-          : 'border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+          ? '这条会动计划本身，确认前看清楚。改错了可以在「最近改动」里撤销'
+          : ''
       "
+      :error-msg="errorMsg"
+      @submit="send"
+      @confirm="confirm"
+      @discard="pending = null"
     >
-      <p
-        v-if="touchesPlan"
-        class="mb-1 text-[11px] text-rose-600 dark:text-rose-400"
+      <!-- 对话记录：手机上压矮，桌面上留足高度 -->
+      <div
+        v-if="log.length"
+        ref="logBox"
+        data-alt="chat-log"
+        class="grid max-h-48 gap-2 overflow-y-auto lg:max-h-[26rem]"
       >
-        这条会动计划本身，确认前看清楚。改错了可以在「最近改动」里撤销
-      </p>
-      <p
-        class="text-sm"
-        :class="
-          touchesPlan
-            ? 'text-rose-900 dark:text-rose-200'
-            : 'text-amber-900 dark:text-amber-200'
-        "
-      >
-        {{ describe(pending) }}
-      </p>
-      <LifeDraftDetail :draft="pending" />
-
-      <div class="mt-2 flex gap-2">
-        <button
-          data-alt="pending-confirm"
-          type="button"
-          :disabled="busy"
-          title="确认记下"
-          aria-label="确认记下"
-          class="grid h-8 w-8 place-items-center rounded-lg text-white transition disabled:opacity-50"
+        <p
+          v-for="(t, i) in log"
+          :key="i"
+          data-alt="chat-turn"
+          class="whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed"
           :class="
-            touchesPlan
-              ? 'bg-rose-500 hover:bg-rose-600'
-              : 'bg-amber-500 hover:bg-amber-600'
+            t.role === 'me'
+              ? 'bg-brand-50 text-slate-700 dark:bg-brand-500/15 dark:text-slate-200'
+              : 'bg-slate-50 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300'
           "
-          @click="confirm"
         >
-          <LifeIcon name="check" class="h-4 w-4" />
-        </button>
-        <button
-          data-alt="pending-cancel"
-          type="button"
-          title="理解错了，丢弃"
-          aria-label="理解错了，丢弃"
-          class="grid h-8 w-8 place-items-center rounded-lg text-amber-800 transition hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-500/20"
-          @click="pending = null"
-        >
-          <LifeIcon name="close" class="h-4 w-4" />
-        </button>
+          {{ t.text }}
+        </p>
       </div>
-    </div>
-
-    <p
-      v-if="errorMsg"
-      data-alt="chat-error"
-      class="text-sm text-rose-600 dark:text-rose-400"
-    >
-      {{ errorMsg }}
-    </p>
-
-    <!-- 对话记录：手机上压矮，桌面上留足高度 -->
-    <div
-      v-if="log.length"
-      ref="logBox"
-      data-alt="chat-log"
-      class="grid max-h-48 gap-2 overflow-y-auto lg:max-h-[26rem]"
-    >
-      <p
-        v-for="(t, i) in log"
-        :key="i"
-        data-alt="chat-turn"
-        class="whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed"
-        :class="
-          t.role === 'me'
-            ? 'bg-brand-50 text-slate-700 dark:bg-brand-500/15 dark:text-slate-200'
-            : 'bg-slate-50 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300'
-        "
-      >
-        {{ t.text }}
-      </p>
-    </div>
-
+    </LifeAskPanel>
   </section>
 </template>

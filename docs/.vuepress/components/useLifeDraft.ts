@@ -6,7 +6,13 @@
  */
 
 /** 会改动计划本身的草稿，比记一笔流水影响大，界面上要区别对待 */
-const PLAN_KINDS = ['plan_update', 'plan_create', 'plan_drop', 'daily_rule'];
+const PLAN_KINDS = [
+  'plan_update',
+  'plan_create',
+  'plan_drop',
+  'daily_rule',
+  'daily_schedule',
+];
 
 /** 会删掉已有数据的草稿 */
 const DESTRUCTIVE_KINDS = ['undo', 'plan_drop'];
@@ -64,6 +70,8 @@ export function describeDraft(
     ].filter(Boolean);
     return `改「${p.nodeTitle}」的计分规则：${parts.join('，')}`;
   }
+  if (p.kind === 'daily_schedule')
+    return `改「${p.nodeTitle}」排哪些天：${p.summary?.before} → ${p.summary?.after}`;
   return (p.items ?? [])
     .map((i: any) => {
       if (i.kind === 'MISS') return `记一条未完成：${nodeTitleOf(i.nodeId)}`;
@@ -139,6 +147,27 @@ export function draftDetails(draft: any): DraftDetail[] {
     ];
   }
 
+  if (p.kind === 'daily_schedule') {
+    const out: DraftDetail[] = [
+      { label: '排期', before: p.summary?.before, after: p.summary?.after },
+    ];
+
+    // 排期的后果是一张表不是一个数。不把这七天摊开，
+    // 「改了排期」这四个字等于没说——人据此判断不了要不要点头
+    const week = ['日', '一', '二', '三', '四', '五', '六'];
+    (p.preview ?? []).forEach((d: any) => {
+      out.push({
+        label: `${d.date.slice(5)} 周${week[d.weekday]}`,
+        value:
+          (d.active ? '做' : '不做') +
+          ` · 当天 ${d.itemCount} 项 · 满分 ${d.fullScore} · 免债线 ${d.debtFreeScore}`,
+      });
+    });
+
+    out.push({ label: '影响', value: '只改往后排哪些天，已经记过的分不动' });
+    return out;
+  }
+
   return [];
 }
 
@@ -212,6 +241,20 @@ export async function applyDraft(
           ? { thresholdMinutes: p.thresholdMinutes }
           : {}),
         ...(p.points != null ? { points: p.points } : {}),
+      }),
+    });
+  } else if (p.kind === 'daily_schedule') {
+    // 后端给的 schedule 是改后的完整排期，整份覆盖即可；
+    // 「哪些字段没提要保留原值」已经在出草稿那一步合并过了
+    const s = p.schedule ?? {};
+    await api(`/life/plan/${p.nodeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...(s.weekdays != null ? { weekdays: s.weekdays } : {}),
+        ...(s.startOn ? { startOn: s.startOn } : {}),
+        ...(s.endOn ? { endOn: s.endOn } : {}),
+        ...(s.exceptDates != null ? { exceptDates: s.exceptDates } : {}),
+        ...(s.onlyDates != null ? { onlyDates: s.onlyDates } : {}),
       }),
     });
   } else if (p.kind === 'plan_drop') {
