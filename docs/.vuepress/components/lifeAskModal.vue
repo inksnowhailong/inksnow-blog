@@ -75,9 +75,17 @@ onUnmounted(() => {
   document.body.classList.remove('overflow-hidden');
 });
 
-/** Esc 关掉，与点遮罩等价 */
+/**
+ * Esc 关掉，与点遮罩等价
+ * @description 问 AI 弹窗可以叠在研究线/节点弹窗之上；它在模板里先挂载，
+ * window 监听按注册顺序触发，所以它先吃到 Esc——标记 defaultPrevented，
+ * 底下那层看到标记就不动，一下 Esc 只关最上面一层
+ */
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.open) emit('close');
+  if (e.key === 'Escape' && props.open) {
+    e.preventDefault();
+    emit('close');
+  }
 }
 
 // 抽屉几乎占满屏幕，底下的页面还能滚会让人以为弹窗失灵

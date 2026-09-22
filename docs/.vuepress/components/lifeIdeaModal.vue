@@ -181,8 +181,9 @@ function ask() {
   });
 }
 
-/** Esc 关掉，与点遮罩等价；三个弹窗行为一致 */
+/** Esc 关掉，与点遮罩等价；三个弹窗行为一致。上层问 AI 弹窗已吃掉的 Esc 不再处理 */
 function onKeydown(e: KeyboardEvent) {
+  if (e.defaultPrevented) return;
   if (e.key === 'Escape' && props.idea) emit('close');
 }
 
