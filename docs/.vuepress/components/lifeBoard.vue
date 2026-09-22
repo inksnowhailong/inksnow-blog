@@ -900,13 +900,15 @@ async function openReading() {
 }
 
 // 记笔记或读完之后重新拉数据，弹窗里拿的还是旧对象，
-// 得按ID换成新的，否则头部那行小字会停在改之前
+// 得按ID换成新的，否则头部那行小字会停在改之前。
+// 找不到说明这本书已经没了（如经 AI 删掉），关掉弹窗——
+// 留着它等于对着一本不存在的书记笔记，每一下都只换回一句报错
 watch(books, () => {
   if (!activeBook.value) return;
-  const fresh = [...readingBooks.value, ...doneBooks.value].find(
-    (b) => b.id === activeBook.value.id,
-  );
-  if (fresh) activeBook.value = fresh;
+  activeBook.value =
+    [...readingBooks.value, ...doneBooks.value].find(
+      (b) => b.id === activeBook.value.id,
+    ) ?? null;
 });
 
 /** 从书弹窗里唤起问 AI */

@@ -18,6 +18,7 @@ import LifeModal from './lifeModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
+import { shortDate } from './lifeFormat';
 
 const props = defineProps<{
   /** 选中的研究线，为 null 时不显示 */
@@ -80,15 +81,6 @@ const isDone = computed(() => props.idea?.state === 'DONE');
 
 /** 结项按钮上的字把代价写出来，省得点之前还要回想这一下值多少 */
 const concludeText = computed(() => `结项 +${props.noteYuan} 元`);
-
-/**
- * 只留月日
- * @description 一条线通常在一年内走完，年份四个字占着左栏，反而挡住日期那一列的对齐
- * @param date YYYY-MM-DD
- */
-function shortDate(date?: string): string {
-  return date ? date.slice(5) : '';
-}
 
 /** 头部那行小字：哪天冒出来的、现在什么状态 */
 const metaText = computed(() =>

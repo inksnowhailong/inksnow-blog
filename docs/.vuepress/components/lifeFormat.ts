@@ -34,6 +34,16 @@ export function weekdayOf(date: string): number {
 }
 
 /**
+ * 只留月日
+ * @description 研究线、书通常在一年内走完，年份四个字占着左栏或行尾，
+ * 反而挤掉真正要看的那一列
+ * @param date YYYY-MM-DD，取不到时返回空串
+ */
+export function shortDate(date?: string): string {
+  return date ? date.slice(5) : '';
+}
+
+/**
  * 距今多久
  * @description 只到「天」这一档：列表要回答的是「这条线、这本书搁了多久」，
  * 精确到小时对这个判断没有帮助

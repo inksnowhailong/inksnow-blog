@@ -7,7 +7,7 @@
  * 要抄两遍，改一处得改两处。与 lifeIdeaRow 同一套写法。
  */
 import { computed } from 'vue';
-import { daysAgoLabel } from './lifeFormat';
+import { daysAgoLabel, shortDate } from './lifeFormat';
 
 const props = defineProps<{
   /** 一本书，字段来自后端 /life/books */
@@ -30,11 +30,6 @@ const metaText = computed(() => {
   const ago = daysAgoLabel(props.book?.lastLogOn);
   return `${props.book?.logCount ?? 0} 条${ago ? ` · ${ago}` : ''}`;
 });
-
-/** 只留月日，年份四个字占着行尾反而挤掉书名 */
-function shortDate(date?: string): string {
-  return date ? date.slice(5) : '';
-}
 </script>
 
 <template>

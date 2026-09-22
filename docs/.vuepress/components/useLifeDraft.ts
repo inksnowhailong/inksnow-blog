@@ -226,13 +226,9 @@ export async function applyDraft(
       body: JSON.stringify({ title: p.title }),
     });
   } else if (p.kind === 'reading_log') {
-    // occurredOn 只在模型明确说了是哪天读的时候才带，缺省交给后端记今天
     await api(`/life/books/${p.bookId}/logs`, {
       method: 'POST',
-      body: JSON.stringify({
-        text: p.text,
-        ...(p.occurredOn ? { occurredOn: p.occurredOn } : {}),
-      }),
+      body: JSON.stringify({ text: p.text }),
     });
   } else if (p.kind === 'book_finish') {
     await api(`/life/books/${p.bookId}/finish`, { method: 'POST' });

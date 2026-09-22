@@ -15,6 +15,7 @@ import LifeModal from './lifeModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
+import { shortDate } from './lifeFormat';
 
 const props = defineProps<{
   /** 选中的书，为 null 时不显示 */
@@ -57,16 +58,6 @@ function toggleMenu(open = !menuOpen.value) {
 
 /** 读完的书只读，不再往里写笔记 */
 const isDone = computed(() => props.book?.status === 'DONE');
-
-/**
- * 只留月日
- * @description 一本书通常在一年内读完，年份四个字占着左栏，
- * 反而挡住日期那一列的对齐
- * @param date YYYY-MM-DD
- */
-function shortDate(date?: string): string {
-  return date ? date.slice(5) : '';
-}
 
 /** 头部那行小字：哪天开读的、现在读完没有 */
 const metaText = computed(() => {
@@ -212,13 +203,14 @@ watch(
 
 /**
  * 重拉笔记
- * @description 盯的是对象不是 id：从这个弹窗唤起 AI 记了一条笔记之后，
- * 面板重拉会换上新的那份，但 id 没变——只盯 id 的话这里还显示改之前的列表
+ * @description 除了换书，还盯 logCount：从这个弹窗唤起 AI 记了一条笔记之后，
+ * 面板重拉会换上新的那份，但 id 没变——只盯 id 的话这里还显示改之前的列表。
+ * 不盯整个对象是因为读完、改书名这类变动与笔记无关，没必要为它们再拉一次
  */
 watch(
-  () => props.book,
-  (book) => {
-    if (book) loadLogs();
+  () => [props.book?.id, props.book?.logCount],
+  () => {
+    if (props.book) loadLogs();
     else logs.value = [];
   },
   { immediate: true },
