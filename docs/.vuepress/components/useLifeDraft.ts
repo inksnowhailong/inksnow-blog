@@ -15,7 +15,7 @@ const PLAN_KINDS = [
 ];
 
 /** 会删掉已有数据的草稿 */
-const DESTRUCTIVE_KINDS = ['undo', 'plan_drop'];
+const DESTRUCTIVE_KINDS = ['undo', 'plan_drop', 'idea_drop'];
 
 /** 这条草稿是否动计划结构 */
 export function touchesPlan(draft: any): boolean {
@@ -40,8 +40,8 @@ export function describeDraft(
   if (!p) return '';
   if (p.kind === 'check') return `勾掉「${p.title}」`;
   if (p.kind === 'idea') return `记下想法：${p.content}`;
-  if (p.kind === 'note')
-    return `给「${p.ideaContent}」写研究笔记：${p.note?.question ?? ''}`;
+  if (p.kind === 'idea_conclude')
+    return `给「${p.ideaContent}」写结论收尾：${p.conclusion}`;
   if (p.kind === 'log') return `给「${p.nodeTitle}」记一条：${p.text}`;
   if (p.kind === 'research_log')
     return `给研究「${p.ideaContent}」记一条进展：${p.text}`;
@@ -198,10 +198,10 @@ export async function applyDraft(
       method: 'POST',
       body: JSON.stringify({ content: p.content }),
     });
-  } else if (p.kind === 'note') {
-    await api(`/life/ideas/${p.ideaId}/note`, {
+  } else if (p.kind === 'idea_conclude') {
+    await api(`/life/ideas/${p.ideaId}/conclude`, {
       method: 'POST',
-      body: JSON.stringify(p.note),
+      body: JSON.stringify({ conclusion: p.conclusion }),
     });
   } else if (p.kind === 'log') {
     await api(`/life/plan/${p.nodeId}/logs`, {
