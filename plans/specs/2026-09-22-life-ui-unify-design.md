@@ -45,3 +45,54 @@
 - [ ] 页面上一共只有一个经 AI 的输入条，且它在弹窗里；`grep -c "LifeChat\|LifeAsk\b\|lifeAsk.vue\|lifeChat.vue\|LifeStarSky" components/*.vue` 为 0。
 - [ ] 从打卡条目、悬浮按钮、研究线弹窗、节点弹窗四处打开的是同一个弹窗，标题行显示各自上下文。
 - [ ] 控制台无报错（favicon 除外）。
+
+## 追加 · 想法池列表与详情弹窗重做（2026-09-22 第二轮，用户已批准，不动后端）
+
+数据：`pool.threads[]` 每条已有 `id content createdOn state(OPEN|STALE|DONE) lastActiveOn logCount conclusion concludedOn`。
+
+### 列表（lifeBoard 的 ideas-section）
+
+```
+┌ 想法池 ─────────── 2 在动 · 1 搁着 · 2 已结 ┐   ← 标题行右侧是三段计数，替代「N 条」
+│ [记一个想法]                                 │   ← note 输入条常驻在最上
+│ 在动                                         │   ← 分段小标题（text-[11px] text-slate-400）
+│ ▌试试用 canvas 画星图        3 条 · 2 天前   │   ← 左侧 2px 色条 brand-400
+│ ▌研究一下 MCP 的 auth        1 条 · 今天     │
+│ 搁着                                         │
+│ ▏sqlite 的 WAL 到底啥        0 条 · 21 天前  │   ← 色条 slate-300 虚线感（border-dashed）
+│ 已结 (2) ˅                                   │   ← 默认折叠，点开每行显示结论那句
+│   ▌把星图删了：视觉压不住                     │   ← 色条 emerald-400，正文=原话，下一行小字=结论
+└─────────────────────────────────────────────┘
+```
+
+- 删掉徽标（IDEA_STATES 的 label/cls 不再用于列表）；状态由分段 + 色条表达。
+- 行右侧 `logCount 条 · 距 lastActiveOn 多久`：今天 / 昨天 / N 天前（用 lifeDate 里已有的工具，没有就写一个 `daysAgoLabel`）。
+- 空段不渲染标题；全空显示原来的空态文案。
+- 想法池整块折叠开关（`showIdeas`）保留；已结段自己再有一个折叠（`showDone`，默认 false）。
+- 手机端行高保证 44px 可点。
+
+### 详情弹窗（lifeIdeaModal.vue 重写模板，逻辑复用）
+
+```
+┌──────────────────────────────────────┐
+│ 原话（text-base 加粗）    09-20 · 在动 │   头：右上角两个图标按钮：问 AI、更多(⋯)→ 删除
+│ ┃ 结论：…（仅 DONE，emerald 左边条）   │
+├──────────────────────────────────────┤
+│ 09-22  发现 ResizeObserver 会二次触发  │   进展流：左栏日期(tabular-nums text-slate-400 w-14)，右栏原文
+│ 09-21  试了 echarts，样式压不住        │   每行 hover 出删除小叉（现有 removeLog）
+│ 09-20  记下                            │   最后一行固定是 createdOn 的「记下」
+├──────────────────────────────────────┤
+│ [记一条进展………………]  (记进展) (收尾)   │   底栏：一条 LifeAskBar mode=note + 两个按钮
+└──────────────────────────────────────┘
+```
+
+- 底栏两种模式：默认「记进展」；点「收尾」切到结论模式——同一条输入栏底色转 amber-50、占位「一句结论，写下即结项」、按钮变「结项 +15 元」与「取消」。结论模式下 Ctrl+Enter 提交结论。
+- DONE 的线：底栏不渲染，进展行不出删除叉，整窗只读；删除仍在 ⋯ 菜单里（已结删掉会回收额度，菜单项文案说明）。
+- 现有的 `closing/conclusionDraft/dropping` 状态与 `conclude/remove/addLog/removeLog` 逻辑沿用，只改模板与少量状态名；`emit('ask')` 保留。
+- 删除确认仍用现在那套（二次确认），不用 window.confirm。
+
+### 验收
+
+- [ ] 列表三段分组正确，空段不显示，已结默认折叠且展开后每行带结论
+- [ ] 弹窗：进展流日期左栏对齐；点「收尾」栏变琥珀色，结项后弹窗转只读并显示结论
+- [ ] 375px 宽下弹窗底栏不被键盘/安全区遮挡（沿用 lifeAskModal 的 safe-area 写法）
