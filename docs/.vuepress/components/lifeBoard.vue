@@ -10,6 +10,7 @@ import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeChat from './lifeChat.vue';
+import LifeStarSky from './lifeStarSky.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAsk from './lifeAsk.vue';
 import LifeAskBar from './lifeAskBar.vue';
@@ -40,6 +41,7 @@ const ledger = ref<any>(null);
 const ideas = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
+const sky = ref<any>(null);
 
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
@@ -49,6 +51,9 @@ const activeDay = ref<any>(null);
 const picked = ref<any>(null);
 const pickedPath = ref('');
 const showIdeas = ref(false);
+
+/** 手机上默认只看今日卡；点「更多」才展开总览、AI 栏其余、路线图 */
+const showMore = ref(false);
 
 /** 带密钥调用后端 */
 async function api(path: string, init: RequestInit = {}) {
@@ -99,18 +104,21 @@ async function loadAll() {
   try {
     const to = today();
     const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p] = await Promise.all([
+    const [d, l, i, h, p, s] = await Promise.all([
       api('/life/diagnosis'),
       api('/life/ledger'),
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
       api('/life/plan'),
+      // 星图只是锦上添花，取不到不该让整个面板打不开
+      api('/life/learning/sky').catch(() => null),
     ]);
     diagnosis.value = d;
     ledger.value = l;
     ideas.value = i;
     heat.value = h;
     plan.value = p;
+    sky.value = s;
     if (!activeDate.value) activeDate.value = to;
     if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
     await Promise.all([loadActiveDay(), loadMonth()]);
@@ -479,6 +487,12 @@ function openNode(node: any, path: string) {
   pickedPath.value = path;
 }
 
+/** 点星座进方向节点 */
+function openConstellation(id: string) {
+  const node = findNode(id);
+  if (node) openNode(node, node.title);
+}
+
 const isToday = computed(() => activeDate.value === today());
 
 /**
@@ -763,6 +777,7 @@ onMounted(() => {
       -->
       <section
         data-alt="overview"
+        :class="showMore ? '' : 'hidden lg:block'"
         class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
       >
         <div
@@ -1069,10 +1084,10 @@ onMounted(() => {
       </section>
 
       <div class="grid gap-4 lg:grid-cols-3">
-        <!-- AI 栏：手机上排在最前，桌面上收到右侧常驻 -->
+        <!-- AI 栏：手机上排在今日卡之后，桌面上收到右侧常驻 -->
         <aside
           data-alt="ai-column"
-          class="grid gap-4 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
+          class="grid gap-4 order-2 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
         >
           <LifeChat
             :api="api"
@@ -1084,6 +1099,7 @@ onMounted(() => {
 
           <section
             data-alt="ideas-section"
+            :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
           >
             <button
@@ -1151,7 +1167,17 @@ onMounted(() => {
         </aside>
 
         <!-- 主内容 -->
-        <div data-alt="main-column" class="grid gap-4 lg:order-1 lg:col-span-2">
+        <div data-alt="main-column" class="grid gap-4 order-1 lg:order-1 lg:col-span-2">
+          <!-- 总体向上那一眼：星图。手机上折在「更多」里，PC 常驻主列顶部 -->
+          <section
+            data-alt="sky-section"
+            :class="showMore ? '' : 'hidden lg:block'"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <p class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">星图</p>
+            <LifeStarSky v-if="sky" :sky="sky" @select="openConstellation" />
+          </section>
+
           <!-- 打卡：每天重复的四项 -->
           <section
             data-alt="punch-card"
@@ -1310,6 +1336,7 @@ onMounted(() => {
           <!-- 路线图 -->
           <section
             data-alt="roadmap"
+            :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
           >
             <div class="mb-4 flex items-baseline justify-between gap-2">
@@ -1327,6 +1354,15 @@ onMounted(() => {
             <LifePlanTree :plan="plan" @select="openNode" />
           </section>
         </div>
+
+        <button
+          data-alt="show-more"
+          type="button"
+          class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          @click="showMore = !showMore"
+        >
+          {{ showMore ? '收起' : '更多：星图 · 总览 · 路线图 · 想法池' }}
+        </button>
       </div>
 
       <p
