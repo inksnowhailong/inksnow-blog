@@ -11,6 +11,10 @@
  *
  * 高度改为随内容自动长高：原先的 resize-y 把手正好在右下角，会和框内按钮抢位置；
  * 而且写长指令时本来就该自己撑开，不该要人去拖。
+ *
+ * 两个模式长得不一样，是为了让人一眼分清这句话会不会经过模型：
+ * ask 有边框、按钮是纸飞机；note 无框只有一层底色、按钮直接写着「记下」——
+ * 写完就落库，没有第二步。
  */
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import LifeIcon from './lifeIcon.vue';
@@ -46,10 +50,7 @@ const buttonLabel = computed(
 );
 
 /** 跑着的时候换成横线，让「在等结果」和「可以点」在图标上就分得开 */
-const icon = computed(() => {
-  if (props.busy) return 'flat';
-  return isAsk.value ? 'send' : 'check';
-});
+const icon = computed(() => (props.busy ? 'flat' : 'send'));
 
 const ta = ref<HTMLTextAreaElement | null>(null);
 
@@ -94,7 +95,12 @@ function onEnter(e: KeyboardEvent) {
   <!-- 边框由这一层持有，里面的 textarea 不再自带边框，于是整体只有一个框 -->
   <div
     data-alt="ask-bar"
-    class="relative rounded-lg border border-slate-200 bg-white transition focus-within:border-brand-400 dark:border-slate-600 dark:bg-slate-900"
+    class="relative rounded-lg transition"
+    :class="
+      isAsk
+        ? 'border border-slate-200 bg-white focus-within:border-brand-400 dark:border-slate-600 dark:bg-slate-900'
+        : 'bg-slate-50 dark:bg-slate-700/40'
+    "
   >
     <!-- 右侧留出的 pr 是给按钮的空位，否则文字会跑到按钮底下 -->
     <textarea
@@ -104,7 +110,8 @@ function onEnter(e: KeyboardEvent) {
       rows="2"
       :placeholder="placeholder"
       :maxlength="maxlength"
-      class="block w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-base leading-relaxed outline-none dark:text-slate-100 sm:px-2.5 sm:py-2 sm:pr-11 sm:text-sm"
+      class="block w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-base leading-relaxed outline-none dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
+      :class="isAsk ? 'pr-14 sm:pr-11' : 'pr-[4.5rem] sm:pr-16'"
       @input="
         emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)
       "
@@ -117,14 +124,21 @@ function onEnter(e: KeyboardEvent) {
       :disabled="disabled"
       :title="buttonLabel"
       :aria-label="buttonLabel"
-      class="absolute bottom-1.5 right-1.5 grid h-11 w-11 place-items-center rounded-md bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:bottom-1 sm:right-1 sm:h-7 sm:w-7"
+      class="absolute bottom-1.5 right-1.5 rounded-md bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:bottom-1 sm:right-1"
+      :class="
+        isAsk
+          ? 'grid h-11 w-11 place-items-center sm:h-7 sm:w-7'
+          : 'h-11 px-3 text-sm sm:h-7 sm:px-2.5 sm:text-xs'
+      "
       @click="submit"
     >
       <LifeIcon
+        v-if="isAsk"
         :name="icon"
         class="h-4 w-4 sm:h-3.5 sm:w-3.5"
         :class="busy && 'animate-pulse'"
       />
+      <template v-else>{{ busy ? '记下…' : '记下' }}</template>
     </button>
   </div>
 </template>

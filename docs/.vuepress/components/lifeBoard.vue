@@ -1129,7 +1129,7 @@ onMounted(() => {
                 mode="note"
                 :busy="busy"
                 :maxlength="500"
-                placeholder="想试试什么"
+                placeholder="记一个想法"
                 label="记下这个想法"
                 @submit="captureIdea"
               />

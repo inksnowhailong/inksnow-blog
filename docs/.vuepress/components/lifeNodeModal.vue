@@ -34,8 +34,6 @@ const errorMsg = ref('');
 const dropping = ref(false);
 const dropReason = ref('');
 
-
-
 /** 每日项才有的计分设定 */
 const threshold = ref(0);
 const points = ref(0);
@@ -424,7 +422,7 @@ function drop() {
           v-model="logDraft"
           mode="note"
           :busy="busy"
-          placeholder="搞懂了什么，或卡在哪"
+          placeholder="记一条：搞懂了什么，或卡在哪"
           @submit="addLog"
         />
         <p class="mt-1 text-[11px] text-slate-400">

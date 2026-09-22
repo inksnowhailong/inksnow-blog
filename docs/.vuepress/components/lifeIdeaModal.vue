@@ -247,7 +247,7 @@ watch(
           v-model="logDraft"
           mode="note"
           :busy="busy"
-          placeholder="这次试了什么，发现了什么"
+          placeholder="记一条进展"
           @submit="addLog"
         />
         <p v-if="!isDone" class="mt-1 text-[11px] text-slate-400">
