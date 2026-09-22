@@ -1032,10 +1032,7 @@ onMounted(() => {
               >
                 奖励与惩罚的超级反应倾向
               </p>
-              <LifeAskButton
-                title="就额度与体能债问 AI"
-                @click="openBankAsk()"
-              />
+              <LifeAskButton title="存一个运动储备" @click="openBankAsk()" />
             </div>
 
             <div data-alt="kpi-balance">
