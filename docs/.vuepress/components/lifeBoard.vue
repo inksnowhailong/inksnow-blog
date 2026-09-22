@@ -391,6 +391,9 @@ async function askSend(text: string) {
       ];
     }
   } catch (e: any) {
+    // 没问出去的那句要从记录里撤掉，否则下次发送历史会以两句 user 连着结尾，
+    // 且第二句不再补前缀
+    askLog.value = askLog.value.slice(0, -1);
     askReply.value = 'AI 暂时不可用：' + e.message;
   } finally {
     busy.value = false;

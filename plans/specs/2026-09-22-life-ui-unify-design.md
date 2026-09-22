@@ -26,7 +26,7 @@
    └─────────────────────┴────────────────┘
                               [问 AI] 悬浮
    ```
-   `grid lg:grid-cols-2`，无 sticky 侧栏，无 `ai-column`。
+   `grid lg:grid-cols-2`：左列（打卡 + 想法池）`lg:self-start lg:sticky lg:top-4` 只占内容高度并随滚动吸顶，右列路线图；无 `ai-column`。
 5. 手机布局（< lg）：首屏 = 今日打卡；其下"更多"按钮展开 总览 · 路线图 · 想法池（沿用 `showMore`，文案改成"更多：总览 · 路线图 · 想法池"）。悬浮按钮常驻。
 6. 性能：记日志 / 记进展 / 确认草稿后不再无脑 `loadAll()` 六连拉。
    `loadAll()` 拆成 `loadCore()`（diagnosis+plan+day）与 `loadIdeas()`；想法池相关动作只 `loadIdeas()`，节点弹窗 `changed` 只 `loadCore()`。sky 请求删除。
