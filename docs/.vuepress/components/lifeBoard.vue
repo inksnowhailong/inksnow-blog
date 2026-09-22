@@ -10,6 +10,7 @@ import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeIdeaRow from './lifeIdeaRow.vue';
+import LifeBookRow from './lifeBookRow.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
@@ -41,6 +42,7 @@ const errorMsg = ref('');
 const diagnosis = ref<any>(null);
 const ledger = ref<any>(null);
 const ideas = ref<any>(null);
+const books = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
 
@@ -55,7 +57,7 @@ const pickedPath = ref('');
 /** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
 const showDone = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、研究线 */
+/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、读书与研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -134,12 +136,20 @@ async function loadIdeas() {
   ideas.value = await api('/life/ideas');
 }
 
-/** 开锁时的首次拉取，两摊都要 */
+/**
+ * 读书
+ * @description 和研究线同理，自成一摊：记一本书、记一条笔记都不改分数也不动额度
+ */
+async function loadBooks() {
+  books.value = await api('/life/books');
+}
+
+/** 开锁时的首次拉取，三摊都要 */
 async function loadAll() {
   loading.value = true;
   errorMsg.value = '';
   try {
-    await Promise.all([loadCore(), loadIdeas()]);
+    await Promise.all([loadCore(), loadIdeas(), loadBooks()]);
     unlocked.value = true;
     try {
       localStorage.setItem(KEY_STORE, key.value);
@@ -414,10 +424,11 @@ async function askConfirm() {
     await applyDraft(p, api);
     askPending.value = null;
     askReply.value = '已记下';
-    // 草稿什么都可能改，两摊都得重拉。不走 loadAll：那条路是开锁用的，
+    // 草稿什么都可能改，三摊都得重拉。不走 loadAll：那条路是开锁用的，
     // 会重写密钥、把整页推回加载态，还会把刷新失败吞进错误条当成加载失败
     refresh(loadCore);
     refresh(loadIdeas);
+    refresh(loadBooks);
   } catch (e: any) {
     askReply.value = e.message;
   } finally {
@@ -498,6 +509,14 @@ function openIdeasAsk() {
   openAsk({
     title: '研究线',
     prefix: '关于我的研究线：',
+  });
+}
+
+/** 读书那一卡的入口，问的是整摊书而不是某一本 */
+function openBooksAsk() {
+  openAsk({
+    title: '读书',
+    prefix: '关于我在读的书：',
   });
 }
 
@@ -820,6 +839,54 @@ function openIdeaAsk(payload: { prefix: string }) {
     placeholder: '今天试了 xxx，发现 yyy',
     prefix: payload.prefix,
   });
+}
+
+/** 在读的书；读完的收在折叠段里 */
+const readingBooks = computed<any[]>(() => books.value?.reading ?? []);
+const doneBooks = computed<any[]>(() => books.value?.done ?? []);
+
+/**
+ * 标题行右侧的计数
+ * @description 空的那一段不占位置；一本都没有时给句固定文案，
+ * 否则标题行右边只剩一颗星芒，像是没加载出来
+ */
+const bookCountText = computed(
+  () =>
+    [
+      readingBooks.value.length ? `在读 ${readingBooks.value.length}` : '',
+      doneBooks.value.length ? `读完 ${doneBooks.value.length}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · ') || '还没有',
+);
+
+/** 读完的书默认折起来：它们是存量，日常要看的是手上这几本 */
+const showDoneBooks = ref(false);
+
+/** 新书的输入框 */
+const bookDraft = ref('');
+
+/**
+ * 记下一本在读的书
+ * @description 与记研究线同理走确定性接口：书名就是一行字，
+ * 让模型过一道手只会多一次失败的机会
+ */
+async function captureBook() {
+  const title = bookDraft.value.trim();
+  if (!title || busy.value) return;
+  busy.value = true;
+  try {
+    await api('/life/books', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+    bookDraft.value = '';
+    await loadBooks();
+  } catch (e: any) {
+    errorMsg.value = e.message;
+  } finally {
+    busy.value = false;
+  }
 }
 
 /** 从节点弹窗里唤起问 AI，让它改写这条计划 */
@@ -1397,6 +1464,79 @@ onMounted(() => {
 
           </section>
 
+          <!--
+            读书排在研究线上面：读书是每天都排、砍不掉的那一项，
+            研究线是想起来才记一句的地方——天天要看的那摊摆在手边
+          -->
+          <section
+            data-alt="books-section"
+            :class="showMore ? '' : 'hidden lg:block'"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                读书
+              </p>
+              <span
+                data-alt="books-counts"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                {{ bookCountText }}
+                <LifeAskButton title="就读书问 AI" @click="openBooksAsk" />
+              </span>
+            </div>
+            <div class="mt-3">
+              <!-- 上限对齐后端的 200，多打的字不该被悄悄吃掉 -->
+              <LifeAskBar
+                v-model="bookDraft"
+                mode="note"
+                :busy="busy"
+                :maxlength="200"
+                placeholder="记一本书"
+                label="记下这本书"
+                @submit="captureBook"
+              />
+
+              <ul
+                v-if="readingBooks.length"
+                data-alt="book-list"
+                class="mt-3 grid"
+              >
+                <LifeBookRow
+                  v-for="b in readingBooks"
+                  :key="b.id"
+                  :book="b"
+                />
+              </ul>
+              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
+                还没在读的书
+              </p>
+
+              <!-- 读完的收起来，点一下才摊开 -->
+              <div v-if="doneBooks.length" data-alt="books-done" class="mt-2">
+                <button
+                  data-alt="books-done-toggle"
+                  type="button"
+                  class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
+                  @click="showDoneBooks = !showDoneBooks"
+                >
+                  读完 ({{ doneBooks.length }})
+                  <LifeIcon
+                    :name="showDoneBooks ? 'up' : 'down'"
+                    class="h-3 w-3"
+                  />
+                </button>
+                <ul v-if="showDoneBooks" data-alt="book-done-list" class="mt-1 grid">
+                  <LifeBookRow
+                    v-for="b in doneBooks"
+                    :key="b.id"
+                    :book="b"
+                  />
+                </ul>
+              </div>
+            </div>
+          </section>
+
           <section
             data-alt="ideas-section"
             :class="showMore ? '' : 'hidden lg:block'"
@@ -1518,7 +1658,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 读书 · 研究线' }}
         </button>
       </div>
 
