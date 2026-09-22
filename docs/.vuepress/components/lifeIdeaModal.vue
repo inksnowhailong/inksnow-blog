@@ -23,8 +23,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  /** 数据变了，让面板重新拉 */
-  (e: 'changed'): void;
+  /** 数据变了，让面板重新拉；scope 说清波及哪一摊 */
+  (e: 'changed', scope: 'ideas' | 'all'): void;
   /** 就这条线问 AI，带上它当上下文 */
   (e: 'ask', payload: { prefix: string }): void;
 }>();
@@ -66,13 +66,18 @@ const stateClass = computed(() => STATES[props.idea?.state]?.cls ?? '');
 /** 已结的线只读 */
 const isDone = computed(() => props.idea?.state === 'DONE');
 
-/** 统一跑一次请求，收口忙碌态与报错 */
-async function run(fn: () => Promise<any>) {
+/**
+ * 统一跑一次请求，收口忙碌态与报错
+ * @param fn 要跑的动作
+ * @param scope 这次改动波及哪一摊：默认只动想法池，
+ * 写结论和删除会连带改额度，得让面板把那一摊也重拉
+ */
+async function run(fn: () => Promise<any>, scope: 'ideas' | 'all' = 'ideas') {
   busy.value = true;
   errorMsg.value = '';
   try {
     await fn();
-    emit('changed');
+    emit('changed', scope);
   } catch (e: any) {
     errorMsg.value = e.message ?? '操作失败';
   } finally {
@@ -126,7 +131,7 @@ function conclude() {
     });
     closing.value = false;
     emit('close');
-  });
+  }, 'all');
 }
 
 /**
@@ -138,7 +143,7 @@ function drop() {
   run(async () => {
     await props.api(`/life/ideas/${props.idea.id}`, { method: 'DELETE' });
     emit('close');
-  });
+  }, 'all');
 }
 
 /** 就这条线问 AI，把它的来龙去脉一并带上 */

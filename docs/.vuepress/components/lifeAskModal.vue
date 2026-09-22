@@ -37,6 +37,8 @@ const props = defineProps<{
   log: AskTurn[];
   /** 待确认的草稿描述，非空时必须点头才落库 */
   pendingText?: string;
+  /** 草稿卡顶部的额外提醒，如「改错了可以在最近改动里撤销」 */
+  pendingNote?: string;
   /** 这条草稿是否会删掉已有数据 */
   destructive?: boolean;
   /** 草稿原件，高风险时要摊开前后对照 */
@@ -193,6 +195,7 @@ function send() {
           :busy="busy"
           :placeholder="placeholder || '说点什么'"
           :pending-text="pendingText"
+          :pending-note="pendingNote"
           :pending="pending"
           :destructive="destructive"
           :direct-label="directLabel"

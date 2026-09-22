@@ -26,8 +26,6 @@ withDefaults(
     pendingNote?: string;
     /** 不经模型的直接动作，如「直接记为已还」 */
     directLabel?: string;
-    /** 出错时的红字 */
-    errorMsg?: string;
   }>(),
   {
     busy: false,
@@ -141,13 +139,5 @@ const emit = defineEmits<{
       <LifeIcon name="check" class="h-3.5 w-3.5" />
       {{ directLabel }}
     </button>
-
-    <p
-      v-if="errorMsg"
-      data-alt="ask-error"
-      class="text-sm text-rose-600 dark:text-rose-400 sm:text-xs"
-    >
-      {{ errorMsg }}
-    </p>
   </div>
 </template>

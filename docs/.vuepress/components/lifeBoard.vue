@@ -16,6 +16,7 @@ import {
   describeDraft,
   applyDraft,
   isDestructive,
+  touchesPlan,
   askStream,
 } from './useLifeDraft';
 
@@ -49,7 +50,7 @@ const picked = ref<any>(null);
 const pickedPath = ref('');
 const showIdeas = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、AI 栏其余、路线图 */
+/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、想法池 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -94,30 +95,46 @@ function weekdayOf(date: string): number {
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-/** 拉取面板所需数据 */
+/**
+ * 打卡与计划这一摊：诊断、账本、热力图、路线图与当日结算
+ * @description 它们是同一笔记录的几个侧面——记一次打卡，五个数都会变，
+ * 所以要一起拉。想法池不在其中，故单独一个函数
+ */
+async function loadCore() {
+  const to = today();
+  const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
+  const [d, l, h, p] = await Promise.all([
+    api('/life/diagnosis'),
+    api('/life/ledger'),
+    api(`/life/settlement/range?from=${from}&to=${to}`),
+    api('/life/plan'),
+  ]);
+  diagnosis.value = d;
+  ledger.value = l;
+  heat.value = h;
+  plan.value = p;
+  if (!activeDate.value) activeDate.value = to;
+  if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
+  await Promise.all([loadActiveDay(), loadMonth()]);
+  // 弹窗开着时同步刷新里面那份，否则改完还显示旧内容
+  if (picked.value) picked.value = findNode(picked.value.id);
+}
+
+/**
+ * 想法池
+ * @description 与打卡、计划互不相干：记一个想法不会改分数也不会动额度，
+ * 没有理由顺带把上面那五个接口再拉一遍
+ */
+async function loadIdeas() {
+  ideas.value = await api('/life/ideas');
+}
+
+/** 开锁时的首次拉取，两摊都要 */
 async function loadAll() {
   loading.value = true;
   errorMsg.value = '';
   try {
-    const to = today();
-    const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p] = await Promise.all([
-      api('/life/diagnosis'),
-      api('/life/ledger'),
-      api('/life/ideas'),
-      api(`/life/settlement/range?from=${from}&to=${to}`),
-      api('/life/plan'),
-    ]);
-    diagnosis.value = d;
-    ledger.value = l;
-    ideas.value = i;
-    heat.value = h;
-    plan.value = p;
-    if (!activeDate.value) activeDate.value = to;
-    if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
-    await Promise.all([loadActiveDay(), loadMonth()]);
-    // 弹窗开着时同步刷新里面那份，否则改完还显示旧内容
-    if (picked.value) picked.value = findNode(picked.value.id);
+    await Promise.all([loadCore(), loadIdeas()]);
     unlocked.value = true;
     try {
       localStorage.setItem(KEY_STORE, key.value);
@@ -127,6 +144,18 @@ async function loadAll() {
   } finally {
     loading.value = false;
   }
+}
+
+/**
+ * 动作之后刷新一块数据
+ * @description 与开锁那次不一样：那次拿不到要退回密钥页，
+ * 这里只是让页面跟上，失败写到错误条上就够了，不该把人踢出去
+ * @param load 要重拉的那一块
+ */
+function refresh(load: () => Promise<void>) {
+  load().catch((e: any) => {
+    errorMsg.value = e.message || '刷新失败';
+  });
 }
 
 /** 取当前选中日期的结算；选中今天时直接复用诊断里的结果 */
@@ -177,7 +206,7 @@ async function punch(nodeId: string, minutes: number) {
       method: 'POST',
       body: JSON.stringify({ nodeId, minutes, occurredOn: activeDate.value }),
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -203,7 +232,7 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
       method: 'POST',
       body: JSON.stringify({ kind, amount, occurredOn: today() }),
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -370,9 +399,16 @@ async function askConfirm() {
   }
 }
 
-/** 草稿的一句话描述，交给浮层展示 */
+/** 草稿的一句话描述，交给弹窗展示 */
 const askPendingText = computed(() =>
   askPending.value ? describeDraft(askPending.value, nodeTitleOf) : '',
+);
+
+/** 会动计划本身的草稿要多说一句，它改的不是一笔流水而是计划表 */
+const askPendingNote = computed(() =>
+  touchesPlan(askPending.value)
+    ? '这条会动计划本身，确认前看清楚。改错了可以在「最近改动」里撤销'
+    : '',
 );
 
 /** 点弹窗里的「直接记下」 */
@@ -436,7 +472,7 @@ async function clearDay(nodeId: string) {
     await api(`/life/plan/${nodeId}/records?date=${activeDate.value}`, {
       method: 'DELETE',
     });
-    await loadAll();
+    await loadCore();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -672,7 +708,7 @@ async function captureIdea() {
       body: JSON.stringify({ content }),
     });
     ideaDraft.value = '';
-    await loadAll();
+    await loadIdeas();
   } catch (e: any) {
     errorMsg.value = e.message;
   } finally {
@@ -687,6 +723,16 @@ watch(ideas, () => {
   const fresh = ideaList.value.find((i) => i.id === activeIdea.value.id);
   if (fresh) activeIdea.value = fresh;
 });
+
+/**
+ * 研究线弹窗改完之后
+ * @param scope 这次改动波及哪一摊：记进展只动想法池，
+ * 写结论和删除会连带改额度，那一摊也得重拉
+ */
+function onIdeaChanged(scope: 'ideas' | 'all') {
+  refresh(loadIdeas);
+  if (scope === 'all') refresh(loadCore);
+}
 
 /** 从研究线弹窗里唤起问 AI */
 function openIdeaAsk(payload: { prefix: string }) {
@@ -1092,12 +1138,185 @@ onMounted(() => {
         </p>
       </section>
 
-      <div class="grid gap-4 lg:grid-cols-3">
-        <!-- 侧栏：手机上排在今日卡之后，桌面上收到右侧 -->
-        <aside
-          data-alt="side-column"
-          class="grid gap-4 order-2 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
+      <div class="grid gap-4 lg:grid-cols-2">
+        <!-- 左列：今天要做的四项，手机上是首屏唯一的东西 -->
+        <section
+          data-alt="punch-card"
+          class="order-1 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
         >
+          <div
+            data-alt="date-nav"
+            class="mb-3 flex items-center justify-between gap-2"
+          >
+            <!-- 项数会随排期逐日变化，标题不能写死 -->
+            <p
+              class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+            >
+              {{ dailyTitle }}
+            </p>
+            <div class="flex items-center gap-1">
+              <button
+                data-alt="prev-day"
+                type="button"
+                title="前一天"
+                aria-label="前一天"
+                class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+                @click="moveDate(-1)"
+              >
+                <LifeIcon name="left" class="h-4 w-4" />
+              </button>
+              <span
+                class="min-w-[4.5rem] text-center text-sm tabular-nums text-slate-600 dark:text-slate-300"
+                >{{ dateLabel }}</span
+              >
+              <button
+                data-alt="next-day"
+                type="button"
+                :disabled="isToday"
+                title="后一天"
+                aria-label="后一天"
+                class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-700"
+                @click="moveDate(1)"
+              >
+                <LifeIcon name="right" class="h-4 w-4" />
+              </button>
+              <button
+                v-if="!isToday"
+                data-alt="back-today"
+                type="button"
+                title="回到今天"
+                aria-label="回到今天"
+                class="ml-1 grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
+                @click="backToToday"
+              >
+                <LifeIcon name="undo" class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
+            <div
+              v-for="it in activeDay.items"
+              :key="it.nodeId"
+              data-alt="punch-item"
+              class="rounded-xl border p-3 transition"
+              :class="
+                it.reached
+                  ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
+                  : 'border-slate-100 dark:border-slate-700'
+              "
+            >
+              <div class="flex items-baseline justify-between gap-2">
+                <button
+                  data-alt="daily-ask"
+                  type="button"
+                  :title="'说一句来补记「' + it.title + '」'"
+                  class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
+                  @click="openDailyAsk(it)"
+                >
+                  {{ it.title }}
+                </button>
+                <span class="shrink-0 text-xs text-slate-400">
+                  <span
+                    v-if="it.isMainline"
+                    class="mr-1 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                    >主线</span
+                  >{{ it.points }} 分
+                </span>
+              </div>
+              <div
+                class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
+              >
+                <div
+                  class="h-full rounded-full transition-all"
+                  :class="
+                    it.reached
+                      ? 'bg-brand-500 dark:bg-brand-300'
+                      : 'bg-brand-500/50'
+                  "
+                  :style="{
+                    width:
+                      Math.min(
+                        100,
+                        (it.minutes / it.thresholdMinutes) * 100,
+                      ) + '%',
+                  }"
+                />
+              </div>
+              <div class="mt-1.5 flex items-center justify-between gap-2">
+                <span class="text-xs tabular-nums text-slate-500"
+                  >{{ it.minutes }}/{{ it.thresholdMinutes }} 分钟<span
+                    v-if="it.minutes > it.thresholdMinutes"
+                    class="ml-1 text-slate-400"
+                    >超 {{ it.minutes - it.thresholdMinutes }}</span
+                  ></span
+                >
+                <span class="flex gap-1">
+                  <button
+                    v-for="m in QUICK_MINUTES"
+                    :key="m"
+                    data-alt="punch-quick"
+                    type="button"
+                    :disabled="busy"
+                    class="rounded px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700"
+                    @click="punch(it.nodeId, m)"
+                  >
+                    +{{ m }}
+                  </button>
+                  <button
+                    v-if="it.minutes > 0"
+                    data-alt="punch-clear"
+                    type="button"
+                    :disabled="busy"
+                    :title="`清掉这一项今天的 ${it.minutes} 分钟`"
+                    aria-label="清零这一项"
+                    class="grid h-6 w-6 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
+                    @click="clearDay(it.nodeId)"
+                  >
+                    <LifeIcon name="undo" class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    v-if="!it.reached"
+                    data-alt="punch-reach"
+                    type="button"
+                    :disabled="busy"
+                    title="一次补到达标"
+                    aria-label="一次补到达标"
+                    class="grid h-6 w-6 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15"
+                    @click="punchToThreshold(it)"
+                  >
+                    <LifeIcon name="target" class="h-4 w-4" />
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- 右列：一次性的清单进度与想法池，手机上折在「更多」里 -->
+        <div data-alt="side-column" class="order-2 grid content-start gap-4">
+          <!-- 路线图 -->
+          <section
+            data-alt="roadmap"
+            :class="showMore ? '' : 'hidden lg:block'"
+            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <div class="mb-4 flex items-baseline justify-between gap-2">
+              <p
+                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+              >
+                路线图
+              </p>
+              <span class="text-xs tabular-nums text-slate-400"
+                >必修 {{ diagnosis.checklist.requiredDone }}/{{
+                  diagnosis.checklist.required
+                }}</span
+              >
+            </div>
+            <LifePlanTree :plan="plan" @select="openNode" />
+          </section>
+
           <section
             data-alt="ideas-section"
             :class="showMore ? '' : 'hidden lg:block'"
@@ -1165,185 +1384,6 @@ onMounted(() => {
               </p>
             </div>
           </section>
-        </aside>
-
-        <!-- 主内容 -->
-        <div data-alt="main-column" class="grid gap-4 order-1 lg:order-1 lg:col-span-2">
-          <!-- 打卡：每天重复的四项 -->
-          <section
-            data-alt="punch-card"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div
-              data-alt="date-nav"
-              class="mb-3 flex items-center justify-between gap-2"
-            >
-              <!-- 项数会随排期逐日变化，标题不能写死 -->
-              <p
-                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-              >
-                {{ dailyTitle }}
-              </p>
-              <div class="flex items-center gap-1">
-                <button
-                  data-alt="prev-day"
-                  type="button"
-                  title="前一天"
-                  aria-label="前一天"
-                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
-                  @click="moveDate(-1)"
-                >
-                  <LifeIcon name="left" class="h-4 w-4" />
-                </button>
-                <span
-                  class="min-w-[4.5rem] text-center text-sm tabular-nums text-slate-600 dark:text-slate-300"
-                  >{{ dateLabel }}</span
-                >
-                <button
-                  data-alt="next-day"
-                  type="button"
-                  :disabled="isToday"
-                  title="后一天"
-                  aria-label="后一天"
-                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-700"
-                  @click="moveDate(1)"
-                >
-                  <LifeIcon name="right" class="h-4 w-4" />
-                </button>
-                <button
-                  v-if="!isToday"
-                  data-alt="back-today"
-                  type="button"
-                  title="回到今天"
-                  aria-label="回到今天"
-                  class="ml-1 grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
-                  @click="backToToday"
-                >
-                  <LifeIcon name="undo" class="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
-              <div
-                v-for="it in activeDay.items"
-                :key="it.nodeId"
-                data-alt="punch-item"
-                class="rounded-xl border p-3 transition"
-                :class="
-                  it.reached
-                    ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
-                    : 'border-slate-100 dark:border-slate-700'
-                "
-              >
-                <div class="flex items-baseline justify-between gap-2">
-                  <button
-                    data-alt="daily-ask"
-                    type="button"
-                    :title="'说一句来补记「' + it.title + '」'"
-                    class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
-                    @click="openDailyAsk(it)"
-                  >
-                    {{ it.title }}
-                  </button>
-                  <span class="shrink-0 text-xs text-slate-400">
-                    <span
-                      v-if="it.isMainline"
-                      class="mr-1 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-                      >主线</span
-                    >{{ it.points }} 分
-                  </span>
-                </div>
-                <div
-                  class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
-                >
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :class="
-                      it.reached
-                        ? 'bg-brand-500 dark:bg-brand-300'
-                        : 'bg-brand-500/50'
-                    "
-                    :style="{
-                      width:
-                        Math.min(
-                          100,
-                          (it.minutes / it.thresholdMinutes) * 100,
-                        ) + '%',
-                    }"
-                  />
-                </div>
-                <div class="mt-1.5 flex items-center justify-between gap-2">
-                  <span class="text-xs tabular-nums text-slate-500"
-                    >{{ it.minutes }}/{{ it.thresholdMinutes }} 分钟<span
-                      v-if="it.minutes > it.thresholdMinutes"
-                      class="ml-1 text-slate-400"
-                      >超 {{ it.minutes - it.thresholdMinutes }}</span
-                    ></span
-                  >
-                  <span class="flex gap-1">
-                    <button
-                      v-for="m in QUICK_MINUTES"
-                      :key="m"
-                      data-alt="punch-quick"
-                      type="button"
-                      :disabled="busy"
-                      class="rounded px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700"
-                      @click="punch(it.nodeId, m)"
-                    >
-                      +{{ m }}
-                    </button>
-                    <button
-                      v-if="it.minutes > 0"
-                      data-alt="punch-clear"
-                      type="button"
-                      :disabled="busy"
-                      :title="`清掉这一项今天的 ${it.minutes} 分钟`"
-                      aria-label="清零这一项"
-                      class="grid h-6 w-6 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
-                      @click="clearDay(it.nodeId)"
-                    >
-                      <LifeIcon name="undo" class="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      v-if="!it.reached"
-                      data-alt="punch-reach"
-                      type="button"
-                      :disabled="busy"
-                      title="一次补到达标"
-                      aria-label="一次补到达标"
-                      class="grid h-6 w-6 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15"
-                      @click="punchToThreshold(it)"
-                    >
-                      <LifeIcon name="target" class="h-4 w-4" />
-                    </button>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-          </section>
-
-          <!-- 路线图 -->
-          <section
-            data-alt="roadmap"
-            :class="showMore ? '' : 'hidden lg:block'"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div class="mb-4 flex items-baseline justify-between gap-2">
-              <p
-                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-              >
-                路线图
-              </p>
-              <span class="text-xs tabular-nums text-slate-400"
-                >必修 {{ diagnosis.checklist.requiredDone }}/{{
-                  diagnosis.checklist.required
-                }}</span
-              >
-            </div>
-            <LifePlanTree :plan="plan" @select="openNode" />
-          </section>
         </div>
 
         <button
@@ -1392,6 +1432,7 @@ onMounted(() => {
       :reply="askReply"
       :log="askLog"
       :pending-text="askPendingText"
+      :pending-note="askPendingNote"
       :destructive="isDestructive(askPending)"
       :pending="askPending"
       @close="closeAsk"
@@ -1407,7 +1448,7 @@ onMounted(() => {
       :api="api"
       :note-yuan="diagnosis?.rules?.researchNoteYuan ?? 15"
       @close="activeIdea = null"
-      @changed="loadAll"
+      @changed="onIdeaChanged"
       @ask="openIdeaAsk"
     />
 
@@ -1417,7 +1458,7 @@ onMounted(() => {
       :path="pickedPath"
       :api="api"
       @close="picked = null"
-      @changed="loadAll"
+      @changed="refresh(loadCore)"
       @ask="openNodeAsk"
     />
   </div>
