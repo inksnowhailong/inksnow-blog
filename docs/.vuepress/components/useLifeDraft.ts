@@ -17,10 +17,16 @@ const PLAN_KINDS = [
 
 /**
  * 会删掉已有数据的草稿
- * @description 改日历也算在内——它不删记录，但改哪天休息会连带改欠债，
- * 后果同样是「已经成立的东西变了」，值得同一档的黄色确认
+ * @description 改日历与改每周默认排休也算在内——它们不删记录，但改哪天休息会
+ * 连带改欠债，后者牵连的还是往后每一周，值得同一档的黄色确认
  */
-const DESTRUCTIVE_KINDS = ['undo', 'plan_drop', 'idea_drop', 'calendar'];
+const DESTRUCTIVE_KINDS = [
+  'undo',
+  'plan_drop',
+  'idea_drop',
+  'calendar',
+  'rest_weekdays',
+];
 
 /** 星期编号转中文，0 是周日，与后端 weekdays 一致 */
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];

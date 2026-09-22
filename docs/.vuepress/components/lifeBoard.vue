@@ -238,19 +238,8 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
   }
 }
 
-/**
- * 当前这天是不是休息日
- * @description 逐日结算那两份（近九周、当月）带了 dayKind，当日结算接口不一定带，
- * 故以当日结算为先、日历数据兜底，免得后端还没跟上时标题跟格子说的不是一回事
- */
-const activeRest = computed(() => {
-  const d = activeDay.value;
-  if (d?.dayKind) return d.dayKind === 'REST';
-  const hit =
-    heat.value.find((x: any) => x.date === activeDate.value) ??
-    monthHeat.value.find((x: any) => x.date === activeDate.value);
-  return hit?.dayKind === 'REST';
-});
+/** 当前这天是不是休息日，由当日结算下发 */
+const activeRest = computed(() => activeDay.value?.dayKind === 'REST');
 
 /**
  * 打卡区的标题
@@ -259,8 +248,10 @@ const activeRest = computed(() => {
  * 免得看见一个空列表以为是加载失败
  */
 const dailyTitle = computed(() => {
-  // 休息日只排常驻项，先说清「不做也不欠」，报项数反而像是又欠了几样
-  if (activeRest.value) return '今天休息 · 做了算白赚';
+  // 休息日只排常驻项，先说清「不做也不欠」，报项数反而像是又欠了几样。
+  // 翻到往日时说「今天」就成了错话，补记那天看着像在说当下
+  if (activeRest.value)
+    return `${isToday.value ? '今天' : '这天'}休息 · 做了算白赚`;
   const n = activeDay.value?.items?.length ?? 0;
   if (!n) return '今天没排计划';
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -729,8 +720,7 @@ const REST_BORDER =
  * 休息日额外描一圈虚线边框——调休上班的周末与放假的工作日光看底色分不出来
  */
 function heatClass(cell: any): string {
-  // undefined 表示该月没有这一天，整格不画；没有 score 表示这天不在统计范围内
-  if (cell === undefined) return 'invisible';
+  // 对齐空位不走这里，进来的都是真有这一天；没有 score 表示不在统计范围内
   if (cell.score == null) return 'bg-transparent';
   const rest = cell.dayKind === 'REST';
   // 看的是「这天排没排计划」而不是「是不是周末」：出差请假同样是没排
@@ -1335,18 +1325,25 @@ onMounted(() => {
               >
             </div>
             <div data-alt="heat-grid" class="grid grid-cols-7 gap-1.5">
-              <button
-                v-for="(cell, i) in monthCells"
-                :key="i"
-                data-alt="heat-cell"
-                type="button"
-                :disabled="!canAskDay(cell)"
-                :title="heatTitle(cell)"
-                :aria-label="cell?.date ? `问 ${cell.date} 这一天` : undefined"
-                class="aspect-square w-7 rounded transition enabled:hover:ring-2 enabled:hover:ring-brand-400 enabled:hover:ring-offset-1 dark:enabled:hover:ring-offset-slate-800"
-                :class="heatClass(cell)"
-                @click="openDayAsk(cell)"
-              />
+              <template v-for="(cell, i) in monthCells" :key="i">
+                <!-- 月初对齐用的空位只是占地方，不进 Tab 键的顺序 -->
+                <div
+                  v-if="cell === undefined"
+                  data-alt="heat-pad"
+                  class="invisible aspect-square w-7"
+                />
+                <button
+                  v-else
+                  data-alt="heat-cell"
+                  type="button"
+                  :disabled="!canAskDay(cell)"
+                  :title="heatTitle(cell)"
+                  :aria-label="`问 ${cell.date} 这一天`"
+                  class="aspect-square w-7 rounded outline-none ring-brand-400 ring-offset-1 transition focus-visible:ring-2 enabled:hover:ring-2 dark:ring-offset-slate-800"
+                  :class="heatClass(cell)"
+                  @click="openDayAsk(cell)"
+                />
+              </template>
             </div>
             <p class="text-[11px] tabular-nums leading-snug text-slate-400">
               已连 {{ streak.current }} 天 · 本月做了 {{ monthActiveDays }} 天
