@@ -239,12 +239,6 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
 }
 
 /**
- * 打卡区的标题
- * @description 原先写死「每日四项」，但排期上线后每天排几项是会变的，
- * 写死的数字迟早和列表对不上。没排到项的日子直接说清楚，
- * 免得看见一个空列表以为是加载失败
- */
-/**
  * 当前这天是不是休息日
  * @description 逐日结算那两份（近九周、当月）带了 dayKind，当日结算接口不一定带，
  * 故以当日结算为先、日历数据兜底，免得后端还没跟上时标题跟格子说的不是一回事
@@ -258,6 +252,12 @@ const activeRest = computed(() => {
   return hit?.dayKind === 'REST';
 });
 
+/**
+ * 打卡区的标题
+ * @description 原先写死「每日四项」，但排期上线后每天排几项是会变的，
+ * 写死的数字迟早和列表对不上。没排到项的日子直接说清楚，
+ * 免得看见一个空列表以为是加载失败
+ */
 const dailyTitle = computed(() => {
   // 休息日只排常驻项，先说清「不做也不欠」，报项数反而像是又欠了几样
   if (activeRest.value) return '今天休息 · 做了算白赚';
