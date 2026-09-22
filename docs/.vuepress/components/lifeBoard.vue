@@ -728,12 +728,17 @@ const ideaSegments = computed(() => {
     : known;
 });
 
-/** 标题行右侧的分段计数，如「2 在动 · 1 搁着」；空段不占位置 */
-const ideaCountText = computed(() =>
-  ideaSegments.value
-    .filter((s) => s.items.length)
-    .map((s) => `${s.items.length} ${s.label}`)
-    .join(' · '),
+/**
+ * 标题行右侧的分段计数，如「2 在动 · 1 搁着」
+ * @description 空段不占位置；一条都没有时给句固定文案，
+ * 否则折叠状态下标题行右边只剩一个箭头，像是没加载出来
+ */
+const ideaCountText = computed(
+  () =>
+    ideaSegments.value
+      .filter((s) => s.items.length)
+      .map((s) => `${s.items.length} ${s.label}`)
+      .join(' · ') || '还没有',
 );
 
 /** 打开详情的那条研究线 */

@@ -39,7 +39,7 @@ export function describeDraft(
   const p = draft;
   if (!p) return '';
   if (p.kind === 'check') return `勾掉「${p.title}」`;
-  if (p.kind === 'idea') return `记下想法：${p.content}`;
+  if (p.kind === 'idea') return `记下研究线：${p.content}`;
   if (p.kind === 'idea_conclude')
     return `给「${p.ideaContent}」写结论收尾：${p.conclusion}`;
   if (p.kind === 'log') {
@@ -50,7 +50,7 @@ export function describeDraft(
     return `给研究「${p.ideaContent}」记一条进展：${p.text}`;
   if (p.kind === 'idea_drop')
     return (
-      `删掉想法「${p.ideaContent}」` +
+      `删掉研究线「${p.ideaContent}」` +
       (p.logCount ? `，连同 ${p.logCount} 条研究日志` : '') +
       (p.yuanLost ? `，额度少 ${p.yuanLost} 元` : '')
     );

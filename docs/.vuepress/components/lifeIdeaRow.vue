@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 想法池的一行
+ * 研究线列表的一行
  * @description 列表里每条研究线长一个样，只有左侧色条与「已结才有的结论那句」
  * 随状态变，所以一个组件配一张样式表就够——三个状态各拆一个组件的话，
  * 44px 触达、右侧计数、hover 这些公共壳子要抄三遍，改一处得改三处。
@@ -30,8 +30,18 @@ const barClass = computed(
 const isDone = computed(() => props.idea?.state === 'DONE');
 
 /**
+ * 行右侧那一串
+ * @description 没有 lastActiveOn 时连「·」一起省掉，
+ * 不然行尾会挂一个后面什么都没有的分隔符
+ */
+const metaText = computed(() => {
+  const ago = daysAgoLabel(props.idea?.lastActiveOn);
+  return `${props.idea?.logCount ?? 0} 条${ago ? ` · ${ago}` : ''}`;
+});
+
+/**
  * 距今多久
- * @description 只到「天」这一档：想法池要回答的是「这条线凉了多久」，
+ * @description 只到「天」这一档：列表要回答的是「这条线凉了多久」，
  * 精确到小时对这个判断没有帮助
  * @param date YYYY-MM-DD，取不到时返回空串
  */
@@ -79,7 +89,7 @@ function daysAgoLabel(date?: string): string {
       data-alt="idea-row-meta"
       class="shrink-0 pt-0.5 text-[11px] tabular-nums text-slate-400 dark:text-slate-500"
     >
-      {{ idea.logCount ?? 0 }} 条 · {{ daysAgoLabel(idea.lastActiveOn) }}
+      {{ metaText }}
     </span>
   </li>
 </template>

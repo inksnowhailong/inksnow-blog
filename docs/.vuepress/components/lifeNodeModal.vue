@@ -5,7 +5,7 @@
  * 要 AI 改写不在这儿写指令——弹窗里不再自带输入框，按钮把上下文交给
  * 全页唯一的问 AI 弹窗，草稿仍然是出给人点头，模型永远不直接写库。
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
@@ -33,6 +33,14 @@ const busy = ref(false);
 const errorMsg = ref('');
 const dropping = ref(false);
 const dropReason = ref('');
+
+/** Esc 关掉，与点遮罩等价；三个弹窗行为一致 */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.node) emit('close');
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 /** 每日项才有的计分设定 */
 const threshold = ref(0);

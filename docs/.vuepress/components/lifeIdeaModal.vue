@@ -11,7 +11,7 @@
  * 和计划节点（未完成 → 完成）不是一回事，塞进一个组件只会得到
  * 一堆互斥的 v-if。
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeIcon from './lifeIcon.vue';
 
@@ -47,6 +47,16 @@ const conclusionDraft = ref('');
 /** 更多菜单，删除藏在里面 */
 const menuOpen = ref(false);
 
+/**
+ * 开关更多菜单
+ * @description 收起时把删除确认一起撤掉：菜单再打开时应该回到「删掉这条线」，
+ * 而不是停在一个「删/不删」——那等于把确认这一步白问一遍
+ */
+function toggleMenu(open = !menuOpen.value) {
+  menuOpen.value = open;
+  if (!open) dropping.value = false;
+}
+
 /** 删除前的二次确认 */
 const dropping = ref(false);
 
@@ -79,7 +89,7 @@ function shortDate(date?: string): string {
 /**
  * 统一跑一次请求，收口忙碌态与报错
  * @param fn 要跑的动作
- * @param scope 这次改动波及哪一摊：默认只动想法池，
+ * @param scope 这次改动波及哪一摊：默认只动研究线，
  * 写结论和删除会连带改额度，得让面板把那一摊也重拉
  */
 async function run(fn: () => Promise<any>, scope: 'ideas' | 'all' = 'ideas') {
@@ -140,7 +150,9 @@ function conclude() {
       body: JSON.stringify({ conclusion }),
     });
     closing.value = false;
-    emit('close');
+    conclusionDraft.value = '';
+    // 不关窗：面板重拉后这条线变 DONE，底栏自然收起、结论显示在头下面，
+    // 人能看见自己刚写的那句落下去了。关掉的话只剩一个消失的弹窗
   }, 'all');
 }
 
@@ -169,6 +181,14 @@ function ask() {
   });
 }
 
+/** Esc 关掉，与点遮罩等价；三个弹窗行为一致 */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.idea) emit('close');
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+
 /** 换了一条线就把手上的草稿与开着的菜单清掉，免得上一条的字串到这一条 */
 watch(
   () => props.idea?.id,
@@ -185,7 +205,7 @@ watch(
 /**
  * 重拉进展
  * @description 盯的是对象不是 id：从这个弹窗唤起 AI 记了一条进展之后，
- * 面板重拉想法池会换上新的那份，但 id 没变——只盯 id 的话这里
+ * 面板重拉研究线会换上新的那份，但 id 没变——只盯 id 的话这里
  * 还显示改之前的列表
  */
 watch(
@@ -258,7 +278,7 @@ watch(
             title="更多"
             aria-label="更多"
             class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-            @click="menuOpen = !menuOpen"
+            @click="toggleMenu()"
           >
             <LifeIcon name="more" class="h-4 w-4" />
           </button>
@@ -272,6 +292,14 @@ watch(
           >
             <LifeIcon name="close" class="h-4 w-4" />
           </button>
+
+          <!-- 透明底板接住菜单外面的那一下，比挂 document 监听少一套回收 -->
+          <div
+            v-if="menuOpen"
+            data-alt="idea-menu-backdrop"
+            class="fixed inset-0"
+            @click="toggleMenu(false)"
+          />
 
           <!-- 删除收在菜单里：它不可逆，不该和常用动作并排摆在手边 -->
           <div
