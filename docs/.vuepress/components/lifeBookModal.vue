@@ -10,7 +10,7 @@
  * 与研究线弹窗分成两个组件而不合并：研究线要写结论收尾、结论要计额度，
  * 读书只是「读完了」这一下，合起来只会得到一堆互斥的 v-if。
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import LifeModal from './lifeModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
@@ -130,16 +130,49 @@ function removeLog(id: string) {
   });
 }
 
+/** 确认态自己撤回的时限，毫秒 */
+const FINISH_CONFIRM_MS = 3000;
+
+/** 「读完」按下第一下之后的确认态 */
+const finishArmed = ref(false);
+let finishTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 撤掉确认态，定时器与那条「点别处」监听一起收干净 */
+function disarmFinish() {
+  finishArmed.value = false;
+  if (finishTimer) clearTimeout(finishTimer);
+  finishTimer = null;
+  window.removeEventListener('click', disarmFinish);
+}
+
 /**
  * 读完这本书
- * @description 不关窗：面板重拉后这本书转成读完，底栏自然收起、头部那行小字
- * 换成读完的日期，人能看见这一下落下去了
+ * @description 接口没有反向操作，误点一下就回不去，所以第一下只把按钮变成
+ * 「确定读完？」，3 秒内再点一下才真提交，超时或点别处都复原。
+ * 用按钮自己变字而不是弹窗或菜单：这一下不值得打断手上的动作，但也不能一点就走。
+ *
+ * 不关窗：面板重拉后这本书转成读完，底栏自然收起、头部那行小字换成读完的日期，
+ * 人能看见这一下落下去了
+ * @param e 这一下点击，要拦住它冒泡到「点别处」那条监听上
  */
-function finish() {
+function finish(e: MouseEvent) {
+  if (busy.value) return;
+  // 自己这一下不能让下面那条监听吃到，否则刚进确认态就被自己撤掉
+  e.stopPropagation();
+  if (!finishArmed.value) {
+    finishArmed.value = true;
+    finishTimer = setTimeout(disarmFinish, FINISH_CONFIRM_MS);
+    window.addEventListener('click', disarmFinish);
+    return;
+  }
+  disarmFinish();
   run(async () => {
     await props.api(`/life/books/${props.book.id}/finish`, { method: 'POST' });
   });
 }
+
+// 弹窗拆了还留着 window 上那条监听就是泄漏
+onUnmounted(disarmFinish);
 
 /**
  * 删掉这本书
@@ -173,6 +206,7 @@ watch(
     logDraft.value = '';
     menuOpen.value = false;
     dropping.value = false;
+    disarmFinish();
   },
 );
 
@@ -337,10 +371,15 @@ watch(
           data-alt="book-finish"
           type="button"
           :disabled="busy"
-          class="shrink-0 text-sm text-slate-500 transition hover:text-slate-700 disabled:opacity-40 dark:text-slate-300 dark:hover:text-slate-100"
+          class="shrink-0 text-sm transition disabled:opacity-40"
+          :class="
+            finishArmed
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100'
+          "
           @click="finish"
         >
-          读完
+          {{ finishArmed ? '确定读完？' : '读完' }}
         </button>
         <p
           class="text-right text-[11px] leading-snug text-slate-400 dark:text-slate-500"

@@ -17,6 +17,7 @@ import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import { planSections } from './usePlanSections';
+import { today, shiftDays, weekdayOf } from './lifeFormat';
 import {
   describeDraft,
   applyDraft,
@@ -80,25 +81,6 @@ async function api(path: string, init: RequestInit = {}) {
     throw new Error(detail?.message || '请求失败 ' + res.status);
   }
   return await res.json();
-}
-
-/** 今天的日期 YYYY-MM-DD，按本地时区 */
-function today(): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(
-    new Date(),
-  );
-}
-
-/** 日期加减天数 */
-function shiftDays(date: string, days: number): string {
-  const d = new Date(date + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** 取某日期是星期几 */
-function weekdayOf(date: string): number {
-  return new Date(date + 'T00:00:00Z').getUTCDay();
 }
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];

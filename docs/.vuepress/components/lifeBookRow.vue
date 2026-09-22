@@ -7,6 +7,7 @@
  * 要抄两遍，改一处得改两处。与 lifeIdeaRow 同一套写法。
  */
 import { computed } from 'vue';
+import { daysAgoLabel } from './lifeFormat';
 
 const props = defineProps<{
   /** 一本书，字段来自后端 /life/books */
@@ -33,27 +34,6 @@ const metaText = computed(() => {
 /** 只留月日，年份四个字占着行尾反而挤掉书名 */
 function shortDate(date?: string): string {
   return date ? date.slice(5) : '';
-}
-
-/**
- * 距今多久
- * @description 只到「天」这一档：列表要回答的是「这本书搁了多久」，
- * 精确到小时对这个判断没有帮助。与 lifeIdeaRow 里那份是同一套算法，
- * 两处都只是显示用，没有共用的必要
- * @param date YYYY-MM-DD，取不到时返回空串
- */
-function daysAgoLabel(date?: string): string {
-  if (!date) return '';
-  const today = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Shanghai',
-  }).format(new Date());
-  const diff = Math.round(
-    (Date.parse(today + 'T00:00:00Z') - Date.parse(date + 'T00:00:00Z')) /
-      86400000,
-  );
-  if (diff <= 0) return '今天';
-  if (diff === 1) return '昨天';
-  return `${diff} 天前`;
 }
 </script>
 

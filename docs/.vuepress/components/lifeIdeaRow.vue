@@ -6,6 +6,7 @@
  * 44px 触达、右侧计数、hover 这些公共壳子要抄三遍，改一处得改三处。
  */
 import { computed } from 'vue';
+import { daysAgoLabel } from './lifeFormat';
 
 const props = defineProps<{
   /** 一条研究线，字段来自后端 /life/ideas */
@@ -39,25 +40,6 @@ const metaText = computed(() => {
   return `${props.idea?.logCount ?? 0} 条${ago ? ` · ${ago}` : ''}`;
 });
 
-/**
- * 距今多久
- * @description 只到「天」这一档：列表要回答的是「这条线凉了多久」，
- * 精确到小时对这个判断没有帮助
- * @param date YYYY-MM-DD，取不到时返回空串
- */
-function daysAgoLabel(date?: string): string {
-  if (!date) return '';
-  const today = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Shanghai',
-  }).format(new Date());
-  const diff = Math.round(
-    (Date.parse(today + 'T00:00:00Z') - Date.parse(date + 'T00:00:00Z')) /
-      86400000,
-  );
-  if (diff <= 0) return '今天';
-  if (diff === 1) return '昨天';
-  return `${diff} 天前`;
-}
 </script>
 
 <template>
