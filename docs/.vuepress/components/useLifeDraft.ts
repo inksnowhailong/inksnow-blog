@@ -48,6 +48,10 @@ export function describeDraft(
   }
   if (p.kind === 'research_log')
     return `给研究「${p.ideaContent}」记一条进展：${p.text}`;
+  if (p.kind === 'book_add') return `记下在读的书：《${p.title}》`;
+  if (p.kind === 'reading_log')
+    return `给《${p.bookTitle}》记一条笔记：${p.text}`;
+  if (p.kind === 'book_finish') return `把《${p.bookTitle}》记成读完`;
   if (p.kind === 'idea_drop')
     return (
       `删掉研究线「${p.ideaContent}」` +
@@ -216,6 +220,22 @@ export async function applyDraft(
       method: 'POST',
       body: JSON.stringify({ text: p.text }),
     });
+  } else if (p.kind === 'book_add') {
+    await api('/life/books', {
+      method: 'POST',
+      body: JSON.stringify({ title: p.title }),
+    });
+  } else if (p.kind === 'reading_log') {
+    // occurredOn 只在模型明确说了是哪天读的时候才带，缺省交给后端记今天
+    await api(`/life/books/${p.bookId}/logs`, {
+      method: 'POST',
+      body: JSON.stringify({
+        text: p.text,
+        ...(p.occurredOn ? { occurredOn: p.occurredOn } : {}),
+      }),
+    });
+  } else if (p.kind === 'book_finish') {
+    await api(`/life/books/${p.bookId}/finish`, { method: 'POST' });
   } else if (p.kind === 'idea_drop') {
     await api(`/life/ideas/${p.ideaId}`, { method: 'DELETE' });
   } else if (p.kind === 'plan_update') {
