@@ -9,9 +9,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
-import LifeChat from './lifeChat.vue';
 import LifeIcon from './lifeIcon.vue';
-import LifeAsk from './lifeAsk.vue';
+import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import {
   describeDraft,
@@ -258,12 +257,12 @@ const overMinutes = computed(() => {
 });
 
 /**
- * 就地问 AI 的浮层状态
- * @description 全页共用一个浮层：谁唤起它，谁就把自己的上下文塞进来。
- * 这样"AI 能操作的地方"等于"哪里挂了这个组件"，不必到处铺输入框
+ * 问 AI 弹窗的状态
+ * @description 全页共用一个弹窗：谁唤起它，谁就把自己的上下文塞进来。
+ * 这样"AI 能操作的地方"等于"谁调了 openXxxAsk"，不必到处铺输入框
  */
 const ask = ref<{
-  anchor: { x: number; y: number } | null;
+  open: boolean;
   title: string;
   context: string;
   placeholder: string;
@@ -273,7 +272,7 @@ const ask = ref<{
   /** 交给模型前，在用户原话前面补的一句背景 */
   prefix: string;
 }>({
-  anchor: null,
+  open: false,
   title: '',
   context: '',
   placeholder: '',
@@ -284,40 +283,32 @@ const ask = ref<{
 const askReply = ref('');
 const askPending = ref<any>(null);
 
-/** 从点击事件里取锚点坐标 */
-function anchorOf(e: MouseEvent) {
-  const el = e.currentTarget as HTMLElement;
-  const r = el.getBoundingClientRect();
-  return { x: r.left, y: r.bottom };
-}
-
 function closeAsk() {
-  ask.value = { ...ask.value, anchor: null, direct: null };
+  ask.value = { ...ask.value, open: false, direct: null };
   askReply.value = '';
   askPending.value = null;
 }
 
 /**
- * 浮层这一次打开期间的问答
- * @description 浮层上只显示最后一条回答，但追问要接得上，
- * 所以这条历史照存不显示。换个地方点开就清空——
- * 上一个话题的上下文带到下一个话题上只会帮倒忙
+ * 弹窗这一次打开期间的问答
+ * @description 追问要接得上，所以整段历史都留着。
+ * 换个地方点开就清空——上一个话题的上下文带到下一个话题上只会帮倒忙
  */
 const askLog = ref<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-// 浮层一开一关都算换了话题。盯 anchor 而不是在每个入口各清一次，
-// 是因为打开浮层的地方有五处，靠记得逐个加迟早会漏一个
+// 一开一关都算换了话题。盯 open 而不是在每个入口各清一次，
+// 是因为打开弹窗的地方有五处，靠记得逐个加迟早会漏一个
 watch(
-  () => ask.value.anchor,
+  () => ask.value.open,
   () => {
     askLog.value = [];
   },
 );
 
 /**
- * 把浮层里的话交给模型
+ * 把弹窗里的话交给模型
  * @description 前缀补一句背景说清这是在问哪件事，历史让追问接得上。
- * 拿回来只出草稿不落库，与对话栏同一套规矩：模型永远不直接改数据。
+ * 拿回来只出草稿不落库：模型永远不直接改数据。
  */
 async function askSend(text: string) {
   if (busy.value) return;
@@ -334,7 +325,7 @@ async function askSend(text: string) {
       API,
       key.value,
       sent,
-      // 浮层空间小，只把正在吐的字显示出来，出草稿时会被替换掉
+      // 边吐边显示，让人立刻看到有反应；这段字还没进记录，故单独放
       (delta) => {
         askReply.value += delta;
       },
@@ -342,11 +333,10 @@ async function askSend(text: string) {
     );
     askLog.value = [...askLog.value, { role: 'user', content: sent }];
     if (res.kind === 'answer') {
-      askReply.value = res.text || askReply.value;
-      askLog.value = [
-        ...askLog.value,
-        { role: 'assistant', content: askReply.value },
-      ];
+      // 说完整了就并进记录，否则同一段话会在记录里和吐字区各显示一遍
+      const answer = res.text || askReply.value;
+      askReply.value = '';
+      askLog.value = [...askLog.value, { role: 'assistant', content: answer }];
     } else {
       askReply.value = '';
       askPending.value = res;
@@ -385,7 +375,7 @@ const askPendingText = computed(() =>
   askPending.value ? describeDraft(askPending.value, nodeTitleOf) : '',
 );
 
-/** 点浮层里的「直接记下」 */
+/** 点弹窗里的「直接记下」 */
 async function askDirect() {
   const fn = ask.value.direct;
   if (!fn || busy.value) return;
@@ -393,10 +383,25 @@ async function askDirect() {
   closeAsk();
 }
 
-/** 点某一个体能债方块 */
-function openDebtAsk(e: MouseEvent, index: number) {
+/** 没有上下文的随便问，从右下角悬浮按钮进来 */
+function openFreeAsk() {
   ask.value = {
-    anchor: anchorOf(e),
+    open: true,
+    title: '',
+    context: '记一笔、问一句、或者让它改计划，都在这儿说',
+    placeholder: '今天主线写了 40 分钟',
+    directLabel: '',
+    direct: null,
+    prefix: '',
+  };
+  askReply.value = '';
+  askPending.value = null;
+}
+
+/** 点某一个体能债方块 */
+function openDebtAsk(index: number) {
+  ask.value = {
+    open: true,
     title: `还掉第 ${index + 1} 个体能债`,
     context: debtUnitText.value,
     placeholder: '我刚做了 10 个俯卧撑',
@@ -409,9 +414,9 @@ function openDebtAsk(e: MouseEvent, index: number) {
 }
 
 /** 点运动储备的空位，存一个 */
-function openBankAsk(e: MouseEvent) {
+function openBankAsk() {
   ask.value = {
-    anchor: anchorOf(e),
+    open: true,
     title: '存 1 个运动储备',
     context: '提前锻炼存起来，以后产生欠债自动抵扣',
     placeholder: '刚做了 20 个深蹲',
@@ -444,9 +449,9 @@ async function clearDay(nodeId: string) {
  * @description 前缀只说是哪一项哪一天，不报已投入多少分钟——
  * 实测把分钟数写进上下文会把模型带偏，它会照着那个数再记一笔
  */
-function openDailyAsk(e: MouseEvent, item: any) {
+function openDailyAsk(item: any) {
   ask.value = {
-    anchor: anchorOf(e),
+    open: true,
     title: item.title,
     context: `${item.minutes}/${item.thresholdMinutes} 分钟 · 达标得 ${item.points} 分`,
     placeholder: '刚又做了半小时',
@@ -683,13 +688,28 @@ watch(ideas, () => {
   if (fresh) activeIdea.value = fresh;
 });
 
-/** 从想法弹窗里唤起问 AI 的浮层 */
-function openIdeaAsk(payload: { prefix: string; anchor: { x: number; y: number } }) {
+/** 从研究线弹窗里唤起问 AI */
+function openIdeaAsk(payload: { prefix: string }) {
   ask.value = {
-    anchor: payload.anchor,
+    open: true,
     title: activeIdea.value?.content ?? '研究',
     context: '可以让它帮你理下一步，或者把这次的进展记下来',
     placeholder: '今天试了 xxx，发现 yyy',
+    directLabel: '',
+    direct: null,
+    prefix: payload.prefix,
+  };
+  askReply.value = '';
+  askPending.value = null;
+}
+
+/** 从节点弹窗里唤起问 AI，让它改写这条计划 */
+function openNodeAsk(payload: { prefix: string }) {
+  ask.value = {
+    open: true,
+    title: picked.value?.title ?? '计划项',
+    context: '说想改成什么样，它出一份草稿，点头才落库',
+    placeholder: '把做完的标准写具体点',
     directLabel: '',
     direct: null,
     prefix: payload.prefix,
@@ -945,7 +965,7 @@ onMounted(() => {
                   :disabled="busy"
                   :title="'点开说说这一个怎么还'"
                   class="h-6 w-6 rounded bg-rose-400 transition hover:bg-rose-500 hover:ring-2 hover:ring-rose-200 disabled:opacity-40 dark:bg-rose-500/70 dark:hover:ring-rose-500/30"
-                  @click="openDebtAsk($event, i - 1)"
+                  @click="openDebtAsk(i - 1)"
                 />
               </div>
               <p
@@ -983,7 +1003,7 @@ onMounted(() => {
                     title="主动锻炼，存一个储备"
                     aria-label="存运动储备"
                     class="grid h-4 w-4 place-items-center rounded border border-dashed border-emerald-400 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
-                    @click="openBankAsk($event)"
+                    @click="openBankAsk()"
                   >
                     <LifeIcon name="rise" class="h-2.5 w-2.5" />
                   </button>
@@ -1073,19 +1093,11 @@ onMounted(() => {
       </section>
 
       <div class="grid gap-4 lg:grid-cols-3">
-        <!-- AI 栏：手机上排在今日卡之后，桌面上收到右侧常驻 -->
+        <!-- 侧栏：手机上排在今日卡之后，桌面上收到右侧 -->
         <aside
-          data-alt="ai-column"
+          data-alt="side-column"
           class="grid gap-4 order-2 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
         >
-          <LifeChat
-            :api="api"
-            :api-base="API"
-            :api-key="key"
-            :node-title-of="nodeTitleOf"
-            @changed="loadAll"
-          />
-
           <section
             data-alt="ideas-section"
             :class="showMore ? '' : 'hidden lg:block'"
@@ -1230,7 +1242,7 @@ onMounted(() => {
                     type="button"
                     :title="'说一句来补记「' + it.title + '」'"
                     class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
-                    @click="openDailyAsk($event, it)"
+                    @click="openDailyAsk(it)"
                   >
                     {{ it.title }}
                   </button>
@@ -1351,17 +1363,34 @@ onMounted(() => {
       >
         {{ errorMsg }}
       </p>
+
+      <!--
+        常驻入口：没有上下文的随便问从这里进。
+        mb 而不是 pb 撑安全区——按钮是 fixed 定位的，加内边距只会把它撑大，
+        要的是整体往上抬开 iPhone 底部那条横杠
+      -->
+      <button
+        data-alt="ask-fab"
+        type="button"
+        title="问 AI"
+        aria-label="问 AI"
+        class="fixed bottom-5 right-5 z-40 mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
+        @click="openFreeAsk"
+      >
+        <LifeIcon name="send" class="h-5 w-5" />
+      </button>
     </div>
 
-    <!-- 全页共用的就地问 AI 浮层 -->
-    <LifeAsk
-      :anchor="ask.anchor"
+    <!-- 全页唯一的经 AI 对话外壳 -->
+    <LifeAskModal
+      :open="ask.open"
       :title="ask.title"
       :context="ask.context"
       :placeholder="ask.placeholder"
       :direct-label="ask.directLabel"
       :busy="busy"
       :reply="askReply"
+      :log="askLog"
       :pending-text="askPendingText"
       :destructive="isDestructive(askPending)"
       :pending="askPending"
@@ -1389,6 +1418,7 @@ onMounted(() => {
       :api="api"
       @close="picked = null"
       @changed="loadAll"
+      @ask="openNodeAsk"
     />
   </div>
 </template>

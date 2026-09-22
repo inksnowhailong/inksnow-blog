@@ -26,7 +26,7 @@ const emit = defineEmits<{
   /** 数据变了，让面板重新拉 */
   (e: 'changed'): void;
   /** 就这条线问 AI，带上它当上下文 */
-  (e: 'ask', payload: { prefix: string; anchor: { x: number; y: number } }): void;
+  (e: 'ask', payload: { prefix: string }): void;
 }>();
 
 const busy = ref(false);
@@ -142,7 +142,7 @@ function drop() {
 }
 
 /** 就这条线问 AI，把它的来龙去脉一并带上 */
-function ask(event: MouseEvent) {
+function ask() {
   const recent = logs.value
     .slice(0, 5)
     .map((l) => `${l.occurredOn} ${l.text}`)
@@ -151,7 +151,6 @@ function ask(event: MouseEvent) {
     prefix: `关于我正在研究的「${props.idea.content}」${
       recent ? `（这一路的进展：${recent}）` : ''
     }：`,
-    anchor: { x: event.clientX, y: event.clientY },
   });
 }
 
