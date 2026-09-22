@@ -42,7 +42,10 @@ export function describeDraft(
   if (p.kind === 'idea') return `记下想法：${p.content}`;
   if (p.kind === 'idea_conclude')
     return `给「${p.ideaContent}」写结论收尾：${p.conclusion}`;
-  if (p.kind === 'log') return `给「${p.nodeTitle}」记一条：${p.text}`;
+  if (p.kind === 'log') {
+    const head = p.tag === 'GOT' ? '记一条搞懂' : p.tag === 'STUCK' ? '记一条卡点' : '记一条';
+    return `给「${p.nodeTitle}」${head}：${p.text}`;
+  }
   if (p.kind === 'research_log')
     return `给研究「${p.ideaContent}」记一条进展：${p.text}`;
   if (p.kind === 'idea_drop')
@@ -206,7 +209,7 @@ export async function applyDraft(
   } else if (p.kind === 'log') {
     await api(`/life/plan/${p.nodeId}/logs`, {
       method: 'POST',
-      body: JSON.stringify({ text: p.text }),
+      body: JSON.stringify({ text: p.text, ...(p.tag ? { tag: p.tag } : {}) }),
     });
   } else if (p.kind === 'research_log') {
     await api(`/life/ideas/${p.ideaId}/logs`, {

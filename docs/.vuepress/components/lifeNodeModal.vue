@@ -68,6 +68,12 @@ function saveRule() {
 const logs = ref<any[]>([]);
 const logDraft = ref('');
 const logsLoading = ref(false);
+/** 这条日志的性质：不选=普通记录 */
+const logTag = ref<'' | 'GOT' | 'STUCK'>('');
+const LOG_TAGS: Array<{ value: 'GOT' | 'STUCK'; label: string; cls: string }> = [
+  { value: 'GOT', label: '搞懂', cls: 'bg-emerald-500 text-white' },
+  { value: 'STUCK', label: '卡点', cls: 'bg-amber-500 text-white' },
+];
 
 /** 拉这一项的学习日志。方向节点会汇总它下面所有清单项的 */
 async function loadLogs() {
@@ -89,9 +95,10 @@ function addLog() {
   run(async () => {
     await props.api(`/life/plan/${props.node.id}/logs`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...(logTag.value ? { tag: logTag.value } : {}) }),
     });
     logDraft.value = '';
+    logTag.value = '';
     await loadLogs();
   });
 }
@@ -116,6 +123,7 @@ watch(
     dropping.value = false;
     dropReason.value = '';
     logDraft.value = '';
+    logTag.value = '';
     logs.value = [];
     threshold.value = props.node?.thresholdMinutes ?? 0;
     points.value = props.node?.points ?? 0;
@@ -424,6 +432,19 @@ function drop() {
           </span>
         </div>
 
+        <div data-alt="log-tag-picker" class="mb-1.5 flex gap-1.5">
+          <button
+            v-for="t in LOG_TAGS"
+            :key="t.value"
+            data-alt="log-tag"
+            type="button"
+            class="rounded-full px-2.5 py-0.5 text-xs transition"
+            :class="logTag === t.value ? t.cls : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'"
+            @click="logTag = logTag === t.value ? '' : t.value"
+          >
+            {{ t.label }}
+          </button>
+        </div>
         <!-- 日志会写成几段，框随内容长高；换行给 Enter，提交给 Ctrl/Cmd+Enter -->
         <LifeAskBar
           v-model="logDraft"
@@ -451,6 +472,12 @@ function drop() {
               </p>
               <p class="mt-0.5 text-[11px] text-slate-400">
                 {{ l.occurredOn }}
+                <span
+                  v-if="l.tag"
+                  class="ml-1 rounded px-1 py-px text-[10px]"
+                  :class="l.tag === 'GOT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'"
+                  >{{ l.tag === 'GOT' ? '搞懂' : '卡点' }}</span
+                >
                 <!-- 方向汇总时会混进子项的日志，标出来才分得清 -->
                 <span v-if="l.nodeId !== node.id"> · {{ l.nodeTitle }}</span>
               </p>
