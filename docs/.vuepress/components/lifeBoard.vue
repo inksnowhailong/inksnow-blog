@@ -11,6 +11,7 @@ import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeIdeaRow from './lifeIdeaRow.vue';
 import LifeBookRow from './lifeBookRow.vue';
+import LifeBookModal from './lifeBookModal.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
@@ -889,6 +890,29 @@ async function captureBook() {
   }
 }
 
+/** 打开详情的那本书 */
+const activeBook = ref<any>(null);
+
+// 记笔记或读完之后重新拉数据，弹窗里拿的还是旧对象，
+// 得按ID换成新的，否则头部那行小字会停在改之前
+watch(books, () => {
+  if (!activeBook.value) return;
+  const fresh = [...readingBooks.value, ...doneBooks.value].find(
+    (b) => b.id === activeBook.value.id,
+  );
+  if (fresh) activeBook.value = fresh;
+});
+
+/** 从书弹窗里唤起问 AI */
+function openBookAsk(payload: { prefix: string }) {
+  openAsk({
+    title: activeBook.value?.title ?? '读书',
+    context: '可以让它跟你聊这本书，或者把刚读到的记下来',
+    placeholder: '今天读了第三章，讲了 xxx',
+    prefix: payload.prefix,
+  });
+}
+
 /** 从节点弹窗里唤起问 AI，让它改写这条计划 */
 function openNodeAsk(payload: { prefix: string }) {
   openAsk({
@@ -1506,6 +1530,7 @@ onMounted(() => {
                   v-for="b in readingBooks"
                   :key="b.id"
                   :book="b"
+                  @click="activeBook = b"
                 />
               </ul>
               <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
@@ -1531,6 +1556,7 @@ onMounted(() => {
                     v-for="b in doneBooks"
                     :key="b.id"
                     :book="b"
+                    @click="activeBook = b"
                   />
                 </ul>
               </div>
@@ -1721,6 +1747,15 @@ onMounted(() => {
       @close="activeIdea = null"
       @changed="onIdeaChanged"
       @ask="openIdeaAsk"
+    />
+
+    <!-- 书详情 -->
+    <LifeBookModal
+      :book="activeBook"
+      :api="api"
+      @close="activeBook = null"
+      @changed="refresh(loadBooks)"
+      @ask="openBookAsk"
     />
 
     <!-- 节点详情 -->
