@@ -159,15 +159,28 @@ function ask() {
   });
 }
 
+/** 换了一条线就把手上的草稿清掉，免得上一条的字串到这一条 */
 watch(
   () => props.idea?.id,
-  (id) => {
+  () => {
     errorMsg.value = '';
     logDraft.value = '';
     conclusionDraft.value = '';
     closing.value = false;
     dropping.value = false;
-    if (id) loadLogs();
+  },
+);
+
+/**
+ * 重拉进展
+ * @description 盯的是对象不是 id：从这个弹窗唤起 AI 记了一条进展之后，
+ * 面板重拉想法池会换上新的那份，但 id 没变——只盯 id 的话这里
+ * 还显示改之前的列表
+ */
+watch(
+  () => props.idea,
+  (idea) => {
+    if (idea) loadLogs();
     else logs.value = [];
   },
   { immediate: true },

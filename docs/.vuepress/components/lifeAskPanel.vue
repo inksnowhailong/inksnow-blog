@@ -14,8 +14,6 @@ withDefaults(
     modelValue: string;
     busy?: boolean;
     placeholder?: string;
-    /** 发送按钮的无障碍文案 */
-    label?: string;
     /** 待确认草稿的人话描述，非空时必须点头才落库 */
     pendingText?: string;
     /** 草稿原件，摊开给人做前后对照 */
@@ -49,7 +47,6 @@ const emit = defineEmits<{
       mode="ask"
       :busy="busy"
       :placeholder="placeholder"
-      :label="label"
       @update:model-value="emit('update:modelValue', $event)"
       @submit="emit('submit')"
     />

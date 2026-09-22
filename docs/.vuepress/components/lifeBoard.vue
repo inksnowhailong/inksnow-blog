@@ -285,12 +285,8 @@ const overMinutes = computed(() => {
   );
 });
 
-/**
- * 问 AI 弹窗的状态
- * @description 全页共用一个弹窗：谁唤起它，谁就把自己的上下文塞进来。
- * 这样"AI 能操作的地方"等于"谁调了 openXxxAsk"，不必到处铺输入框
- */
-const ask = ref<{
+/** 问 AI 弹窗的一次上下文 */
+interface AskState {
   open: boolean;
   title: string;
   context: string;
@@ -300,7 +296,10 @@ const ask = ref<{
   direct: (() => Promise<void>) | null;
   /** 交给模型前，在用户原话前面补的一句背景 */
   prefix: string;
-}>({
+}
+
+/** 这一次打开时的空白状态，openAsk 拿它兜住 patch 没给的字段 */
+const BLANK_ASK: AskState = {
   open: false,
   title: '',
   context: '',
@@ -308,15 +307,16 @@ const ask = ref<{
   directLabel: '',
   direct: null,
   prefix: '',
-});
+};
+
+/**
+ * 问 AI 弹窗的状态
+ * @description 全页共用一个弹窗：谁唤起它，谁就把自己的上下文塞进来。
+ * 这样"AI 能操作的地方"等于"谁调了 openAsk"，不必到处铺输入框
+ */
+const ask = ref<AskState>({ ...BLANK_ASK });
 const askReply = ref('');
 const askPending = ref<any>(null);
-
-function closeAsk() {
-  ask.value = { ...ask.value, open: false, direct: null };
-  askReply.value = '';
-  askPending.value = null;
-}
 
 /**
  * 弹窗这一次打开期间的问答
@@ -325,14 +325,26 @@ function closeAsk() {
  */
 const askLog = ref<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-// 一开一关都算换了话题。盯 open 而不是在每个入口各清一次，
-// 是因为打开弹窗的地方有五处，靠记得逐个加迟早会漏一个
-watch(
-  () => ask.value.open,
-  () => {
-    askLog.value = [];
-  },
-);
+/**
+ * 打开问 AI 弹窗
+ * @description 六个入口都从这儿进，清场与赋值收在一处。
+ * 清场不挂在 open 的翻转上：弹窗已经开着时再点另一个入口，open 不变，
+ * 但话题已经换了，上一轮的记录和草稿必须跟着走
+ * @param patch 这一次的上下文，没给的字段回到空值
+ */
+function openAsk(patch: Partial<Omit<AskState, 'open'>>) {
+  askReply.value = '';
+  askPending.value = null;
+  askLog.value = [];
+  ask.value = { ...BLANK_ASK, ...patch, open: true };
+}
+
+function closeAsk() {
+  ask.value = { ...ask.value, open: false, direct: null };
+  askReply.value = '';
+  askPending.value = null;
+  askLog.value = [];
+}
 
 /**
  * 把弹窗里的话交给模型
@@ -347,7 +359,11 @@ async function askSend(text: string) {
 
   // 第一句要带前缀点明话题，后续追问已在上下文里，再带就啰嗦了
   const sent = askLog.value.length ? text : ask.value.prefix + text;
+  // 历史要在这句入列之前取，否则这次的问题会在上下文里重复一遍
   const history = askLog.value.slice(-12);
+  // 发出就入列：输入框此时已经清空，不先摆上去的话屏幕上只剩 AI 在吐字，
+  // 看不见自己刚说了什么
+  askLog.value = [...askLog.value, { role: 'user', content: sent }];
 
   try {
     const res = await askStream(
@@ -360,7 +376,6 @@ async function askSend(text: string) {
       },
       history,
     );
-    askLog.value = [...askLog.value, { role: 'user', content: sent }];
     if (res.kind === 'answer') {
       // 说完整了就并进记录，否则同一段话会在记录里和吐字区各显示一遍
       const answer = res.text || askReply.value;
@@ -382,7 +397,7 @@ async function askSend(text: string) {
   }
 }
 
-/** 浮层里点头之后才写入 */
+/** 弹窗里点头之后才写入 */
 async function askConfirm() {
   const p = askPending.value;
   if (!p || busy.value) return;
@@ -391,7 +406,10 @@ async function askConfirm() {
     await applyDraft(p, api);
     askPending.value = null;
     askReply.value = '已记下';
-    await loadAll();
+    // 草稿什么都可能改，两摊都得重拉。不走 loadAll：那条路是开锁用的，
+    // 会重写密钥、把整页推回加载态，还会把刷新失败吞进错误条当成加载失败
+    refresh(loadCore);
+    refresh(loadIdeas);
   } catch (e: any) {
     askReply.value = e.message;
   } finally {
@@ -421,47 +439,34 @@ async function askDirect() {
 
 /** 没有上下文的随便问，从右下角悬浮按钮进来 */
 function openFreeAsk() {
-  ask.value = {
-    open: true,
-    title: '',
+  openAsk({
     context: '记一笔、问一句、或者让它改计划，都在这儿说',
     placeholder: '例如：主线写了 40 分钟，或问它任何事',
-    directLabel: '',
-    direct: null,
-    prefix: '',
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 点某一个体能债方块 */
 function openDebtAsk(index: number) {
-  ask.value = {
-    open: true,
+  openAsk({
     title: `还掉第 ${index + 1} 个体能债`,
     context: debtUnitText.value,
     placeholder: '我刚做了 10 个俯卧撑',
     directLabel: '直接记为已还 1 个',
     direct: () => ledgerAction('REPAY', 1),
     prefix: '关于还体能债：',
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 点运动储备的空位，存一个 */
 function openBankAsk() {
-  ask.value = {
-    open: true,
+  openAsk({
     title: '存 1 个运动储备',
     context: '提前锻炼存起来，以后产生欠债自动抵扣',
     placeholder: '刚做了 20 个深蹲',
     directLabel: '直接记为存 1 个',
     direct: () => ledgerAction('EXERCISE', 1),
     prefix: '关于主动锻炼存运动储备：',
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 清掉某项某天的记录，不经模型 */
@@ -486,17 +491,12 @@ async function clearDay(nodeId: string) {
  * 实测把分钟数写进上下文会把模型带偏，它会照着那个数再记一笔
  */
 function openDailyAsk(item: any) {
-  ask.value = {
-    open: true,
+  openAsk({
     title: item.title,
     context: `${item.minutes}/${item.thresholdMinutes} 分钟 · 达标得 ${item.points} 分`,
     placeholder: '刚又做了半小时',
-    directLabel: '',
-    direct: null,
     prefix: `关于「${item.title}」这一项，日期 ${activeDate.value}：`,
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 在计划树里按ID找节点，弹窗刷新后要用 */
@@ -736,32 +736,22 @@ function onIdeaChanged(scope: 'ideas' | 'all') {
 
 /** 从研究线弹窗里唤起问 AI */
 function openIdeaAsk(payload: { prefix: string }) {
-  ask.value = {
-    open: true,
+  openAsk({
     title: activeIdea.value?.content ?? '研究',
     context: '可以让它帮你理下一步，或者把这次的进展记下来',
     placeholder: '今天试了 xxx，发现 yyy',
-    directLabel: '',
-    direct: null,
     prefix: payload.prefix,
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 /** 从节点弹窗里唤起问 AI，让它改写这条计划 */
 function openNodeAsk(payload: { prefix: string }) {
-  ask.value = {
-    open: true,
+  openAsk({
     title: picked.value?.title ?? '计划项',
     context: '说想改成什么样，它出一份草稿，点头才落库',
     placeholder: '把做完的标准写具体点',
-    directLabel: '',
-    direct: null,
     prefix: payload.prefix,
-  };
-  askReply.value = '';
-  askPending.value = null;
+  });
 }
 
 onMounted(() => {
