@@ -4,6 +4,7 @@
  * 各写一份必然漂移——加一种意图只改了一处、另一处静默失效，
  * 这类 bug 在界面上表现为"说完没反应"，极难察觉。故收成这一份。
  */
+import { shortDate } from './lifeFormat';
 
 /** 会改动计划本身的草稿，比记一笔流水影响大，界面上要区别对待 */
 const PLAN_KINDS = [
@@ -14,8 +15,26 @@ const PLAN_KINDS = [
   'daily_schedule',
 ];
 
-/** 会删掉已有数据的草稿 */
-const DESTRUCTIVE_KINDS = ['undo', 'plan_drop', 'idea_drop'];
+/**
+ * 会删掉已有数据的草稿
+ * @description 改日历也算在内——它不删记录，但改哪天休息会连带改欠债，
+ * 后果同样是「已经成立的东西变了」，值得同一档的黄色确认
+ */
+const DESTRUCTIVE_KINDS = ['undo', 'plan_drop', 'idea_drop', 'calendar'];
+
+/** 星期编号转中文，0 是周日，与后端 weekdays 一致 */
+const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** 一天的安排说成两个字 */
+function kindText(kind?: string | null): string {
+  return kind === 'REST' ? '休息' : kind === 'WORK' ? '上班' : '恢复默认';
+}
+
+/** 一串星期编号说成「周六、周日」 */
+function weekdaysText(weekdays?: number[]): string {
+  const list = (weekdays ?? []).map((w) => `周${WEEK_CN[w]}`).join('、');
+  return list || '一天都不';
+}
 
 /** 这条草稿是否动计划结构 */
 export function touchesPlan(draft: any): boolean {
@@ -79,6 +98,29 @@ export function describeDraft(
   }
   if (p.kind === 'daily_schedule')
     return `改「${p.nodeTitle}」排哪些天：${p.summary?.before} → ${p.summary?.after}`;
+  if (p.kind === 'calendar') {
+    const days: any[] = p.days ?? [];
+    if (!days.length) return '日历不动';
+    // 放假往往是连着的一段，逐日念一遍谁也核对不动，说成首尾两头
+    const dates = days.map((d) => d.date).sort();
+    const span =
+      dates.length === 1
+        ? shortDate(dates[0])
+        : `${shortDate(dates[0])}～${shortDate(dates[dates.length - 1])}`;
+    const kinds = new Set(days.map((d) => d.kind ?? null));
+    const only = kinds.size === 1 ? [...kinds][0] : undefined;
+    const what =
+      only === 'REST'
+        ? '设为休息'
+        : only === 'WORK'
+          ? '设为上班'
+          : only === null
+            ? '恢复成默认排休'
+            : '重新排休';
+    const note = days.find((d) => d.note)?.note;
+    return `把 ${span} ${what}${note ? `（${note}）` : ''}`;
+  }
+  if (p.kind === 'rest_weekdays') return `以后${weekdaysText(p.weekdays)}休息`;
   return (p.items ?? [])
     .map((i: any) => {
       if (i.kind === 'MISS') return `记一条未完成：${nodeTitleOf(i.nodeId)}`;
@@ -161,10 +203,9 @@ export function draftDetails(draft: any): DraftDetail[] {
 
     // 排期的后果是一张表不是一个数。不把这七天摊开，
     // 「改了排期」这四个字等于没说——人据此判断不了要不要点头
-    const week = ['日', '一', '二', '三', '四', '五', '六'];
     (p.preview ?? []).forEach((d: any) => {
       out.push({
-        label: `${d.date.slice(5)} 周${week[d.weekday]}`,
+        label: `${shortDate(d.date)} 周${WEEK_CN[d.weekday]}`,
         value:
           (d.active ? '做' : '不做') +
           ` · 当天 ${d.itemCount} 项 · 满分 ${d.fullScore} · 免债线 ${d.debtFreeScore}`,
@@ -172,6 +213,37 @@ export function draftDetails(draft: any): DraftDetail[] {
     });
 
     out.push({ label: '影响', value: '只改往后排哪些天，已经记过的分不动' });
+    return out;
+  }
+
+  if (p.kind === 'calendar') {
+    // 哪天休息直接决定那天欠不欠债，一句「改了日历」核对不了对错，
+    // 必须逐日摆出来——模型把 10-08 也当成假期这种错，只有列出来才看得见
+    const out: DraftDetail[] = (p.days ?? []).map((d: any) => ({
+      label: shortDate(d.date),
+      value: kindText(d.kind) + (d.note ? ` · ${d.note}` : ''),
+    }));
+    out.push({
+      label: '影响',
+      value: '休息日不排非常驻项，也不欠债；做了照得分',
+    });
+    return out;
+  }
+
+  if (p.kind === 'rest_weekdays') {
+    const out: DraftDetail[] = [
+      p.before?.weekdays
+        ? {
+            label: '每周休',
+            before: weekdaysText(p.before.weekdays),
+            after: weekdaysText(p.weekdays),
+          }
+        : { label: '每周休', value: weekdaysText(p.weekdays) },
+    ];
+    out.push({
+      label: '影响',
+      value: '只改往后哪些天默认休息，单独设过的那几天不动',
+    });
     return out;
   }
 
@@ -275,6 +347,17 @@ export async function applyDraft(
         ...(s.exceptDates != null ? { exceptDates: s.exceptDates } : {}),
         ...(s.onlyDates != null ? { onlyDates: s.onlyDates } : {}),
       }),
+    });
+  } else if (p.kind === 'calendar') {
+    // 整批一次写：几天的假期是一个决定，逐日发请求会出现改了一半的日历
+    await api('/life/calendar', {
+      method: 'PUT',
+      body: JSON.stringify({ days: p.days }),
+    });
+  } else if (p.kind === 'rest_weekdays') {
+    await api('/life/settings/rest-weekdays', {
+      method: 'PUT',
+      body: JSON.stringify({ weekdays: p.weekdays }),
     });
   } else if (p.kind === 'plan_drop') {
     await api(`/life/plan/${p.nodeId}/drop`, {
