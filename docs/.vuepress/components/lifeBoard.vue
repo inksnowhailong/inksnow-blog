@@ -633,7 +633,11 @@ const IDEA_STATES: Record<string, { label: string; cls: string }> = {
   },
 };
 const ideaList = computed(() =>
-  (ideas.value?.threads ?? []).map((t: any) => ({ ...t, ...IDEA_STATES[t.state] })),
+  (ideas.value?.threads ?? []).map((t: any) => ({
+    ...t,
+    // 后端若送来认不得的 state，红色显出来，不要静默渲染成空徽标
+    ...(IDEA_STATES[t.state] ?? { label: t.state ?? '未知', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' }),
+  })),
 );
 
 /** 想法总条数 */

@@ -290,7 +290,7 @@ watch(
       </div>
 
       <!-- 收尾：一句结论，"不成"同样算结论 -->
-      <div v-if="!isDone && closing" data-alt="idea-close-form" class="mt-5 grid gap-2">
+      <div v-if="!isDone && closing" data-alt="idea-conclude-form" class="mt-5 grid gap-2">
         <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
           写一句结论收尾，拿 {{ noteYuan }} 元
         </p>
@@ -321,7 +321,7 @@ watch(
       >
         <button
           v-if="!isDone && !closing"
-          data-alt="idea-start-close"
+          data-alt="idea-conclude-open"
           type="button"
           class="rounded-lg bg-slate-100 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
           @click="closing = true"

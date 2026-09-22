@@ -15,7 +15,7 @@ const PLAN_KINDS = [
 ];
 
 /** 会删掉已有数据的草稿 */
-const DESTRUCTIVE_KINDS = ['undo', 'plan_drop'];
+const DESTRUCTIVE_KINDS = ['undo', 'plan_drop', 'idea_drop'];
 
 /** 这条草稿是否动计划结构 */
 export function touchesPlan(draft: any): boolean {
