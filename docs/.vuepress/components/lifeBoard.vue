@@ -13,6 +13,7 @@ import LifeIdeaRow from './lifeIdeaRow.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import { planSections } from './usePlanSections';
 import {
   describeDraft,
   applyDraft,
@@ -529,6 +530,37 @@ function openNode(node: any, path: string) {
   picked.value = node;
   pickedPath.value = path;
 }
+
+/**
+ * 每日项 → 它所属方向当前该做的那条清单项
+ * @description 手机上路线图折在「更多」里，打卡的时候看不见今天该学哪一项。
+ * 解法不是把整张路线图搬回首屏，而是让每个打卡项自己带上那一条。
+ * 算法直接用 planSections，与路线图是同一份——各算一份的话，
+ * 做完一项会变成一边跳下一项、另一边还停在原处
+ */
+const hereByNode = computed(() => {
+  const map = new Map<string, { item: any; path: string }>();
+  for (const s of planSections(plan.value)) {
+    if (!s.currentId) continue;
+    const group = s.groups.find((g: any) =>
+      g.items.some((i: any) => i.id === s.currentId),
+    );
+    if (!group) continue;
+    const item = group.items.find((i: any) => i.id === s.currentId);
+    const path = [s.title, group.title].filter(Boolean).join(' › ');
+    // 同一个方向下的每日项指向同一条「在这」
+    for (const d of s.daily) map.set(d.id, { item, path });
+  }
+  return map;
+});
+
+/** 打卡项配上它的「在这」，模板里就不必反复查表 */
+const punchItems = computed(() =>
+  (activeDay.value?.items ?? []).map((i: any) => ({
+    ...i,
+    here: hereByNode.value.get(i.nodeId) ?? null,
+  })),
+);
 
 const isToday = computed(() => activeDate.value === today());
 
@@ -1207,7 +1239,7 @@ onMounted(() => {
 
             <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
               <div
-                v-for="it in activeDay.items"
+                v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
                 class="rounded-xl border p-3 transition"
@@ -1300,6 +1332,29 @@ onMounted(() => {
                     </button>
                   </span>
                 </div>
+
+                <!-- 「在这」：这一项属于哪个方向，那个方向现在该学的是哪条 -->
+                <button
+                  v-if="it.here"
+                  data-alt="punch-here"
+                  type="button"
+                  :title="'打开清单项「' + it.here.item.title + '」'"
+                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  @click="openNode(it.here.item, it.here.path)"
+                >
+                  <span
+                    class="shrink-0 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                    >在这</span
+                  >
+                  <span
+                    class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300"
+                    >{{ it.here.item.title }}</span
+                  >
+                  <LifeIcon
+                    name="right"
+                    class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
+                  />
+                </button>
               </div>
             </div>
 
