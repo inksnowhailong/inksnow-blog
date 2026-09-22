@@ -8,6 +8,7 @@
 import { ref, computed, watch } from 'vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
 
 const props = defineProps<{
   /** 选中的节点，为 null 时不显示 */
@@ -420,6 +421,9 @@ function drop() {
           </div>
         </div>
       </div>
+
+      <!-- 方向节点才有知识地图；清单项只有日志 -->
+      <LifeKnowledgeMap v-if="node.level === 'DIRECTION'" :node-id="node.id" :api="api" />
 
       <!-- 学习日志：这一项从开始到现在留下了什么 -->
       <div data-alt="modal-logs" class="mt-5">
