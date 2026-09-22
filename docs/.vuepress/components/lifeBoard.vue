@@ -244,7 +244,23 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
  * 写死的数字迟早和列表对不上。没排到项的日子直接说清楚，
  * 免得看见一个空列表以为是加载失败
  */
+/**
+ * 当前这天是不是休息日
+ * @description 逐日结算那两份（近九周、当月）带了 dayKind，当日结算接口不一定带，
+ * 故以当日结算为先、日历数据兜底，免得后端还没跟上时标题跟格子说的不是一回事
+ */
+const activeRest = computed(() => {
+  const d = activeDay.value;
+  if (d?.dayKind) return d.dayKind === 'REST';
+  const hit =
+    heat.value.find((x: any) => x.date === activeDate.value) ??
+    monthHeat.value.find((x: any) => x.date === activeDate.value);
+  return hit?.dayKind === 'REST';
+});
+
 const dailyTitle = computed(() => {
+  // 休息日只排常驻项，先说清「不做也不欠」，报项数反而像是又欠了几样
+  if (activeRest.value) return '今天休息 · 做了算白赚';
   const n = activeDay.value?.items?.length ?? 0;
   if (!n) return '今天没排计划';
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -703,33 +719,50 @@ function openDayAsk(cell: any) {
   });
 }
 
+/** 休息日格子的虚线边框，休不休由后端的 dayKind 说了算 */
+const REST_BORDER =
+  'border border-dashed border-slate-300 dark:border-slate-600';
+
 /**
  * 某格的配色
- * @description 分四档深浅；周末无义务，做了才着色，没做显示为空底
+ * @description 分四档深浅；休息日与没排计划的日子无义务，做了才着色，没做显示为空底。
+ * 休息日额外描一圈虚线边框——调休上班的周末与放假的工作日光看底色分不出来
  */
 function heatClass(cell: any): string {
   // undefined 表示该月没有这一天，整格不画；没有 score 表示这天不在统计范围内
   if (cell === undefined) return 'invisible';
   if (cell.score == null) return 'bg-transparent';
+  const rest = cell.dayKind === 'REST';
   // 看的是「这天排没排计划」而不是「是不是周末」：出差请假同样是没排
   if (cell.score <= 0) {
-    return cell.planned
+    return cell.planned && !rest
       ? 'bg-slate-100 dark:bg-slate-700'
-      : 'bg-transparent border border-dashed border-slate-200 dark:border-slate-700';
+      : `bg-transparent ${REST_BORDER}`;
   }
   // 按达成率着色而非绝对分：每天排几项会变，绝对分之间不再可比
   const ratio = cell.fullScore > 0 ? cell.score / cell.fullScore : 0;
-  if (ratio >= 1) return 'bg-brand-500 dark:bg-brand-300';
-  if (ratio >= 0.6) return 'bg-brand-500/75 dark:bg-brand-300/75';
-  if (ratio >= 0.3) return 'bg-brand-500/50 dark:bg-brand-300/50';
-  return 'bg-brand-500/25 dark:bg-brand-300/30';
+  const tone =
+    ratio >= 1
+      ? 'bg-brand-500 dark:bg-brand-300'
+      : ratio >= 0.6
+        ? 'bg-brand-500/75 dark:bg-brand-300/75'
+        : ratio >= 0.3
+          ? 'bg-brand-500/50 dark:bg-brand-300/50'
+          : 'bg-brand-500/25 dark:bg-brand-300/30';
+  // 休息日做了事照样着色：白赚的分抹掉了，这天就成了一片空白
+  return rest ? `${tone} ${REST_BORDER}` : tone;
 }
 
 function heatTitle(cell: any): string {
   if (!cell || cell.score == null) return '';
-  if (!cell.planned) return `${cell.date} 未排计划`;
+  // 备注是这天为什么休息的唯一解释，如「国庆」，没有它虚格看着像漏记
+  const rest =
+    cell.dayKind === 'REST'
+      ? ` · 休息${cell.note ? `（${cell.note}）` : ''}`
+      : '';
+  if (!cell.planned) return `${cell.date} 未排计划${rest}`;
   const pass = cell.debtFreeScore > 0 && cell.score >= cell.debtFreeScore;
-  return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}`;
+  return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}${rest}`;
 }
 
 /**
@@ -1341,6 +1374,7 @@ onMounted(() => {
         >
           1 分 = {{ diagnosis.rules.yuanPerPoint }} 元，每月最多兑
           {{ diagnosis.rules.monthlyPointCap }} 分 · 日历格子越深表示当天得分越高
+          · 虚线格是休息日或没排计划的日子 · 点格子可以问那天
           · 阈值制：达标即得固定分，多做只记录不加分
         </p>
       </section>
