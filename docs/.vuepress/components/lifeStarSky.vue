@@ -52,8 +52,9 @@ function layout(w: number, h: number): Placed[] {
   const n = dirs.length;
   const cx0 = w / 2;
   const cy0 = h / 2;
-  const R = Math.min(w, h) * (n === 1 ? 0 : 0.32);
-  const r = Math.min(w, h) * (n === 1 ? 0.4 : Math.min(0.22, 0.9 / n));
+  // 半径预算 R + r + 标签 必须 ≤ h/2，否则最下面的星座画到画布外
+  const R = Math.min(w, h) * (n === 1 ? 0 : 0.26);
+  const r = Math.min(w, h) * (n === 1 ? 0.34 : Math.min(0.17, 0.7 / n));
   return dirs.map((d, i) => {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2;
     const cx = cx0 + R * Math.cos(a);
@@ -137,7 +138,7 @@ function draw() {
     ctx.fillStyle = 'rgba(203,213,225,0.75)';
     ctx.font = '12px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`${c.title} · ${c.stars.length}`, c.cx, c.cy + c.r + 16);
+    ctx.fillText(`${c.title} · ${c.stars.length}`, c.cx, c.cy + c.r + 12);
   });
 
   if (!placed.length) {

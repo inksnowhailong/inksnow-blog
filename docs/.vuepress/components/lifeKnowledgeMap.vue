@@ -77,7 +77,7 @@ const tree = computed(() => {
     });
     return { title: b.title, x1: trunkX, y1: y, x2, y2, leaves, dir };
   });
-  const stuck = (view.value?.stuck ?? []).slice(0, 8).map((s: any, k: number) => ({
+  const stuck = (view.value?.stuck ?? []).slice(0, 8).map((_: any, k: number) => ({
     x: trunkX + (k % 2 ? 1 : -1) * (40 + k * 9),
     y: H - 12,
   }));
@@ -93,6 +93,7 @@ const outlineLines = computed(() =>
 );
 
 watch(() => props.nodeId, load, { immediate: true });
+defineExpose({ load });
 </script>
 
 <template>
@@ -117,7 +118,7 @@ watch(() => props.nodeId, load, { immediate: true });
       <g v-for="(b, i) in tree.items" :key="i">
         <line :x1="b.x1" :y1="b.y1" :x2="b.x2" :y2="b.y2" stroke="#8b6b4a" stroke-width="2" stroke-linecap="round" />
         <circle v-for="(l, k) in b.leaves" :key="k" :cx="l.x" :cy="l.y" r="3.2" fill="#34d399" />
-        <text :x="b.x2 + b.dir * 4" :y="b.y2 - 4" font-size="9" :text-anchor="b.dir < 0 ? 'end' : 'start'" fill="#64748b">{{ b.title }}</text>
+        <text :x="b.x2 - b.dir * 4" :y="b.y2 - 4" font-size="9" :text-anchor="b.dir < 0 ? 'start' : 'end'" fill="#64748b">{{ b.title }}</text>
       </g>
       <!-- 枯叶：卡点落在根部 -->
       <circle v-for="(s, k) in tree.stuck" :key="'s' + k" :cx="s.x" :cy="s.y" r="2.8" fill="#d6a24a" opacity="0.8" />

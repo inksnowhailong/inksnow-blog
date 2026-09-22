@@ -110,7 +110,8 @@ async function loadAll() {
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
       api('/life/plan'),
-      api('/life/learning/sky'),
+      // 星图只是锦上添花，取不到不该让整个面板打不开
+      api('/life/learning/sky').catch(() => null),
     ]);
     diagnosis.value = d;
     ledger.value = l;
@@ -1083,7 +1084,7 @@ onMounted(() => {
       </section>
 
       <div class="grid gap-4 lg:grid-cols-3">
-        <!-- AI 栏：手机上排在最前，桌面上收到右侧常驻 -->
+        <!-- AI 栏：手机上排在今日卡之后，桌面上收到右侧常驻 -->
         <aside
           data-alt="ai-column"
           class="grid gap-4 order-2 lg:sticky lg:top-4 lg:order-2 lg:col-span-1 lg:self-start"
@@ -1332,15 +1333,6 @@ onMounted(() => {
 
           </section>
 
-          <button
-            data-alt="show-more"
-            type="button"
-            class="rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
-            @click="showMore = !showMore"
-          >
-            {{ showMore ? '收起' : '更多：星图 · 总览 · 路线图 · 想法池' }}
-          </button>
-
           <!-- 路线图 -->
           <section
             data-alt="roadmap"
@@ -1362,6 +1354,15 @@ onMounted(() => {
             <LifePlanTree :plan="plan" @select="openNode" />
           </section>
         </div>
+
+        <button
+          data-alt="show-more"
+          type="button"
+          class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          @click="showMore = !showMore"
+        >
+          {{ showMore ? '收起' : '更多：星图 · 总览 · 路线图 · 想法池' }}
+        </button>
       </div>
 
       <p

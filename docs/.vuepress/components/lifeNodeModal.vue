@@ -100,15 +100,22 @@ function addLog() {
     });
     logDraft.value = '';
     logTag.value = '';
+    // 记日志会长星，让面板重新拉星图
     await loadLogs();
+    emit('changed');
   });
 }
+
+const knowledgeMap = ref<any>(null);
+// 搞懂/卡点条数要跟着日志变
+watch(() => logs.value.length, () => knowledgeMap.value?.load?.());
 
 /** 删掉一条记错的 */
 function removeLog(id: string) {
   run(async () => {
     await props.api(`/life/logs/${id}`, { method: 'DELETE' });
     await loadLogs();
+    emit('changed');
   });
 }
 
@@ -422,8 +429,13 @@ function drop() {
         </div>
       </div>
 
-      <!-- 方向节点才有知识地图；清单项只有日志 -->
-      <LifeKnowledgeMap v-if="node.level === 'DIRECTION'" :node-id="node.id" :api="api" />
+      <!-- 方向节点才有知识地图；顶层每日项本身也是方向；清单项只有日志 -->
+      <LifeKnowledgeMap
+        v-if="node.level === 'DIRECTION' || (node.level === 'DAILY' && !node.parentId)"
+        ref="knowledgeMap"
+        :node-id="node.id"
+        :api="api"
+      />
 
       <!-- 学习日志：这一项从开始到现在留下了什么 -->
       <div data-alt="modal-logs" class="mt-5">
