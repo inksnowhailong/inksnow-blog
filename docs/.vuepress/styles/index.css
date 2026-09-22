@@ -39,6 +39,12 @@
     display: flex;
     align-items: center;
 }
+/* 导航栏只留 logo，不再重复写一遍站名。
+   这里藏的是显示，config.ts 里的 title 要留着——
+   它同时是浏览器标签页的标题与 SEO 用的站点名，清空会一起丢 */
+.navbar-container .site-brand .site-name {
+    display: none;
+}
 
 #c{
     position: fixed;

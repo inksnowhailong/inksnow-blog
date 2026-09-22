@@ -28,8 +28,7 @@ const emit = defineEmits<{
   (e: 'ask', payload: { prefix: string; anchor: { x: number; y: number } }): void;
 }>();
 
-/** 单条日志的字数上限，与后端一致 */
-const LOG_MAX = 120;
+
 
 const busy = ref(false);
 const errorMsg = ref('');
@@ -216,7 +215,9 @@ watch(
       <div data-alt="idea-modal-head" class="mb-4 flex items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="text-xs text-slate-400 dark:text-slate-500">研究</p>
-          <p class="mt-0.5 text-lg font-semibold leading-snug text-slate-800 dark:text-slate-100">
+          <p
+            class="mt-0.5 whitespace-pre-wrap text-lg font-semibold leading-snug text-slate-800 dark:text-slate-100"
+          >
             {{ idea.content }}
           </p>
           <p class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -312,15 +313,16 @@ watch(
           </span>
         </div>
 
-        <div v-if="!isNoted" class="flex gap-1.5">
-          <input
+        <div v-if="!isNoted" class="flex items-start gap-1.5">
+          <!-- 研究进展常常要写几句才说得清，单行框装不下 -->
+          <textarea
             v-model="logDraft"
             data-alt="idea-log-input"
-            type="text"
-            :maxlength="LOG_MAX"
+            rows="2"
             placeholder="这次试了什么，发现了什么"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
-            @keydown.enter.prevent="addLog"
+            class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
+            @keydown.enter.ctrl.prevent="addLog"
+            @keydown.enter.meta.prevent="addLog"
           />
           <button
             data-alt="idea-log-add"
@@ -335,7 +337,7 @@ watch(
           </button>
         </div>
         <p v-if="!isNoted" class="mt-1 text-[11px] text-slate-400">
-          一条只记一件事，上限 {{ LOG_MAX }} 字 · 已写 {{ logDraft.length }}
+          一条只记一件事 · Ctrl+Enter 记下
           <span v-if="idea.status !== 'STARTED'"> · 记下第一条就算动手了</span>
         </p>
 
@@ -347,7 +349,9 @@ watch(
             class="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40"
           >
             <div class="min-w-0">
-              <p class="text-sm leading-snug text-slate-700 dark:text-slate-200">
+              <p
+                class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+              >
                 {{ l.text }}
               </p>
               <p class="mt-0.5 text-[11px] text-slate-400">{{ l.occurredOn }}</p>
@@ -375,7 +379,12 @@ watch(
         <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
           结项 · 写完这四行就算完成，拿 {{ noteYuan }} 元
         </p>
-        <input
+        <!--
+          结论那栏只写「成 / 不成 / 不确定」几个字，用单行框；
+          其余三栏要展开讲，给多行框
+        -->
+        <component
+          :is="row.k === 'result' ? 'input' : 'textarea'"
           v-for="row in [
             { k: 'question', p: '我想搞清楚什么' },
             { k: 'did', p: '试了什么' },
@@ -384,10 +393,10 @@ watch(
           ]"
           :key="row.k"
           v-model="note[row.k]"
+          :rows="row.k === 'result' ? undefined : 2"
           :data-alt="'idea-note-' + row.k"
-          type="text"
           :placeholder="row.p"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
+          class="resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
         />
         <p class="text-[11px] text-slate-400">
           结论是「不成」同样算完成——一次记录在案的失败比一次没记录的成功值钱

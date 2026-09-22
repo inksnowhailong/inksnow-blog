@@ -1078,15 +1078,20 @@ onMounted(() => {
             </button>
             <div v-if="showIdeas" class="mt-3">
               <!-- 捕获不受限：记一行字零成本、不计分 -->
-              <div class="flex gap-1.5">
-                <input
+              <div class="flex items-start gap-1.5">
+                <!--
+                  上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
+                  而后端其实收得下
+                -->
+                <textarea
                   v-model="ideaDraft"
                   data-alt="idea-capture-input"
-                  type="text"
-                  maxlength="200"
+                  rows="2"
+                  maxlength="500"
                   placeholder="想试试什么"
-                  class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-base sm:text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                  @keydown.enter.prevent="captureIdea"
+                  class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:text-sm"
+                  @keydown.enter.ctrl.prevent="captureIdea"
+                  @keydown.enter.meta.prevent="captureIdea"
                 />
                 <button
                   data-alt="idea-capture"
@@ -1109,7 +1114,9 @@ onMounted(() => {
                   class="cursor-pointer rounded-lg bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700"
                   @click="activeIdea = it"
                 >
-                  <p class="text-sm leading-snug text-slate-700 dark:text-slate-200">
+                  <p
+                    class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+                  >
                     {{ it.content }}
                   </p>
                   <p class="mt-1 flex items-center gap-1.5 text-[11px]">
