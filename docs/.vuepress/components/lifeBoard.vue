@@ -9,6 +9,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
+import LifeIdeaRow from './lifeIdeaRow.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
@@ -50,7 +51,10 @@ const picked = ref<any>(null);
 const pickedPath = ref('');
 const showIdeas = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、想法池 */
+/** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
+const showDone = ref(false);
+
+/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -98,7 +102,7 @@ const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 /**
  * 打卡与计划这一摊：诊断、账本、热力图、路线图与当日结算
  * @description 它们是同一笔记录的几个侧面——记一次打卡，五个数都会变，
- * 所以要一起拉。想法池不在其中，故单独一个函数
+ * 所以要一起拉。研究线不在其中，故单独一个函数
  */
 async function loadCore() {
   const to = today();
@@ -121,8 +125,8 @@ async function loadCore() {
 }
 
 /**
- * 想法池
- * @description 与打卡、计划互不相干：记一个想法不会改分数也不会动额度，
+ * 研究线
+ * @description 与打卡、计划互不相干：记一条研究线不会改分数也不会动额度，
  * 没有理由顺带把上面那五个接口再拉一遍
  */
 async function loadIdeas() {
@@ -661,43 +665,53 @@ const streak = computed(() => {
 });
 
 /**
- * 想法池列表
- * @description 后端已按「进行中 → 搁着 → 已结」排好，这里只配徽标文案与配色。
- * 状态是后端从结论与最近动静算出来的，前端不再自己推
+ * 研究线列表
+ * @description 状态是后端从结论与最近动静算出来的，前端不再自己推，
+ * 也不再逐条配徽标——状态改由分段标题与行首色条表达
  */
-const IDEA_STATES: Record<string, { label: string; cls: string }> = {
-  OPEN: {
-    label: '进行中',
-    cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
-  },
-  STALE: {
-    label: '搁着',
-    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-  },
-  DONE: {
-    label: '已结',
-    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-  },
-};
-const ideaList = computed(() =>
-  (ideas.value?.threads ?? []).map((t: any) => ({
-    ...t,
-    // 后端若送来认不得的 state，红色显出来，不要静默渲染成空徽标
-    ...(IDEA_STATES[t.state] ?? { label: t.state ?? '未知', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' }),
-  })),
+const ideaList = computed<any[]>(() => ideas.value?.threads ?? []);
+
+/** 分段的顺序与中文说法，键与后端的 state 一致 */
+const IDEA_SEGMENTS = [
+  { key: 'OPEN', label: '在动' },
+  { key: 'STALE', label: '搁着' },
+  { key: 'DONE', label: '已结' },
+];
+
+/**
+ * 按状态切成三段
+ * @description 认不得的 state 兜到末尾单独一段，不能让它静默消失——
+ * 列表按状态分组之后，漏掉的那条在界面上是查无此人
+ */
+const ideaSegments = computed(() => {
+  const known = IDEA_SEGMENTS.map((s) => ({
+    ...s,
+    items: ideaList.value.filter((t) => t.state === s.key),
+  }));
+  const rest = ideaList.value.filter(
+    (t) => !IDEA_SEGMENTS.some((s) => s.key === t.state),
+  );
+  return rest.length
+    ? [...known, { key: 'OTHER', label: '状态不明', items: rest }]
+    : known;
+});
+
+/** 标题行右侧的分段计数，如「2 在动 · 1 搁着」；空段不占位置 */
+const ideaCountText = computed(() =>
+  ideaSegments.value
+    .filter((s) => s.items.length)
+    .map((s) => `${s.items.length} ${s.label}`)
+    .join(' · '),
 );
 
-/** 想法总条数 */
-const ideaCount = computed(() => ideaList.value.length);
-
-/** 打开详情的那个想法 */
+/** 打开详情的那条研究线 */
 const activeIdea = ref<any>(null);
 
-/** 新想法的输入框 */
+/** 新研究线的输入框 */
 const ideaDraft = ref('');
 
 /**
- * 记下一个想法
+ * 记下一条研究线
  * @description 走确定性接口不经模型：记一行字这件事没有任何需要判断的地方，
  * 让模型过一道手只会多一次失败的机会
  */
@@ -729,7 +743,7 @@ watch(ideas, () => {
 
 /**
  * 研究线弹窗改完之后
- * @param scope 这次改动波及哪一摊：记进展只动想法池，
+ * @param scope 这次改动波及哪一摊：记进展只动研究线，
  * 写结论和删除会连带改额度，那一摊也得重拉
  */
 function onIdeaChanged(scope: 'ideas' | 'all') {
@@ -1132,7 +1146,7 @@ onMounted(() => {
       </section>
 
       <div class="grid gap-4 lg:grid-cols-2">
-        <!-- 左列：打卡与想法池都不高，吸顶跟着右边那条长列滚 -->
+        <!-- 左列：打卡与研究线都不高，吸顶跟着右边那条长列滚 -->
         <div
           data-alt="left-column"
           class="order-1 grid gap-4 lg:sticky lg:top-4 lg:self-start"
@@ -1304,10 +1318,13 @@ onMounted(() => {
             >
               <span
                 class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-                >想法池</span
+                >研究线</span
               >
-              <span class="flex items-center gap-1 text-xs text-slate-400">
-                {{ ideaCount }} 条
+              <span
+                data-alt="ideas-counts"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                {{ ideaCountText }}
                 <LifeIcon :name="showIdeas ? 'up' : 'down'" class="h-3.5 w-3.5" />
               </span>
             </button>
@@ -1322,32 +1339,49 @@ onMounted(() => {
                 mode="note"
                 :busy="busy"
                 :maxlength="500"
-                placeholder="记一个想法"
-                label="记下这个想法"
+                placeholder="记一条研究线"
+                label="记下这条研究线"
                 @submit="captureIdea"
               />
 
-              <ul v-if="ideaList.length" class="mt-2 grid gap-1.5">
-                <li
-                  v-for="it in ideaList"
-                  :key="it.id"
-                  data-alt="idea-row"
-                  class="cursor-pointer rounded-lg bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700"
-                  @click="activeIdea = it"
-                >
-                  <p
-                    class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
-                  >
-                    {{ it.content }}
-                  </p>
-                  <p class="mt-1 flex items-center gap-1.5 text-[11px]">
-                    <span class="rounded px-1.5 py-0.5" :class="it.cls">{{ it.label }}</span>
-                    <span class="text-slate-400">{{ it.createdOn }}</span>
-                  </p>
-                </li>
-              </ul>
+              <!-- 按状态分段；空段连标题一起不渲染，免得一排「暂无」占着地方 -->
+              <div v-if="ideaList.length" class="mt-3 grid gap-2.5">
+                <template v-for="seg in ideaSegments" :key="seg.key">
+                  <div v-if="seg.items.length" data-alt="idea-segment">
+                    <button
+                      v-if="seg.key === 'DONE'"
+                      data-alt="idea-done-toggle"
+                      type="button"
+                      class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
+                      @click="showDone = !showDone"
+                    >
+                      {{ seg.label }} ({{ seg.items.length }})
+                      <LifeIcon :name="showDone ? 'up' : 'down'" class="h-3 w-3" />
+                    </button>
+                    <p
+                      v-else
+                      data-alt="idea-segment-title"
+                      class="text-[11px] text-slate-400 dark:text-slate-500"
+                    >
+                      {{ seg.label }}
+                    </p>
+                    <ul
+                      v-if="seg.key !== 'DONE' || showDone"
+                      data-alt="idea-list"
+                      class="mt-1 grid"
+                    >
+                      <LifeIdeaRow
+                        v-for="it in seg.items"
+                        :key="it.id"
+                        :idea="it"
+                        @click="activeIdea = it"
+                      />
+                    </ul>
+                  </div>
+                </template>
+              </div>
               <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
-                还没有想法。冒出什么念头先记一行，有进展就往里追一句
+                还没有研究线。冒出什么念头先记一行，有进展就往里追一句
               </p>
 
               <p
@@ -1387,7 +1421,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：总览 · 路线图 · 想法池' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}
         </button>
       </div>
 
