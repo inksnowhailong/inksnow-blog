@@ -32,8 +32,7 @@ const errorMsg = ref('');
 const dropping = ref(false);
 const dropReason = ref('');
 
-/** 单条日志的字数上限，与后端一致 */
-const LOG_MAX = 120;
+
 
 /** 每日项才有的计分设定 */
 const threshold = ref(0);
@@ -441,15 +440,19 @@ function drop() {
           </span>
         </div>
 
-        <div class="flex gap-1.5">
-          <input
+        <div class="flex items-start gap-1.5">
+          <!--
+            用 textarea 而不是 input：日志会写成几段，单行框里看不见自己写了什么。
+            换行交给 Enter，提交改用 Ctrl/Cmd+Enter 与右边的按钮
+          -->
+          <textarea
             v-model="logDraft"
             data-alt="log-input"
-            type="text"
-            :maxlength="LOG_MAX"
+            rows="2"
             placeholder="搞懂了什么，或卡在哪"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
-            @keydown.enter.prevent="addLog"
+            class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
+            @keydown.enter.ctrl.prevent="addLog"
+            @keydown.enter.meta.prevent="addLog"
           />
           <button
             data-alt="log-add"
@@ -464,8 +467,7 @@ function drop() {
           </button>
         </div>
         <p class="mt-1 text-[11px] text-slate-400">
-          一条只记一件事，上限 {{ LOG_MAX }} 字 · 已写
-          {{ logDraft.length }}
+          一条只记一件事 · Ctrl+Enter 记下
         </p>
 
         <ul v-if="logs.length" class="mt-2 grid gap-1.5">
@@ -476,7 +478,9 @@ function drop() {
             class="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40"
           >
             <div class="min-w-0">
-              <p class="text-sm leading-snug text-slate-700 dark:text-slate-200">
+              <p
+                class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+              >
                 {{ l.text }}
               </p>
               <p class="mt-0.5 text-[11px] text-slate-400">

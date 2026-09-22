@@ -8,7 +8,7 @@ modules:
   - Footer
 bannerBrand:
   bgImage: '/bg.svg'
-  title: inksnow海龙的博客
+  title: inksnow
   description: 日复一日,年复一年。
   tagline: “你需要放下当前的预设和执念，甚至要牺牲你最在乎的东西，才能实现自己的潜力，而不是始终停滞不前”——乔丹·彼得森
   # buttons:

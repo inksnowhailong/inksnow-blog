@@ -143,7 +143,7 @@ watch(
     text.value = '';
     boxHeight.value = 0;
     await nextTick();
-    box.value?.querySelector('input')?.focus();
+    box.value?.querySelector('textarea')?.focus();
     await measure();
   },
 );
@@ -203,14 +203,15 @@ function send() {
           </button>
         </div>
 
-        <div class="flex gap-1.5">
-          <input
+        <div class="flex items-start gap-1.5">
+          <!-- 同对话栏：Enter 发送，Shift+Enter 换行 -->
+          <textarea
             v-model="text"
             data-alt="ask-input"
-            type="text"
+            rows="2"
             :placeholder="placeholder || '说点什么'"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-1.5 sm:text-sm"
-            @keydown.enter.prevent="send"
+            class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
+            @keydown.enter.exact.prevent="send"
           />
           <button
             data-alt="ask-send"

@@ -137,14 +137,18 @@ async function confirm() {
     class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
   >
     <!-- 输入放在最上面：它是这个页面用得最多的东西 -->
-    <div data-alt="chat-input-row" class="flex gap-2">
-      <input
+    <div data-alt="chat-input-row" class="flex items-start gap-2">
+      <!--
+        聊天框沿用 Enter 发送（这是聊天的通用预期），换行给 Shift+Enter。
+        换成 textarea 是为了让长指令写的时候看得见，而不是憋在一行里
+      -->
+      <textarea
         v-model="input"
         data-alt="chat-input"
-        type="text"
+        rows="2"
         placeholder="今天主线写了 40 分钟"
-        class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:py-2 sm:text-sm"
-        @keydown.enter.prevent="send"
+        class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:py-2 sm:text-sm"
+        @keydown.enter.exact.prevent="send"
       />
       <button
         data-alt="chat-send"
