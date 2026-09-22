@@ -212,7 +212,9 @@ export function draftDetails(draft: any): DraftDetail[] {
     (p.preview ?? []).forEach((d: any) => {
       out.push({
         label: `${shortDate(d.date)} 周${WEEK_CN[d.weekday]}`,
+        // 休息日那行要点明是日历压掉的，否则「不做」会被当成排期本身的意思
         value:
+          (d.dayKind === 'REST' ? '休息日 · ' : '') +
           (d.active ? '做' : '不做') +
           ` · 当天 ${d.itemCount} 项 · 满分 ${d.fullScore} · 免债线 ${d.debtFreeScore}`,
       });
