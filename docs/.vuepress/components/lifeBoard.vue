@@ -51,7 +51,6 @@ const activeDay = ref<any>(null);
 /** 弹窗里正在看的节点 */
 const picked = ref<any>(null);
 const pickedPath = ref('');
-const showIdeas = ref(false);
 
 /** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
 const showDone = ref(false);
@@ -1406,31 +1405,24 @@ onMounted(() => {
             :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
           >
+            <!--
+              这一摊不再折叠：折起来的东西等于不存在，而研究线本来就是
+              想起来才记一句的地方——要先点开才看得见，就永远想不起来。
+              在动那一段给个高度封顶自己滚，长了也不会把下面的路线图顶走
+            -->
             <div class="flex items-center justify-between gap-2">
-              <button
-                data-alt="ideas-toggle"
-                type="button"
-                class="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
-                @click="showIdeas = !showIdeas"
+              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                研究线
+              </p>
+              <span
+                data-alt="ideas-counts"
+                class="flex items-center gap-1 text-xs text-slate-400"
               >
-                <span
-                  class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-                  >研究线</span
-                >
-                <span
-                  data-alt="ideas-counts"
-                  class="flex items-center gap-1 text-xs text-slate-400"
-                >
-                  {{ ideaCountText }}
-                  <LifeIcon
-                    :name="showIdeas ? 'up' : 'down'"
-                    class="h-3.5 w-3.5"
-                  />
-                </span>
-              </button>
-              <LifeAskButton title="就研究线问 AI" @click="openIdeasAsk" />
+                {{ ideaCountText }}
+                <LifeAskButton title="就研究线问 AI" @click="openIdeasAsk" />
+              </span>
             </div>
-            <div v-if="showIdeas" class="mt-3">
+            <div class="mt-3">
               <!-- 捕获不受限：记一行字零成本、不计分 -->
               <!--
                 上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
@@ -1471,6 +1463,9 @@ onMounted(() => {
                       v-if="seg.key !== 'DONE' || showDone"
                       data-alt="idea-list"
                       class="mt-1 grid"
+                      :class="
+                        seg.key === 'OPEN' ? 'max-h-64 overflow-y-auto' : ''
+                      "
                     >
                       <LifeIdeaRow
                         v-for="it in seg.items"
