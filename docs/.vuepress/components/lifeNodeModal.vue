@@ -11,6 +11,7 @@ import { ref, computed, watch } from 'vue';
 import LifeModal from './lifeModal.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import LifeAskButton from './lifeAskButton.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
 
 const props = defineProps<{
@@ -256,16 +257,7 @@ function drop() {
   >
     <template #icons>
       <!-- 指令不在这儿写：交给全页唯一那个对话弹窗，它会出草稿 -->
-      <button
-        data-alt="node-ask"
-        type="button"
-        title="让 AI 改写这条计划"
-        aria-label="让 AI 改写这条计划"
-        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-        @click="askAi"
-      >
-        <LifeIcon name="sparkle" class="h-4 w-4" />
-      </button>
+      <LifeAskButton title="让 AI 改写这条计划" @click="askAi" />
       <button
         data-alt="node-more"
         type="button"

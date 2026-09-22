@@ -11,6 +11,7 @@ import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeIdeaRow from './lifeIdeaRow.vue';
 import LifeIcon from './lifeIcon.vue';
+import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import { planSections } from './usePlanSections';
@@ -453,6 +454,14 @@ function openFreeAsk() {
   });
 }
 
+/** 总览「战胜内心的批判家」那一卡的入口：今天投了多少、拿了几分 */
+function openScoreAsk() {
+  openAsk({
+    title: '今天的分数',
+    prefix: '关于今天的投入和分数：',
+  });
+}
+
 /** 点某一个体能债方块 */
 function openDebtAsk(index: number) {
   openAsk({
@@ -474,6 +483,22 @@ function openBankAsk() {
     directLabel: '直接记为存 1 个',
     direct: () => ledgerAction('EXERCISE', 1),
     prefix: '关于主动锻炼存运动储备：',
+  });
+}
+
+/** 路线图那一卡的入口 */
+function openRoadmapAsk() {
+  openAsk({
+    title: '路线图',
+    prefix: '关于我的学习路线图：',
+  });
+}
+
+/** 研究线那一卡的入口，问的是整摊线而不是某一条 */
+function openIdeasAsk() {
+  openAsk({
+    title: '研究线',
+    prefix: '关于我的研究线：',
   });
 }
 
@@ -887,11 +912,14 @@ onMounted(() => {
             data-alt="kpi-group-self"
             class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
           >
-            <p
-              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
-            >
-              战胜内心的批判家：和昨天的自己比，别和今天的别人比
-            </p>
+            <div class="flex items-start justify-between gap-2">
+              <p
+                class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
+              >
+                战胜内心的批判家：和昨天的自己比，别和今天的别人比
+              </p>
+              <LifeAskButton title="就今天的分数问 AI" @click="openScoreAsk" />
+            </div>
 
             <div data-alt="kpi-today">
               <div class="flex items-baseline justify-between gap-2">
@@ -999,11 +1027,17 @@ onMounted(() => {
             data-alt="kpi-group-incentive"
             class="grid content-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/30"
           >
-            <p
-              class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
-            >
-              奖励与惩罚的超级反应倾向
-            </p>
+            <div class="flex items-start justify-between gap-2">
+              <p
+                class="text-[11px] leading-snug text-brand-600 dark:text-brand-300"
+              >
+                奖励与惩罚的超级反应倾向
+              </p>
+              <LifeAskButton
+                title="就额度与体能债问 AI"
+                @click="openBankAsk()"
+              />
+            </div>
 
             <div data-alt="kpi-balance">
               <span class="text-xs text-slate-500 dark:text-slate-400"
@@ -1254,22 +1288,24 @@ onMounted(() => {
                     : 'border-slate-100 dark:border-slate-700'
                 "
               >
-                <div class="flex items-baseline justify-between gap-2">
-                  <button
-                    data-alt="daily-ask"
-                    type="button"
-                    :title="'说一句来补记「' + it.title + '」'"
-                    class="text-left text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-slate-200 dark:hover:text-brand-300"
-                    @click="openDailyAsk(it)"
+                <div class="flex items-center justify-between gap-2">
+                  <p
+                    class="min-w-0 flex-1 text-sm font-medium text-slate-700 dark:text-slate-200"
                   >
                     {{ it.title }}
-                  </button>
-                  <span class="shrink-0 text-xs text-slate-400">
+                  </p>
+                  <span
+                    class="flex shrink-0 items-center gap-1 text-xs text-slate-400"
+                  >
                     <span
                       v-if="it.isMainline"
-                      class="mr-1 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                      class="rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                       >主线</span
                     >{{ it.points }} 分
+                    <LifeAskButton
+                      :title="'说一句来补记「' + it.title + '」'"
+                      @click="openDailyAsk(it)"
+                    />
                   </span>
                 </div>
                 <div
@@ -1370,24 +1406,30 @@ onMounted(() => {
             :class="showMore ? '' : 'hidden lg:block'"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
           >
-            <button
-              data-alt="ideas-toggle"
-              type="button"
-              class="flex w-full items-center justify-between text-left"
-              @click="showIdeas = !showIdeas"
-            >
-              <span
-                class="text-sm font-semibold text-slate-700 dark:text-slate-200"
-                >研究线</span
+            <div class="flex items-center justify-between gap-2">
+              <button
+                data-alt="ideas-toggle"
+                type="button"
+                class="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                @click="showIdeas = !showIdeas"
               >
-              <span
-                data-alt="ideas-counts"
-                class="flex items-center gap-1 text-xs text-slate-400"
-              >
-                {{ ideaCountText }}
-                <LifeIcon :name="showIdeas ? 'up' : 'down'" class="h-3.5 w-3.5" />
-              </span>
-            </button>
+                <span
+                  class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+                  >研究线</span
+                >
+                <span
+                  data-alt="ideas-counts"
+                  class="flex items-center gap-1 text-xs text-slate-400"
+                >
+                  {{ ideaCountText }}
+                  <LifeIcon
+                    :name="showIdeas ? 'up' : 'down'"
+                    class="h-3.5 w-3.5"
+                  />
+                </span>
+              </button>
+              <LifeAskButton title="就研究线问 AI" @click="openIdeasAsk" />
+            </div>
             <div v-if="showIdeas" class="mt-3">
               <!-- 捕获不受限：记一行字零成本、不计分 -->
               <!--
@@ -1460,17 +1502,20 @@ onMounted(() => {
           :class="showMore ? '' : 'hidden lg:block'"
           class="order-2 rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
         >
-          <div class="mb-4 flex items-baseline justify-between gap-2">
+          <div class="mb-4 flex items-center justify-between gap-2">
             <p
               class="text-sm font-semibold text-slate-700 dark:text-slate-200"
             >
               路线图
             </p>
-            <span class="text-xs tabular-nums text-slate-400"
-              >必修 {{ diagnosis.checklist.requiredDone }}/{{
-                diagnosis.checklist.required
-              }}</span
+            <span
+              class="flex items-center gap-1 text-xs tabular-nums text-slate-400"
             >
+              必修 {{ diagnosis.checklist.requiredDone }}/{{
+                diagnosis.checklist.required
+              }}
+              <LifeAskButton title="就路线图问 AI" @click="openRoadmapAsk" />
+            </span>
           </div>
           <LifePlanTree :plan="plan" @select="openNode" />
         </section>

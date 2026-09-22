@@ -16,6 +16,7 @@
 import { ref, computed, watch } from 'vue';
 import LifeModal from './lifeModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 
 const props = defineProps<{
@@ -226,16 +227,7 @@ watch(
     @close="emit('close')"
   >
     <template #icons>
-      <button
-        data-alt="idea-ask"
-        type="button"
-        title="就这条线问 AI"
-        aria-label="就这条线问 AI"
-        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-        @click="ask"
-      >
-        <LifeIcon name="sparkle" class="h-4 w-4" />
-      </button>
+      <LifeAskButton title="就这条线问 AI" @click="ask" />
       <button
         data-alt="idea-more"
         type="button"
