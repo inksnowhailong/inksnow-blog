@@ -67,3 +67,9 @@ DTO 加在 `life.dto.ts`（`AddBookDto`、`AddBookLogDto`）。
 - [ ] 聊天说"今天读了《X》，讲了 Y" → 草稿 → 确认落库
 - [ ] MCP `life_book list` 能列书；`life_book log` 能记
 - [ ] smoke 测试补一节：加书、记笔记、读完、pinned 砍不掉
+
+## 实现期裁定（2026-09-22）
+
+- 「读书」pinned 后周末也排，周末只有它一项（2 分）：免债线 ceil(2×0.8)=2，即**周末没读书当天欠 2 个**；一个月 8～9 个周末日最坏欠 16～18 个。这是"天天排"的字面后果，不是算错。
+- 迁移按 `title LIKE '%读书%'` 找常驻项，找不到打 warn，不静默。
+- 回滚（plan-changes revert）遇到 pinned 节点一律拒绝。

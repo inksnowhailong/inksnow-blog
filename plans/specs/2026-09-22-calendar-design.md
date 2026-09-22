@@ -38,3 +38,11 @@ PUT  /life/settings/rest-weekdays    {weekdays}
 - 前端：日历格子可点（`data-alt="heat-cell"` 变 button），点了 `openAsk({ title: '9 月 15 日', context: '问这一天做了什么、为什么欠债都行', prefix: '关于 2026-09-15 这一天：', focusDate: '2026-09-15' })`；`askStream` 多传 `focusDate`。未来日期不可点。
 - 后端：`POST /life/ask`（流式）请求体加可选 `focusDate`；`InterpretMessageUseCase.execute(userId, message, history, focusDate?)` 在系统提示里追加一段「被问到的那一天」：该日结算（得分/满分/各项分钟与达标）、当天全部事件按类型列出（DO/NOTE/CHECK/SPEND/REPAY/EXERCISE/MISS，含备注与关联的清单项/研究线/书名）、当天是否休息日。要求模型回答那天的事只引用这段。
 - 验收：点 9 月 15 日格 → 弹窗标题「9 月 15 日」→ 问"那天做了什么" → 回答列出当天记录；点未来格无反应。
+
+## 实现期裁定（2026-09-22）
+
+- 休息日做了的项算"白赚"（bonus）：计入 score 与月封顶兑换，不计入 fullScore，不产生欠债；**休息日的欠债只看常驻项本身的得分**，白赚项不能抵常驻项的债。
+- 休息日推进主线算主线周天数（mainlineDays 计 bonus）——休息日推主线也是推进。
+- `focusDate` 是未来日期时，上下文只给一句「这一天还没到，没有记录」。
+- `calendar.list` 不封顶天数（from ≤ to，上限 20 年）；账本按自己的 since..asOf 一次取整段。
+- 排期确认卡的七天预览同样按日历算满分与免债线。
