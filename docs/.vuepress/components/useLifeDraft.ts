@@ -297,6 +297,7 @@ export async function applyDraft(
  * @param message 用户原话
  * @param onDelta 每收到一段文字就回调
  * @param history 之前几轮对话，让模型接得上上文
+ * @param focusDate 被问到的那一天 YYYY-MM-DD，后端据此把那天的结算与事件塞进提示
  * @returns 最终的草稿或回答
  */
 export async function askStream(
@@ -305,11 +306,12 @@ export async function askStream(
   message: string,
   onDelta: (text: string) => void,
   history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  focusDate?: string,
 ): Promise<any> {
   const res = await fetch(`${base}/life/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-life-key': key },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, ...(focusDate ? { focusDate } : {}) }),
   });
   if (!res.ok || !res.body) {
     const detail = await res.json().catch(() => null);

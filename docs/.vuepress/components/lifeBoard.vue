@@ -294,6 +294,8 @@ interface AskState {
   direct: (() => Promise<void>) | null;
   /** 交给模型前，在用户原话前面补的一句背景 */
   prefix: string;
+  /** 这一次问的是哪一天，空则不限定某天 */
+  focusDate: string;
 }
 
 /** 这一次打开时的空白状态，openAsk 拿它兜住 patch 没给的字段 */
@@ -305,6 +307,7 @@ const BLANK_ASK: AskState = {
   directLabel: '',
   direct: null,
   prefix: '',
+  focusDate: '',
 };
 
 /**
@@ -373,6 +376,7 @@ async function askSend(text: string) {
         askReply.value += delta;
       },
       history,
+      ask.value.focusDate,
     );
     if (res.kind === 'answer') {
       // 说完整了就并进记录，否则同一段话会在记录里和吐字区各显示一遍
@@ -656,7 +660,8 @@ const monthLabel = computed(() => {
 /**
  * 当月日历的格子
  * @description 周一起排，月初补空位使星期列对齐。
- * 三态：有记录的日子、该日无记录、只是为对齐补的空位
+ * 三态：有记录的日子、该日无记录、只是为对齐补的空位。
+ * 无记录的日子也带上日期——格子要能点开问那天，没有日期就问不了
  */
 const monthCells = computed(() => {
   if (!heatMonth.value) return [];
@@ -668,19 +673,44 @@ const monthCells = computed(() => {
   const cells: any[] = Array(lead).fill(undefined);
   for (let d = 1; d <= days; d++) {
     const date = `${heatMonth.value}-${String(d).padStart(2, '0')}`;
-    cells.push(byDate.get(date) ?? null);
+    cells.push(byDate.get(date) ?? { date });
   }
   return cells;
 });
+
+/**
+ * 这格能不能点开问 AI
+ * @description 对齐用的空位没有日期，未来的日子还没发生，都没什么可问
+ */
+function canAskDay(cell: any): boolean {
+  return !!cell?.date && cell.date <= today();
+}
+
+/**
+ * 点日历格子，问这一天
+ * @description 格子只画得出分数高低，答不了「那天到底干了什么」。
+ * 带上 focusDate 让后端把那天的结算与全部事件塞进提示，模型才有据可依
+ */
+function openDayAsk(cell: any) {
+  if (!canAskDay(cell)) return;
+  const [, m, d] = cell.date.split('-');
+  openAsk({
+    title: `${Number(m)} 月 ${Number(d)} 日`,
+    context: '问这一天做了什么、为什么欠债都行',
+    placeholder: '那天做了什么',
+    prefix: `关于 ${cell.date} 这一天：`,
+    focusDate: cell.date,
+  });
+}
 
 /**
  * 某格的配色
  * @description 分四档深浅；周末无义务，做了才着色，没做显示为空底
  */
 function heatClass(cell: any): string {
-  // undefined 表示该月没有这一天，整格不画；null 表示这天不在统计范围内
+  // undefined 表示该月没有这一天，整格不画；没有 score 表示这天不在统计范围内
   if (cell === undefined) return 'invisible';
-  if (!cell) return 'bg-transparent';
+  if (cell.score == null) return 'bg-transparent';
   // 看的是「这天排没排计划」而不是「是不是周末」：出差请假同样是没排
   if (cell.score <= 0) {
     return cell.planned
@@ -696,7 +726,7 @@ function heatClass(cell: any): string {
 }
 
 function heatTitle(cell: any): string {
-  if (!cell) return '';
+  if (!cell || cell.score == null) return '';
   if (!cell.planned) return `${cell.date} 未排计划`;
   const pass = cell.debtFreeScore > 0 && cell.score >= cell.debtFreeScore;
   return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}`;
@@ -1272,13 +1302,17 @@ onMounted(() => {
               >
             </div>
             <div data-alt="heat-grid" class="grid grid-cols-7 gap-1.5">
-              <div
+              <button
                 v-for="(cell, i) in monthCells"
                 :key="i"
                 data-alt="heat-cell"
-                class="aspect-square w-7 rounded"
-                :class="heatClass(cell)"
+                type="button"
+                :disabled="!canAskDay(cell)"
                 :title="heatTitle(cell)"
+                :aria-label="cell?.date ? `问 ${cell.date} 这一天` : undefined"
+                class="aspect-square w-7 rounded transition enabled:hover:ring-2 enabled:hover:ring-brand-400 enabled:hover:ring-offset-1 dark:enabled:hover:ring-offset-slate-800"
+                :class="heatClass(cell)"
+                @click="openDayAsk(cell)"
               />
             </div>
             <p class="text-[11px] tabular-nums leading-snug text-slate-400">
