@@ -10,7 +10,6 @@ import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeChat from './lifeChat.vue';
-import LifeStarSky from './lifeStarSky.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAsk from './lifeAsk.vue';
 import LifeAskBar from './lifeAskBar.vue';
@@ -41,7 +40,6 @@ const ledger = ref<any>(null);
 const ideas = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
-const sky = ref<any>(null);
 
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
@@ -104,21 +102,18 @@ async function loadAll() {
   try {
     const to = today();
     const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p, s] = await Promise.all([
+    const [d, l, i, h, p] = await Promise.all([
       api('/life/diagnosis'),
       api('/life/ledger'),
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
       api('/life/plan'),
-      // 星图只是锦上添花，取不到不该让整个面板打不开
-      api('/life/learning/sky').catch(() => null),
     ]);
     diagnosis.value = d;
     ledger.value = l;
     ideas.value = i;
     heat.value = h;
     plan.value = p;
-    sky.value = s;
     if (!activeDate.value) activeDate.value = to;
     if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
     await Promise.all([loadActiveDay(), loadMonth()]);
@@ -485,12 +480,6 @@ function nodeTitleOf(id: string): string {
 function openNode(node: any, path: string) {
   picked.value = node;
   pickedPath.value = path;
-}
-
-/** 点星座进方向节点 */
-function openConstellation(id: string) {
-  const node = findNode(id);
-  if (node) openNode(node, node.title);
 }
 
 const isToday = computed(() => activeDate.value === today());
@@ -1168,16 +1157,6 @@ onMounted(() => {
 
         <!-- 主内容 -->
         <div data-alt="main-column" class="grid gap-4 order-1 lg:order-1 lg:col-span-2">
-          <!-- 总体向上那一眼：星图。手机上折在「更多」里，PC 常驻主列顶部 -->
-          <section
-            data-alt="sky-section"
-            :class="showMore ? '' : 'hidden lg:block'"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <p class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">星图</p>
-            <LifeStarSky v-if="sky" :sky="sky" @select="openConstellation" />
-          </section>
-
           <!-- 打卡：每天重复的四项 -->
           <section
             data-alt="punch-card"
@@ -1361,7 +1340,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：星图 · 总览 · 路线图 · 想法池' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 想法池' }}
         </button>
       </div>
 

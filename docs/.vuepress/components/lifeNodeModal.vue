@@ -100,7 +100,6 @@ function addLog() {
     });
     logDraft.value = '';
     logTag.value = '';
-    // 记日志会长星，让面板重新拉星图
     await loadLogs();
     emit('changed');
   });
