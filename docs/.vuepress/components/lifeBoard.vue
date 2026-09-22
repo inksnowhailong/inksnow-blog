@@ -614,22 +614,27 @@ const streak = computed(() => {
 });
 
 /**
- * 想法池拉平成一条列表
- * @description 后端按状态分组返回，但界面上按状态切成四段会让每段只剩一两条，
- * 反而看不出全貌。拉平成一条列表、状态做成徽标，在做的排在最前——
- * 那才是真正需要天天看见的
+ * 想法池列表
+ * @description 后端已按「进行中 → 搁着 → 已结」排好，这里只配徽标文案与配色。
+ * 状态是后端从结论与最近动静算出来的，前端不再自己推
  */
-const ideaList = computed(() => {
-  const d = ideas.value ?? {};
-  const tag = (list: any[], status: string, label: string, cls: string) =>
-    (list ?? []).map((i: any) => ({ ...i, status, label, cls }));
-  return [
-    ...tag(d.started, 'STARTED', '在做', 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300'),
-    ...tag(d.cooling, 'PENDING', '冷却中', 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'),
-    ...tag(d.sunk, 'SUNK', '沉底', 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'),
-    ...tag(d.noted, 'NOTED', '已结项', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'),
-  ];
-});
+const IDEA_STATES: Record<string, { label: string; cls: string }> = {
+  OPEN: {
+    label: '进行中',
+    cls: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
+  },
+  STALE: {
+    label: '搁着',
+    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  },
+  DONE: {
+    label: '已结',
+    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+  },
+};
+const ideaList = computed(() =>
+  (ideas.value?.threads ?? []).map((t: any) => ({ ...t, ...IDEA_STATES[t.state] })),
+);
 
 /** 想法总条数 */
 const ideaCount = computed(() => ideaList.value.length);
@@ -663,8 +668,8 @@ async function captureIdea() {
   }
 }
 
-// 记一条进展会把想法从"冷却中"推到"在做"，重新拉数据后
-// 弹窗里拿的还是旧对象，得按ID换成新的，否则状态显示会停在改之前
+// 记进展或写结论后重新拉数据，弹窗里拿的还是旧对象，
+// 得按ID换成新的，否则状态显示会停在改之前
 watch(ideas, () => {
   if (!activeIdea.value) return;
   const fresh = ideaList.value.find((i) => i.id === activeIdea.value.id);
@@ -1128,7 +1133,7 @@ onMounted(() => {
                 </li>
               </ul>
               <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
-                还没有想法。冒出什么念头先记一行，三天后还惦记再动手
+                还没有想法。冒出什么念头先记一行，有进展就往里追一句
               </p>
 
               <p
