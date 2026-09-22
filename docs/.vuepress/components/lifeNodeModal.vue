@@ -224,10 +224,15 @@ function drop() {
 </script>
 
 <template>
+  <!--
+    z 抬到 110：主题的「回到顶部」按钮是 z-index:100 的固定元素，
+    弹窗低于它会被它盖住——手机上它正好压在底栏按钮上。
+    三个弹窗统一用这个值，彼此不再分高低
+  -->
   <div
     v-if="node"
     data-alt="node-modal-mask"
-    class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+    class="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
     @click.self="emit('close')"
   >
     <div

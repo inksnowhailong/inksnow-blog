@@ -1400,7 +1400,7 @@ onMounted(() => {
               />
 
               <!-- 按状态分段；空段连标题一起不渲染，免得一排「暂无」占着地方 -->
-              <div v-if="ideaList.length" class="mt-3 grid gap-2.5">
+              <div v-if="ideaList.length" class="mt-3 grid gap-1.5">
                 <template v-for="seg in ideaSegments" :key="seg.key">
                   <div v-if="seg.items.length" data-alt="idea-segment">
                     <button
@@ -1493,12 +1493,17 @@ onMounted(() => {
         mb 而不是 pb 撑安全区——按钮是 fixed 定位的，加内边距只会把它撑大，
         要的是整体往上抬开 iPhone 底部那条横杠
       -->
+      <!--
+        右下角这一带被主题的「回到顶部」按钮占着（固定在 bottom:4rem、48px 高、
+        z-index:100），所以往上让一格并抬到它之上，免得两颗圆钮叠在一起、
+        点下去还点不到自己这颗
+      -->
       <button
         data-alt="ask-fab"
         type="button"
         title="问 AI"
         aria-label="问 AI"
-        class="fixed bottom-5 right-5 z-40 mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
+        class="fixed bottom-20 right-5 z-[101] mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
         @click="openFreeAsk"
       >
         <LifeIcon name="send" class="h-5 w-5" />

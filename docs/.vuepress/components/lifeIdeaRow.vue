@@ -51,10 +51,13 @@ function daysAgoLabel(date?: string): string {
 </script>
 
 <template>
-  <!-- min-h-[44px]：手机上这一行是要用手指点的 -->
+  <!--
+    min-h-[44px] 只留给手机：那一行是要用手指点的。
+    桌面有指针，不需要这个下限，去掉后行高回到内容本身的高度，一屏能多扫几条
+  -->
   <li
     data-alt="idea-row"
-    class="flex min-h-[44px] cursor-pointer items-start gap-2 rounded-r-lg border-l-2 py-2 pl-2.5 pr-1 transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+    class="flex min-h-[44px] cursor-pointer items-start gap-2 rounded-r-lg border-l-2 py-2 pl-2.5 pr-1 transition hover:bg-slate-50 dark:hover:bg-slate-700/40 sm:min-h-0"
     :class="barClass"
   >
     <div class="min-w-0 flex-1">
@@ -67,7 +70,7 @@ function daysAgoLabel(date?: string): string {
       <p
         v-if="isDone && idea.conclusion"
         data-alt="idea-row-conclusion"
-        class="mt-0.5 whitespace-pre-wrap text-[11px] leading-snug text-slate-400 dark:text-slate-500"
+        class="mt-0.5 line-clamp-2 whitespace-pre-wrap text-[11px] leading-snug text-slate-400 dark:text-slate-500"
       >
         结论：{{ idea.conclusion }}
       </p>
