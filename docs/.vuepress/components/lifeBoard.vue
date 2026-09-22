@@ -1494,16 +1494,16 @@ onMounted(() => {
         要的是整体往上抬开 iPhone 底部那条横杠
       -->
       <!--
-        右下角这一带被主题的「回到顶部」按钮占着（固定在 bottom:4rem、48px 高、
-        z-index:100），所以往上让一格并抬到它之上，免得两颗圆钮叠在一起、
-        点下去还点不到自己这颗
+        右下角这一带本来被主题的「回到顶部」按钮占着，现已由本页 frontmatter 的
+        backToTop: false 关掉，所以这颗可以回到角落里。z 仍留在主题那层之上
+        （它是 z-index:100），万一哪天又被打开也不会盖住这颗
       -->
       <button
         data-alt="ask-fab"
         type="button"
         title="问 AI"
         aria-label="问 AI"
-        class="fixed bottom-20 right-5 z-[101] mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
+        class="fixed bottom-5 right-5 z-[101] mb-[env(safe-area-inset-bottom)] grid h-14 w-14 place-items-center rounded-full bg-brand-500 text-white shadow-lg transition hover:bg-brand-600 sm:h-12 sm:w-12"
         @click="openFreeAsk"
       >
         <LifeIcon name="send" class="h-5 w-5" />
