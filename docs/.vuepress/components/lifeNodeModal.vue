@@ -7,6 +7,7 @@
  */
 import { ref, computed, watch } from 'vue';
 import LifeIcon from './lifeIcon.vue';
+import LifeAskBar from './lifeAskBar.vue';
 
 const props = defineProps<{
   /** 选中的节点，为 null 时不显示 */
@@ -359,31 +360,14 @@ function drop() {
         data-alt="modal-ai"
         class="mt-5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/40"
       >
-        <div class="flex gap-2">
-          <input
-            v-model="instruction"
-            data-alt="ai-instruction"
-            type="text"
-            placeholder="怎么改，例如：把做完的标准写具体点"
-            class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-            @keydown.enter.prevent="askAi"
-          />
-          <button
-            data-alt="ai-ask"
-            type="button"
-            :disabled="busy || !instruction.trim()"
-            title="交给 AI 改写，只出草稿不落库"
-            aria-label="交给 AI 改写"
-            class="grid shrink-0 place-items-center rounded-lg bg-slate-700 px-3 text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-slate-600"
-            @click="askAi"
-          >
-            <LifeIcon
-              name="sparkle"
-              class="h-4 w-4"
-              :class="busy && 'animate-pulse'"
-            />
-          </button>
-        </div>
+        <LifeAskBar
+          v-model="instruction"
+          mode="ask"
+          :busy="busy"
+          placeholder="怎么改，例如：把做完的标准写具体点"
+          label="交给 AI 改写，只出草稿不落库"
+          @submit="askAi"
+        />
 
         <!-- 草稿：改前改后摆一起，看清了再采纳 -->
         <div v-if="draft" data-alt="ai-draft" class="mt-3 grid gap-2 text-sm">
@@ -440,32 +424,14 @@ function drop() {
           </span>
         </div>
 
-        <div class="flex items-start gap-1.5">
-          <!--
-            用 textarea 而不是 input：日志会写成几段，单行框里看不见自己写了什么。
-            换行交给 Enter，提交改用 Ctrl/Cmd+Enter 与右边的按钮
-          -->
-          <textarea
-            v-model="logDraft"
-            data-alt="log-input"
-            rows="2"
-            placeholder="搞懂了什么，或卡在哪"
-            class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
-            @keydown.enter.ctrl.prevent="addLog"
-            @keydown.enter.meta.prevent="addLog"
-          />
-          <button
-            data-alt="log-add"
-            type="button"
-            :disabled="busy || !logDraft.trim()"
-            title="记下这一条"
-            aria-label="记下这一条"
-            class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-40 sm:h-auto sm:w-auto sm:px-2.5"
-            @click="addLog"
-          >
-            <LifeIcon name="check" class="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <!-- 日志会写成几段，框随内容长高；换行给 Enter，提交给 Ctrl/Cmd+Enter -->
+        <LifeAskBar
+          v-model="logDraft"
+          mode="note"
+          :busy="busy"
+          placeholder="搞懂了什么，或卡在哪"
+          @submit="addLog"
+        />
         <p class="mt-1 text-[11px] text-slate-400">
           一条只记一件事 · Ctrl+Enter 记下
         </p>

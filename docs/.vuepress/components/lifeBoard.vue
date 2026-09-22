@@ -12,7 +12,7 @@ import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeChat from './lifeChat.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAsk from './lifeAsk.vue';
-import LifeChanges from './lifeChanges.vue';
+import LifeAskBar from './lifeAskBar.vue';
 import {
   describeDraft,
   applyDraft,
@@ -40,7 +40,6 @@ const ledger = ref<any>(null);
 const ideas = ref<any>(null);
 const heat = ref<any[]>([]);
 const plan = ref<any[]>([]);
-const changes = ref<any[]>([]);
 
 /** 当前操作的日期，切到往日即为补记 */
 const activeDate = ref('');
@@ -100,20 +99,18 @@ async function loadAll() {
   try {
     const to = today();
     const from = shiftDays(to, -(HEATMAP_WEEKS * 7 - 1));
-    const [d, l, i, h, p, c] = await Promise.all([
+    const [d, l, i, h, p] = await Promise.all([
       api('/life/diagnosis'),
       api('/life/ledger'),
       api('/life/ideas'),
       api(`/life/settlement/range?from=${from}&to=${to}`),
       api('/life/plan'),
-      api('/life/plan-changes?limit=20'),
     ]);
     diagnosis.value = d;
     ledger.value = l;
     ideas.value = i;
     heat.value = h;
     plan.value = p;
-    changes.value = c;
     if (!activeDate.value) activeDate.value = to;
     if (!heatMonth.value) heatMonth.value = to.slice(0, 7);
     await Promise.all([loadActiveDay(), loadMonth()]);
@@ -211,6 +208,19 @@ async function ledgerAction(kind: 'REPAY' | 'EXERCISE', amount: number) {
     busy.value = false;
   }
 }
+
+/**
+ * 打卡区的标题
+ * @description 原先写死「每日四项」，但排期上线后每天排几项是会变的，
+ * 写死的数字迟早和列表对不上。没排到项的日子直接说清楚，
+ * 免得看见一个空列表以为是加载失败
+ */
+const dailyTitle = computed(() => {
+  const n = activeDay.value?.items?.length ?? 0;
+  if (!n) return '今天没排计划';
+  const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  return `每日${cn[n] ?? n}项`;
+});
 
 /** 当日进度占免债线的比例，用于画进度条 */
 const debtFreeProgress = computed(() => {
@@ -562,12 +572,14 @@ function heatClass(cell: any): string {
   // undefined 表示该月没有这一天，整格不画；null 表示这天不在统计范围内
   if (cell === undefined) return 'invisible';
   if (!cell) return 'bg-transparent';
+  // 看的是「这天排没排计划」而不是「是不是周末」：出差请假同样是没排
   if (cell.score <= 0) {
-    return cell.workday
+    return cell.planned
       ? 'bg-slate-100 dark:bg-slate-700'
       : 'bg-transparent border border-dashed border-slate-200 dark:border-slate-700';
   }
-  const ratio = cell.score / (cell.fullScore || 10);
+  // 按达成率着色而非绝对分：每天排几项会变，绝对分之间不再可比
+  const ratio = cell.fullScore > 0 ? cell.score / cell.fullScore : 0;
   if (ratio >= 1) return 'bg-brand-500 dark:bg-brand-300';
   if (ratio >= 0.6) return 'bg-brand-500/75 dark:bg-brand-300/75';
   if (ratio >= 0.3) return 'bg-brand-500/50 dark:bg-brand-300/50';
@@ -576,21 +588,27 @@ function heatClass(cell: any): string {
 
 function heatTitle(cell: any): string {
   if (!cell) return '';
-  const tag = cell.workday ? '' : '（周末）';
-  return `${cell.date} ${cell.score}/${cell.fullScore || 0} 分${tag}`;
+  if (!cell.planned) return `${cell.date} 未排计划`;
+  const pass = cell.debtFreeScore > 0 && cell.score >= cell.debtFreeScore;
+  return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}`;
 }
 
-/** 近九周的连续与断链统计 */
+/**
+ * 近九周的连续与断链统计
+ * @description 排了计划的日子才算数；判定用「过没过免债线」而不是「有没有得分」——
+ * 每天排几项不一样之后，得 1 分在四项的日子是断链，在一项的日子可能已经满分
+ */
 const streak = computed(() => {
-  const days = heat.value.filter((d: any) => d.workday);
+  const days = heat.value.filter((d: any) => d.planned);
+  const passed = (d: any) => d.debtFreeScore > 0 && d.score >= d.debtFreeScore;
   let current = 0;
   for (let i = days.length - 1; i >= 0; i--) {
-    if (days[i].score > 0) current++;
+    if (passed(days[i])) current++;
     else break;
   }
   return {
     current,
-    active: days.filter((d: any) => d.score > 0).length,
+    active: days.filter(passed).length,
     total: days.length,
   };
 });
@@ -1055,8 +1073,6 @@ onMounted(() => {
             @changed="loadAll"
           />
 
-          <LifeChanges :changes="changes" :api="api" @changed="loadAll" />
-
           <section
             data-alt="ideas-section"
             class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
@@ -1078,33 +1094,19 @@ onMounted(() => {
             </button>
             <div v-if="showIdeas" class="mt-3">
               <!-- 捕获不受限：记一行字零成本、不计分 -->
-              <div class="flex items-start gap-1.5">
-                <!--
-                  上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
-                  而后端其实收得下
-                -->
-                <textarea
-                  v-model="ideaDraft"
-                  data-alt="idea-capture-input"
-                  rows="2"
-                  maxlength="500"
-                  placeholder="想试试什么"
-                  class="min-w-0 flex-1 resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-base leading-relaxed outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:text-sm"
-                  @keydown.enter.ctrl.prevent="captureIdea"
-                  @keydown.enter.meta.prevent="captureIdea"
-                />
-                <button
-                  data-alt="idea-capture"
-                  type="button"
-                  :disabled="busy || !ideaDraft.trim()"
-                  title="记下这个想法"
-                  aria-label="记下这个想法"
-                  class="grid shrink-0 place-items-center rounded-lg bg-brand-500 px-2.5 text-white transition hover:bg-brand-600 disabled:opacity-40"
-                  @click="captureIdea"
-                >
-                  <LifeIcon name="check" class="h-3.5 w-3.5" />
-                </button>
-              </div>
+              <!--
+                上限对齐后端的 500：之前前端卡在 200，多打的字会被悄悄吃掉，
+                而后端其实收得下
+              -->
+              <LifeAskBar
+                v-model="ideaDraft"
+                mode="note"
+                :busy="busy"
+                :maxlength="500"
+                placeholder="想试试什么"
+                label="记下这个想法"
+                @submit="captureIdea"
+              />
 
               <ul v-if="ideaList.length" class="mt-2 grid gap-1.5">
                 <li
@@ -1150,10 +1152,11 @@ onMounted(() => {
               data-alt="date-nav"
               class="mb-3 flex items-center justify-between gap-2"
             >
+              <!-- 项数会随排期逐日变化，标题不能写死 -->
               <p
                 class="text-sm font-semibold text-slate-700 dark:text-slate-200"
               >
-                每日四项
+                {{ dailyTitle }}
               </p>
               <div class="flex items-center gap-1">
                 <button
