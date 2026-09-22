@@ -118,3 +118,49 @@
 验收：
 - [ ] 打卡卡上有清单的每日项显示「在这」行，点了开对应清单项弹窗；无清单的每日项不显示
 - [ ] 路线图与打卡卡的「在这」指向同一项（改动一项为完成后两处同步跳到下一项）
+
+## 追加 · 统一 AI 入口、统一弹窗壳、日志去标签、研究线常开（2026-09-22 第四轮，用户指令）
+
+用户原话：研究线不要折叠默认展开、在动段有最大高度纵向滚动；各处 AI 入口要同一个图标钮，总览状态卡没有入口了；弹窗按钮风格不统一；学习日志就是日志，去掉搞懂/卡点按钮。
+
+### A · AI 入口只有一种
+
+- 新组件 `lifeAskButton.vue`：`<button data-alt="ask-button">` 内含 `LifeIcon name="sparkle"`，`h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-brand-500`（手机 `h-9 w-9`），props：`title`（必填，作 title/aria-label）。`emit('click')`。
+- 放置（每处只这一颗，位置固定在标题行/行的最右）：
+  - 总览「战胜内心的批判家」卡标题行右 → `openAsk` 上下文「今天的分数」，prefix「关于今天的投入和分数：」
+  - 总览「奖励与惩罚」卡标题行右 → 现有 `openBankAsk` 的上下文（额度/体能债）。红方块与小绿钮的点击保留（它们是数据元素的快捷方式），但不再算"入口"
+  - 打卡卡每项：行右（分数旁）→ `openDailyAsk(it)`；标题恢复为普通文字，不再是下划线按钮
+  - 路线图标题行右 → 上下文「路线图」，prefix「关于我的学习路线图：」
+  - 研究线标题行右 → 上下文「研究线」，prefix「关于我的研究线：」
+  - 研究线弹窗头部图标行（已有，换成该组件）
+  - 节点弹窗头部图标行（替代底部灰按钮「让 AI 改写」）
+  - 右下角 FAB 保留（它是无上下文入口，样式不变）
+
+### B · 弹窗壳只写一份
+
+- 新组件 `lifeModal.vue`：props `open`、`title`、`meta?`（标题下一行小字）；slots：`icons`（头部右侧图标行）、默认（滚动正文）、`foot`（底栏）。
+  - 遮罩 `fixed inset-0 z-[110]`，手机底部抽屉（grabber、`max-h-[85vh]`、safe-area）/ 桌面居中 `max-w-lg`，Esc（含 defaultPrevented 约定）与遮罩点击 → `emit('close')`，body `overflow-hidden` 开关、onUnmounted 清理。这些逻辑现在在三个弹窗里各写一份，全部搬进来。
+  - 头部：左 title/meta，右 `<slot name="icons">` + 固定的关闭钮 `data-alt="modal-close"`；图标钮统一 `h-8 w-8`（手机 `h-9 w-9`）。
+  - 底栏 `data-alt="modal-foot"`：`flex items-center justify-between border-t pt-3`；约定：右侧 **一个** 实心主按钮（`h-9 px-4 rounded-lg bg-brand-500 text-white text-sm`，加载中 disabled），左侧文字次按钮（`text-sm text-slate-500`）。删除类动作不进底栏。
+- `lifeAskModal / lifeIdeaModal / lifeNodeModal` 全部改为 `<LifeModal>` 包裹：
+  - 问 AI：icons 无；底栏不用（输入栏就是它的底）。
+  - 研究线：icons = [✧][⋯]；底栏 = 现有输入栏 + 「记进展」主按钮 / 收尾模式「结项 +15 元」主按钮 + 「取消」次按钮；⋯ 菜单里是删除（现状）。
+  - 节点：icons = [✧][⋯]；⋯ 菜单 = 「砍掉这条」（进入原有的原因输入 + 确认，确认区渲染在正文底部，不在底栏）；底栏主按钮 = 有改动时「保存」，否则清单项显示「标记完成 / 取消完成」；次按钮 = 有改动时「放弃改动」。原 `modal-actions` 区删掉；`save-rule`/`save-edit` 的内联保存按钮并入底栏「保存」（一个按钮保存所有脏字段，后端接口不变，多次 PATCH 顺序发也行）。
+
+### C · 学习日志去标签
+
+- `lifeNodeModal.vue` 删掉 `LOG_TAGS / logTag / log-tag-picker` 与日志行上的标签徽标；`addLog` 不再传 `tag`。
+- 后端与 `useLifeDraft` 的 `tag` 字段保留（MCP 路径仍用），页面不展示。
+
+### D · 研究线常开
+
+- 去掉 `showIdeas` 与 `ideas-toggle`，标题行改为静态标题 + 右侧计数 + ✧。
+- 「在动」段的 `<ul>` 加 `max-h-64 overflow-y-auto`；搁着段不限；已结段保持折叠开关。
+
+### 验收
+
+- [ ] 页面上所有 `[data-alt="ask-button"]` 外观一致；总览两卡、打卡项、路线图、研究线、两个弹窗头部各一颗
+- [ ] 三个弹窗共用 LifeModal：头部图标行等高、关闭钮同位；研究线与节点弹窗底栏都是"右主按钮 + 左次按钮"
+- [ ] 节点弹窗无搞懂/卡点 UI；日志行无徽标
+- [ ] 研究线无折叠开关；在动段超过约 16rem 出现纵向滚动条
+- [ ] 375 与 1920 截图，控制台无报错
