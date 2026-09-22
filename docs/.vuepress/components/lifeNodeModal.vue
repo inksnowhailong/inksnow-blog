@@ -2,8 +2,8 @@
 /**
  * 计划节点详情弹窗
  * @description 一条计划的全部信息都在这里看、在这里改。
- * AI 改写走"先出草稿再由人点头"的路子：模型永远不直接写库，
- * 因而也不需要为"撤销 AI 的修改"再造一套机制。
+ * 要 AI 改写不在这儿写指令——弹窗里不再自带输入框，按钮把上下文交给
+ * 全页唯一的问 AI 弹窗，草稿仍然是出给人点头，模型永远不直接写库。
  */
 import { ref, computed, watch } from 'vue';
 import LifeIcon from './lifeIcon.vue';
@@ -23,12 +23,12 @@ const emit = defineEmits<{
   (e: 'close'): void;
   /** 数据变了，让面板重新拉 */
   (e: 'changed'): void;
+  /** 让全页那个问 AI 弹窗接手，带上这条计划当上下文 */
+  (e: 'ask', payload: { prefix: string }): void;
 }>();
 
 const title = ref('');
 const description = ref('');
-const instruction = ref('');
-const draft = ref<any>(null);
 const busy = ref(false);
 const errorMsg = ref('');
 const dropping = ref(false);
@@ -124,8 +124,6 @@ watch(
   () => {
     title.value = props.node?.title ?? '';
     description.value = props.node?.description ?? '';
-    instruction.value = '';
-    draft.value = null;
     errorMsg.value = '';
     dropping.value = false;
     dropReason.value = '';
@@ -137,6 +135,28 @@ watch(
     if (props.node) loadLogs();
   },
   { immediate: true },
+);
+
+/**
+ * 节点内容被外面改了就跟着换
+ * @description AI 改写是在这个弹窗外面落的库，不跟着换的话输入框会一直
+ * 显示改之前的文字，还会被 dirty 当成"有未保存的改动"。
+ * 盯的是内容而不是对象本身：只有服务端那份真的变了才覆盖，
+ * 因而记一条日志引起的刷新不会把手上没存的编辑冲掉
+ */
+watch(
+  () => [
+    props.node?.title,
+    props.node?.description,
+    props.node?.thresholdMinutes,
+    props.node?.points,
+  ],
+  ([t, d, th, p]) => {
+    title.value = (t as string) ?? '';
+    description.value = (d as string) ?? '';
+    threshold.value = (th as number) ?? 0;
+    points.value = (p as number) ?? 0;
+  },
 );
 
 const isDone = computed(() => props.node?.status === 'DONE');
@@ -177,24 +197,9 @@ function save() {
   });
 }
 
-/** 让 AI 给个改法，只拿草稿 */
+/** 把这条计划交给全页那个问 AI 弹窗，让它出改写草稿 */
 function askAi() {
-  if (!instruction.value.trim()) return;
-  run(async () => {
-    draft.value = await props.api(`/life/plan/${props.node.id}/ai-draft`, {
-      method: 'POST',
-      body: JSON.stringify({ instruction: instruction.value.trim() }),
-    });
-  });
-}
-
-/** 采纳草稿：只填进输入框，仍要再点一次保存才落库 */
-function adopt() {
-  if (!draft.value) return;
-  title.value = draft.value.after.title;
-  description.value = draft.value.after.description;
-  draft.value = null;
-  instruction.value = '';
+  emit('ask', { prefix: `改写计划项《${props.node.title}》的标题或描述：` });
 }
 
 /** 勾掉或取消勾掉 */
@@ -356,75 +361,29 @@ function drop() {
           </div>
         </div>
 
-        <button
-          v-if="dirty"
-          data-alt="save-edit"
-          type="button"
-          :disabled="busy"
-          title="保存修改"
-          aria-label="保存修改"
-          class="grid h-8 w-8 place-items-center justify-self-start rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-50"
-          @click="save"
-        >
-          <LifeIcon name="check" class="h-4 w-4" />
-        </button>
-      </div>
-
-      <!-- AI 改 -->
-      <div
-        data-alt="modal-ai"
-        class="mt-5 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/40"
-      >
-        <LifeAskBar
-          v-model="instruction"
-          mode="ask"
-          :busy="busy"
-          placeholder="怎么改，例如：把做完的标准写具体点"
-          label="交给 AI 改写，只出草稿不落库"
-          @submit="askAi"
-        />
-
-        <!-- 草稿：改前改后摆一起，看清了再采纳 -->
-        <div v-if="draft" data-alt="ai-draft" class="mt-3 grid gap-2 text-sm">
-          <p v-if="draft.reason" class="text-xs text-slate-500 dark:text-slate-400">
-            {{ draft.reason }}
-          </p>
-          <div
-            class="rounded-lg border border-slate-200 bg-white p-2.5 dark:border-slate-600 dark:bg-slate-900"
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-if="dirty"
+            data-alt="save-edit"
+            type="button"
+            :disabled="busy"
+            title="保存修改"
+            aria-label="保存修改"
+            class="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-50"
+            @click="save"
           >
-            <p class="text-xs text-slate-400 dark:text-slate-500">改后标题</p>
-            <p class="text-slate-800 dark:text-slate-100">
-              {{ draft.after.title }}
-            </p>
-            <p class="mt-2 text-xs text-slate-400 dark:text-slate-500">
-              改后说明
-            </p>
-            <p class="leading-relaxed text-slate-700 dark:text-slate-200">
-              {{ draft.after.description }}
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <button
-              data-alt="ai-adopt"
-              type="button"
-              title="采纳，填进上面的输入框"
-              aria-label="采纳"
-              class="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600"
-              @click="adopt"
-            >
-              <LifeIcon name="check" class="h-4 w-4" />
-            </button>
-            <button
-              data-alt="ai-discard"
-              type="button"
-              title="丢弃这个改法"
-              aria-label="丢弃"
-              class="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
-              @click="draft = null"
-            >
-              <LifeIcon name="close" class="h-4 w-4" />
-            </button>
-          </div>
+            <LifeIcon name="check" class="h-4 w-4" />
+          </button>
+          <!-- 指令不在这儿写：交给全页唯一那个对话弹窗，它会出草稿 -->
+          <button
+            data-alt="node-ask-ai"
+            type="button"
+            class="flex h-8 items-center gap-1.5 rounded-lg bg-slate-100 px-3 text-xs text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            @click="askAi"
+          >
+            <LifeIcon name="sparkle" class="h-3.5 w-3.5" />
+            让 AI 改写
+          </button>
         </div>
       </div>
 
