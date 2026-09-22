@@ -7,11 +7,14 @@
  * 版式按「一条时间线」排：中间是进展流，最后一行固定是它哪天冒出来的，
  * 底栏那条输入栏就接在流的末尾——写一句就多一行，看得见自己在往前推。
  *
+ * 壳（遮罩、抽屉、Esc、滚动锁、头部与底栏版式）在 LifeModal 里，与另两个弹窗同一份。
+ *
  * 与计划节点分成两个组件而不合并：研究线（原话 → 进展 → 结论）
  * 和计划节点（未完成 → 完成）不是一回事，塞进一个组件只会得到
  * 一堆互斥的 v-if。
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch } from 'vue';
+import LifeModal from './lifeModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeIcon from './lifeIcon.vue';
 
@@ -85,6 +88,11 @@ const concludeText = computed(() => `结项 +${props.noteYuan} 元`);
 function shortDate(date?: string): string {
   return date ? date.slice(5) : '';
 }
+
+/** 头部那行小字：哪天冒出来的、现在什么状态 */
+const metaText = computed(() =>
+  props.idea ? `${shortDate(props.idea.createdOn)} · ${stateText.value}` : '',
+);
 
 /**
  * 统一跑一次请求，收口忙碌态与报错
@@ -181,15 +189,6 @@ function ask() {
   });
 }
 
-/** Esc 关掉，与点遮罩等价；三个弹窗行为一致。上层问 AI 弹窗已吃掉的 Esc 不再处理 */
-function onKeydown(e: KeyboardEvent) {
-  if (e.defaultPrevented) return;
-  if (e.key === 'Escape' && props.idea) emit('close');
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onUnmounted(() => window.removeEventListener('keydown', onKeydown));
-
 /** 换了一条线就把手上的草稿与开着的菜单清掉，免得上一条的字串到这一条 */
 watch(
   () => props.idea?.id,
@@ -220,254 +219,204 @@ watch(
 </script>
 
 <template>
-  <!--
-    z 抬到 110：主题的「回到顶部」按钮是 z-index:100 的固定元素，
-    弹窗低于它会被它盖住——手机上它正好压在底栏按钮上。
-    三个弹窗统一用这个值，彼此不再分高低
-  -->
-  <div
-    v-if="idea"
-    data-alt="idea-modal-mask"
-    class="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4"
-    @click.self="emit('close')"
+  <LifeModal
+    :open="!!idea"
+    :title="idea?.content"
+    :meta="metaText"
+    @close="emit('close')"
   >
-    <!-- 手机上是贴底抽屉，底部留出安全区，否则输入栏会压在小白条底下 -->
-    <div
-      data-alt="idea-modal"
-      class="flex max-h-[85vh] w-full flex-col gap-3 rounded-t-2xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl dark:bg-slate-800 sm:max-w-lg sm:rounded-2xl sm:pb-4 [&_li]:!my-0 [&_p]:!my-0 [&_ul]:!m-0 [&_ul]:!list-none [&_ul]:!p-0"
-    >
-      <!-- 窄屏给一条抓手，让人一眼看出这是可以划走的抽屉 -->
+    <template #icons>
+      <button
+        data-alt="idea-ask"
+        type="button"
+        title="就这条线问 AI"
+        aria-label="就这条线问 AI"
+        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
+        @click="ask"
+      >
+        <LifeIcon name="sparkle" class="h-4 w-4" />
+      </button>
+      <button
+        data-alt="idea-more"
+        type="button"
+        title="更多"
+        aria-label="更多"
+        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
+        @click="toggleMenu()"
+      >
+        <LifeIcon name="more" class="h-4 w-4" />
+      </button>
+
+      <!-- 透明底板接住菜单外面的那一下，比挂 document 监听少一套回收 -->
       <div
-        data-alt="idea-modal-grabber"
-        class="mx-auto h-1 w-9 shrink-0 rounded-full bg-slate-200 dark:bg-slate-600 sm:hidden"
+        v-if="menuOpen"
+        data-alt="idea-menu-backdrop"
+        class="fixed inset-0"
+        @click="toggleMenu(false)"
       />
 
-      <!-- 头：原话、记于哪天、现在什么状态 -->
+      <!-- 删除收在菜单里：它不可逆，不该和常用动作并排摆在手边 -->
       <div
-        data-alt="idea-modal-head"
-        class="flex shrink-0 items-start justify-between gap-2"
+        v-if="menuOpen"
+        data-alt="idea-menu"
+        class="absolute right-0 top-10 z-10 w-56 rounded-xl border border-slate-100 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
       >
-        <div class="min-w-0">
-          <p
-            data-alt="idea-modal-content"
-            class="whitespace-pre-wrap text-base font-semibold leading-snug text-slate-800 dark:text-slate-100"
-          >
-            {{ idea.content }}
+        <button
+          v-if="!dropping"
+          data-alt="idea-drop"
+          type="button"
+          class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          @click="dropping = true"
+        >
+          删掉这条线
+          <span class="mt-0.5 block text-[11px] leading-snug text-slate-400">
+            连 {{ logs.length }} 条进展一起删{{
+              isDone ? `，额度少 ${noteYuan} 元` : ''
+            }}
+          </span>
+        </button>
+        <div v-else data-alt="idea-drop-confirm" class="p-1.5">
+          <p class="text-xs leading-snug text-rose-600 dark:text-rose-400">
+            删了找不回来
           </p>
-          <p
-            data-alt="idea-modal-meta"
-            class="mt-1 text-xs tabular-nums text-slate-400 dark:text-slate-500"
-          >
-            {{ shortDate(idea.createdOn) }} · {{ stateText }}
-          </p>
-        </div>
-
-        <div class="relative flex shrink-0 items-center gap-0.5">
-          <button
-            data-alt="idea-ask"
-            type="button"
-            title="就这条线问 AI"
-            aria-label="就这条线问 AI"
-            class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-            @click="ask"
-          >
-            <LifeIcon name="sparkle" class="h-4 w-4" />
-          </button>
-          <button
-            data-alt="idea-more"
-            type="button"
-            title="更多"
-            aria-label="更多"
-            class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-            @click="toggleMenu()"
-          >
-            <LifeIcon name="more" class="h-4 w-4" />
-          </button>
-          <button
-            data-alt="idea-modal-close"
-            type="button"
-            title="关掉"
-            aria-label="关掉"
-            class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
-            @click="emit('close')"
-          >
-            <LifeIcon name="close" class="h-4 w-4" />
-          </button>
-
-          <!-- 透明底板接住菜单外面的那一下，比挂 document 监听少一套回收 -->
-          <div
-            v-if="menuOpen"
-            data-alt="idea-menu-backdrop"
-            class="fixed inset-0"
-            @click="toggleMenu(false)"
-          />
-
-          <!-- 删除收在菜单里：它不可逆，不该和常用动作并排摆在手边 -->
-          <div
-            v-if="menuOpen"
-            data-alt="idea-menu"
-            class="absolute right-0 top-10 z-10 w-56 rounded-xl border border-slate-100 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
-          >
+          <div class="mt-2 flex items-center gap-2">
             <button
-              v-if="!dropping"
-              data-alt="idea-drop"
+              data-alt="idea-drop-yes"
               type="button"
-              class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
-              @click="dropping = true"
+              :disabled="busy"
+              class="rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40"
+              @click="drop"
             >
-              删掉这条线
-              <span class="mt-0.5 block text-[11px] leading-snug text-slate-400">
-                连 {{ logs.length }} 条进展一起删{{
-                  isDone ? `，额度少 ${noteYuan} 元` : ''
-                }}
-              </span>
+              删
             </button>
-            <div v-else data-alt="idea-drop-confirm" class="p-1.5">
-              <p class="text-xs leading-snug text-rose-600 dark:text-rose-400">
-                删了找不回来
-              </p>
-              <div class="mt-2 flex items-center gap-2">
-                <button
-                  data-alt="idea-drop-yes"
-                  type="button"
-                  :disabled="busy"
-                  class="rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40"
-                  @click="drop"
-                >
-                  删
-                </button>
-                <button
-                  data-alt="idea-drop-no"
-                  type="button"
-                  class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
-                  @click="dropping = false"
-                >
-                  不删
-                </button>
-              </div>
-            </div>
+            <button
+              data-alt="idea-drop-no"
+              type="button"
+              class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+              @click="dropping = false"
+            >
+              不删
+            </button>
           </div>
         </div>
       </div>
+    </template>
 
-      <!-- 已结的结论：左边一条绿线，和下面的进展流分开 -->
-      <div
-        v-if="isDone && idea.conclusion"
-        data-alt="idea-conclusion"
-        class="shrink-0 border-l-2 border-emerald-400 bg-emerald-50/70 py-1.5 pl-2.5 dark:bg-emerald-500/10"
+    <!-- 已结的结论：左边一条绿线，和下面的进展流分开 -->
+    <div
+      v-if="isDone && idea.conclusion"
+      data-alt="idea-conclusion"
+      class="border-l-2 border-emerald-400 bg-emerald-50/70 py-1.5 pl-2.5 dark:bg-emerald-500/10"
+    >
+      <p
+        class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
       >
-        <p
-          class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+        结论：{{ idea.conclusion }}
+      </p>
+    </div>
+
+    <!-- 进展流：左栏日期对齐成一列，右栏是当时记的原话 -->
+    <ul
+      data-alt="idea-logs"
+      class="grid content-start gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-700"
+    >
+      <li
+        v-for="l in logs"
+        :key="l.id"
+        data-alt="idea-log-row"
+        class="group flex items-start gap-2 rounded-lg px-1 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+      >
+        <span
+          class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
         >
-          结论：{{ idea.conclusion }}
+          {{ shortDate(l.occurredOn) }}
+        </span>
+        <p
+          class="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+        >
+          {{ l.text }}
+        </p>
+        <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
+        <button
+          v-if="!isDone"
+          data-alt="idea-log-remove"
+          type="button"
+          :disabled="busy"
+          title="删掉这条"
+          aria-label="删掉这条"
+          class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:opacity-0 sm:group-hover:opacity-100"
+          @click="removeLog(l.id)"
+        >
+          <LifeIcon name="close" class="h-3 w-3" />
+        </button>
+      </li>
+
+      <li v-if="logsLoading" data-alt="idea-logs-loading" class="px-1 py-1.5">
+        <span class="text-xs text-slate-400">读取中…</span>
+      </li>
+
+      <!-- 流的最后一行固定是它哪天冒出来的，那是这条线的起点 -->
+      <li data-alt="idea-log-origin" class="flex items-start gap-2 px-1 py-1.5">
+        <span
+          class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
+        >
+          {{ shortDate(idea.createdOn) }}
+        </span>
+        <p class="text-sm leading-snug text-slate-400 dark:text-slate-500">记下</p>
+      </li>
+    </ul>
+
+    <p
+      v-if="errorMsg"
+      data-alt="idea-modal-error"
+      class="text-sm text-rose-600 dark:text-rose-400"
+    >
+      {{ errorMsg }}
+    </p>
+
+    <!-- 底栏：已结的线不再往里写字，整窗转只读 -->
+    <template v-if="!isDone" #foot>
+      <!-- 收尾与记进展共用同一条输入栏，只换底色、占位与按钮：
+           写的都是这条线的下一行字，换个框会让人以为换了地方 -->
+      <LifeAskBar
+        v-if="closing"
+        v-model="conclusionDraft"
+        mode="note"
+        tone="warn"
+        :busy="busy"
+        placeholder="一句结论，写下即结项"
+        :action-text="concludeText"
+        @submit="conclude"
+      />
+      <LifeAskBar
+        v-else
+        v-model="logDraft"
+        mode="note"
+        :busy="busy"
+        placeholder="记一条进展"
+        action-text="记进展"
+        @submit="addLog"
+      />
+
+      <div class="flex items-center justify-between gap-2">
+        <button
+          data-alt="idea-conclude-toggle"
+          type="button"
+          class="shrink-0 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          @click="closing = !closing"
+        >
+          {{ closing ? '取消' : '收尾' }}
+        </button>
+        <p
+          class="text-right text-[11px] leading-snug text-slate-400 dark:text-slate-500"
+        >
+          {{
+            closing
+              ? '「不成」同样算结论——一次记录在案的失败比一次没记录的成功值钱'
+              : '一条只记一件事 · Ctrl+Enter 记下'
+          }}
         </p>
       </div>
-
-      <!-- 进展流：左栏日期对齐成一列，右栏是当时记的原话 -->
-      <ul
-        data-alt="idea-logs"
-        class="grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto border-t border-slate-100 pt-2 dark:border-slate-700"
-      >
-        <li
-          v-for="l in logs"
-          :key="l.id"
-          data-alt="idea-log-row"
-          class="group flex items-start gap-2 rounded-lg px-1 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
-        >
-          <span
-            class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
-          >
-            {{ shortDate(l.occurredOn) }}
-          </span>
-          <p
-            class="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
-          >
-            {{ l.text }}
-          </p>
-          <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
-          <button
-            v-if="!isDone"
-            data-alt="idea-log-remove"
-            type="button"
-            :disabled="busy"
-            title="删掉这条"
-            aria-label="删掉这条"
-            class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:opacity-0 sm:group-hover:opacity-100"
-            @click="removeLog(l.id)"
-          >
-            <LifeIcon name="close" class="h-3 w-3" />
-          </button>
-        </li>
-
-        <li v-if="logsLoading" data-alt="idea-logs-loading" class="px-1 py-1.5">
-          <span class="text-xs text-slate-400">读取中…</span>
-        </li>
-
-        <!-- 流的最后一行固定是它哪天冒出来的，那是这条线的起点 -->
-        <li data-alt="idea-log-origin" class="flex items-start gap-2 px-1 py-1.5">
-          <span
-            class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
-          >
-            {{ shortDate(idea.createdOn) }}
-          </span>
-          <p class="text-sm leading-snug text-slate-400 dark:text-slate-500">记下</p>
-        </li>
-      </ul>
-
-      <p
-        v-if="errorMsg"
-        data-alt="idea-modal-error"
-        class="shrink-0 text-sm text-rose-600 dark:text-rose-400"
-      >
-        {{ errorMsg }}
-      </p>
-
-      <!-- 底栏：已结的线不再往里写字，整窗转只读 -->
-      <div
-        v-if="!isDone"
-        data-alt="idea-foot"
-        class="grid shrink-0 gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-700"
-      >
-        <!-- 收尾与记进展共用同一条输入栏，只换底色、占位与按钮：
-             写的都是这条线的下一行字，换个框会让人以为换了地方 -->
-        <LifeAskBar
-          v-if="closing"
-          v-model="conclusionDraft"
-          mode="note"
-          tone="warn"
-          :busy="busy"
-          placeholder="一句结论，写下即结项"
-          :action-text="concludeText"
-          @submit="conclude"
-        />
-        <LifeAskBar
-          v-else
-          v-model="logDraft"
-          mode="note"
-          :busy="busy"
-          placeholder="记一条进展"
-          action-text="记进展"
-          @submit="addLog"
-        />
-
-        <div class="flex items-center justify-between gap-2">
-          <p class="text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-            {{
-              closing
-                ? '「不成」同样算结论——一次记录在案的失败比一次没记录的成功值钱'
-                : '一条只记一件事 · Ctrl+Enter 记下'
-            }}
-          </p>
-          <button
-            data-alt="idea-conclude-toggle"
-            type="button"
-            class="shrink-0 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
-            @click="closing = !closing"
-          >
-            {{ closing ? '取消' : '收尾' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    </template>
+  </LifeModal>
 </template>

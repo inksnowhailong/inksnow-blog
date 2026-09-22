@@ -2,10 +2,13 @@
 /**
  * 计划节点详情弹窗
  * @description 一条计划的全部信息都在这里看、在这里改。
- * 要 AI 改写不在这儿写指令——弹窗里不再自带输入框，按钮把上下文交给
+ * 要 AI 改写不在这儿写指令——弹窗里不再自带输入框，头部那颗星芒把上下文交给
  * 全页唯一的问 AI 弹窗，草稿仍然是出给人点头，模型永远不直接写库。
+ *
+ * 壳（遮罩、抽屉、Esc、滚动锁、头部与底栏版式）在 LifeModal 里，与另两个弹窗同一份。
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch } from 'vue';
+import LifeModal from './lifeModal.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
@@ -34,14 +37,23 @@ const errorMsg = ref('');
 const dropping = ref(false);
 const dropReason = ref('');
 
-/** Esc 关掉，与点遮罩等价；三个弹窗行为一致。上层问 AI 弹窗已吃掉的 Esc 不再处理 */
-function onKeydown(e: KeyboardEvent) {
-  if (e.defaultPrevented) return;
-  if (e.key === 'Escape' && props.node) emit('close');
+/** 更多菜单，砍掉藏在里面 */
+const menuOpen = ref(false);
+
+/**
+ * 开关更多菜单
+ * @description 收起时不碰 dropping：砍掉的原因输入渲染在正文底部，
+ * 菜单是它的入口而不是它的容器，关掉入口不该把已经摊开的那一步收回去
+ */
+function toggleMenu(open = !menuOpen.value) {
+  menuOpen.value = open;
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+/** 从菜单里进入砍掉流程，输入框在正文底部 */
+function startDrop() {
+  menuOpen.value = false;
+  dropping.value = true;
+}
 
 /** 每日项才有的计分设定 */
 const threshold = ref(0);
@@ -56,23 +68,6 @@ const ruleDirty = computed(
       points.value !== (props.node?.points ?? 0)),
 );
 
-/**
- * 存下改动后的计分规则
- * @description 只影响往后的计分。已经记下的分是按当时的规则算出来的，
- * 不会被追溯重算——否则改一次规则，过去几个月的账全变了
- */
-function saveRule() {
-  run(async () => {
-    await props.api(`/life/plan/${props.node.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        thresholdMinutes: threshold.value,
-        points: points.value,
-      }),
-    });
-    emit('changed');
-  });
-}
 const logs = ref<any[]>([]);
 const logDraft = ref('');
 const logsLoading = ref(false);
@@ -129,16 +124,14 @@ function removeLog(id: string) {
 watch(
   () => props.node?.id,
   () => {
-    title.value = props.node?.title ?? '';
-    description.value = props.node?.description ?? '';
+    reset();
     errorMsg.value = '';
     dropping.value = false;
     dropReason.value = '';
+    menuOpen.value = false;
     logDraft.value = '';
     logTag.value = '';
     logs.value = [];
-    threshold.value = props.node?.thresholdMinutes ?? 0;
-    points.value = props.node?.points ?? 0;
     if (props.node) loadLogs();
   },
   { immediate: true },
@@ -158,12 +151,7 @@ watch(
     props.node?.thresholdMinutes,
     props.node?.points,
   ],
-  ([t, d, th, p]) => {
-    title.value = (t as string) ?? '';
-    description.value = (d as string) ?? '';
-    threshold.value = (th as number) ?? 0;
-    points.value = (p as number) ?? 0;
-  },
+  reset,
 );
 
 const isDone = computed(() => props.node?.status === 'DONE');
@@ -175,6 +163,17 @@ const dirty = computed(
     title.value !== (props.node?.title ?? '') ||
     description.value !== (props.node?.description ?? ''),
 );
+
+/** 手上有没有没存的改动，底栏按哪个按钮就看它 */
+const anyDirty = computed(() => dirty.value || ruleDirty.value);
+
+/** 把编辑框拉回服务端那一份 */
+function reset() {
+  title.value = props.node?.title ?? '';
+  description.value = props.node?.description ?? '';
+  threshold.value = props.node?.thresholdMinutes ?? 0;
+  points.value = props.node?.points ?? 0;
+}
 
 /** 统一的出错处理，省得每个动作各写一遍 try */
 async function run(fn: () => Promise<any>) {
@@ -190,16 +189,32 @@ async function run(fn: () => Promise<any>) {
   }
 }
 
-/** 存下手改的内容 */
+/**
+ * 存下手改的内容
+ * @description 底栏只有一颗「保存」，而标题说明与计分规则是两摊字段：
+ * 哪摊脏就发哪一发 PATCH，都脏就顺序发两发，后端接口不用改。
+ * 计分规则只影响往后的计分，已经记下的分是按当时的规则算出来的，不会被追溯重算
+ */
 function save() {
   run(async () => {
-    await props.api(`/life/plan/${props.node.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        title: title.value.trim(),
-        description: description.value.trim(),
-      }),
-    });
+    if (dirty.value) {
+      await props.api(`/life/plan/${props.node.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: title.value.trim(),
+          description: description.value.trim(),
+        }),
+      });
+    }
+    if (ruleDirty.value) {
+      await props.api(`/life/plan/${props.node.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          thresholdMinutes: threshold.value,
+          points: points.value,
+        }),
+      });
+    }
     emit('changed');
   });
 }
@@ -233,332 +248,318 @@ function drop() {
 </script>
 
 <template>
-  <!--
-    z 抬到 110：主题的「回到顶部」按钮是 z-index:100 的固定元素，
-    弹窗低于它会被它盖住——手机上它正好压在底栏按钮上。
-    三个弹窗统一用这个值，彼此不再分高低
-  -->
-  <div
-    v-if="node"
-    data-alt="node-modal-mask"
-    class="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-    @click.self="emit('close')"
+  <LifeModal
+    :open="!!node"
+    :title="node?.title"
+    :meta="path"
+    @close="emit('close')"
   >
-    <div
-      data-alt="node-modal"
-      class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-slate-800 sm:rounded-2xl"
-    >
-      <!-- 头 -->
-      <div data-alt="modal-head" class="mb-4 flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="truncate text-xs text-slate-400 dark:text-slate-500">
-            {{ path }}
-          </p>
-          <p
-            class="mt-0.5 text-lg font-semibold text-slate-800 dark:text-slate-100"
-          >
-            {{ node.title }}
-          </p>
-          <p class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-            <span
-              class="rounded px-1.5 py-0.5"
-              :class="
-                isDone
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-              "
-            >
-              {{ isDone ? '已完成' : '未完成' }}
-            </span>
-            <span
-              v-if="isChecklist"
-              class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-            >
-              {{ node.required ? '必修' : '选修' }}
-            </span>
-            <span
-              v-if="node.doneOn"
-              class="text-slate-400 dark:text-slate-500"
-              >{{ node.doneOn }} 完成</span
-            >
-          </p>
-        </div>
-        <button
-          data-alt="modal-close"
-          type="button"
-          title="关闭"
-          aria-label="关闭"
-          class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
-          @click="emit('close')"
-        >
-          <LifeIcon name="close" class="h-4 w-4" />
-        </button>
-      </div>
+    <template #icons>
+      <!-- 指令不在这儿写：交给全页唯一那个对话弹窗，它会出草稿 -->
+      <button
+        data-alt="node-ask"
+        type="button"
+        title="让 AI 改写这条计划"
+        aria-label="让 AI 改写这条计划"
+        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
+        @click="askAi"
+      >
+        <LifeIcon name="sparkle" class="h-4 w-4" />
+      </button>
+      <button
+        data-alt="node-more"
+        type="button"
+        title="更多"
+        aria-label="更多"
+        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-8 sm:w-8"
+        @click="toggleMenu()"
+      >
+        <LifeIcon name="more" class="h-4 w-4" />
+      </button>
 
-      <!-- 手改 -->
-      <div data-alt="modal-edit" class="grid gap-3">
-        <label class="grid gap-1">
-          <span class="text-xs text-slate-500 dark:text-slate-400">标题</span>
-          <input
-            v-model="title"
-            data-alt="edit-title"
-            type="text"
-            maxlength="200"
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-          />
-        </label>
-        <label class="grid gap-1">
-          <span class="text-xs text-slate-500 dark:text-slate-400"
-            >说明与做完的标准</span
-          >
-          <textarea
-            v-model="description"
-            data-alt="edit-desc"
-            rows="4"
-            maxlength="1000"
-            class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm leading-relaxed text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-          />
-        </label>
-        <!--
-          每日项的计分设定。放在这里而不是只让 AI 改：
-          一句话说不清的东西交给模型有误判风险，但完全不给入口
-          等于把路堵死——使用者连自己的计划参数都调不了
-        -->
-        <div v-if="isDaily" data-alt="daily-rule" class="grid gap-2">
-          <div class="grid grid-cols-2 gap-2">
-            <label class="grid gap-1">
-              <span class="text-xs text-slate-500 dark:text-slate-400"
-                >达标时长（分钟）</span
-              >
-              <input
-                v-model.number="threshold"
-                data-alt="edit-threshold"
-                type="number"
-                min="1"
-                max="600"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              />
-            </label>
-            <label class="grid gap-1">
-              <span class="text-xs text-slate-500 dark:text-slate-400"
-                >达标得分</span
-              >
-              <input
-                v-model.number="points"
-                data-alt="edit-points"
-                type="number"
-                min="1"
-                max="20"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              />
-            </label>
-          </div>
-          <div v-if="ruleDirty" class="flex items-center gap-2">
-            <button
-              data-alt="save-rule"
-              type="button"
-              :disabled="busy"
-              title="保存计分规则"
-              aria-label="保存计分规则"
-              class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500 text-white transition hover:bg-amber-600 disabled:opacity-50"
-              @click="saveRule"
-            >
-              <LifeIcon name="check" class="h-4 w-4" />
-            </button>
-            <span class="text-[11px] leading-snug text-slate-400">
-              {{ node.thresholdMinutes }} 分钟 / {{ node.points }} 分 →
-              {{ threshold }} 分钟 / {{ points }} 分 ·
-              只改往后的计分，已记的分不动
-            </span>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-if="dirty"
-            data-alt="save-edit"
-            type="button"
-            :disabled="busy"
-            title="保存修改"
-            aria-label="保存修改"
-            class="grid h-8 w-8 place-items-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-600 disabled:opacity-50"
-            @click="save"
-          >
-            <LifeIcon name="check" class="h-4 w-4" />
-          </button>
-          <!-- 指令不在这儿写：交给全页唯一那个对话弹窗，它会出草稿 -->
-          <button
-            data-alt="node-ask-ai"
-            type="button"
-            class="flex h-8 items-center gap-1.5 rounded-lg bg-slate-100 px-3 text-xs text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-            @click="askAi"
-          >
-            <LifeIcon name="sparkle" class="h-3.5 w-3.5" />
-            让 AI 改写
-          </button>
-        </div>
-      </div>
-
-      <!-- 方向节点才有知识地图；顶层每日项本身也是方向；清单项只有日志 -->
-      <LifeKnowledgeMap
-        v-if="node.level === 'DIRECTION' || (node.level === 'DAILY' && !node.parentId)"
-        ref="knowledgeMap"
-        :node-id="node.id"
-        :api="api"
+      <!-- 透明底板接住菜单外面的那一下，比挂 document 监听少一套回收 -->
+      <div
+        v-if="menuOpen"
+        data-alt="node-menu-backdrop"
+        class="fixed inset-0"
+        @click="toggleMenu(false)"
       />
 
-      <!-- 学习日志：这一项从开始到现在留下了什么 -->
-      <div data-alt="modal-logs" class="mt-5">
-        <div class="mb-2 flex items-baseline justify-between gap-2">
-          <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
-            学习日志
-          </p>
-          <span class="text-[11px] text-slate-400">
-            {{ logsLoading ? '读取中…' : logs.length + ' 条' }}
-          </span>
-        </div>
-
-        <div data-alt="log-tag-picker" class="mb-1.5 flex gap-1.5">
-          <button
-            v-for="t in LOG_TAGS"
-            :key="t.value"
-            data-alt="log-tag"
-            type="button"
-            class="rounded-full px-2.5 py-0.5 text-xs transition"
-            :class="logTag === t.value ? t.cls : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'"
-            @click="logTag = logTag === t.value ? '' : t.value"
-          >
-            {{ t.label }}
-          </button>
-        </div>
-        <!-- 日志会写成几段，框随内容长高；换行给 Enter，提交给 Ctrl/Cmd+Enter -->
-        <LifeAskBar
-          v-model="logDraft"
-          mode="note"
-          :busy="busy"
-          placeholder="记一条：搞懂了什么，或卡在哪"
-          @submit="addLog"
-        />
-        <p class="mt-1 text-[11px] text-slate-400">
-          一条只记一件事 · Ctrl+Enter 记下
-        </p>
-
-        <ul v-if="logs.length" class="mt-2 grid gap-1.5">
-          <li
-            v-for="l in logs"
-            :key="l.id"
-            data-alt="log-row"
-            class="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40"
-          >
-            <div class="min-w-0">
-              <p
-                class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
-              >
-                {{ l.text }}
-              </p>
-              <p class="mt-0.5 text-[11px] text-slate-400">
-                {{ l.occurredOn }}
-                <span
-                  v-if="l.tag"
-                  class="ml-1 rounded px-1 py-px text-[10px]"
-                  :class="l.tag === 'GOT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'"
-                  >{{ l.tag === 'GOT' ? '搞懂' : '卡点' }}</span
-                >
-                <!-- 方向汇总时会混进子项的日志，标出来才分得清 -->
-                <span v-if="l.nodeId !== node.id"> · {{ l.nodeTitle }}</span>
-              </p>
-            </div>
-            <button
-              data-alt="log-remove"
-              type="button"
-              :disabled="busy"
-              title="删掉这条"
-              aria-label="删掉这条"
-              class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:bg-white hover:text-rose-500 disabled:opacity-40 dark:hover:bg-slate-800"
-              @click="removeLog(l.id)"
-            >
-              <LifeIcon name="close" class="h-3 w-3" />
-            </button>
-          </li>
-        </ul>
-        <p
-          v-else-if="!logsLoading"
-          class="mt-2 text-xs text-slate-400 dark:text-slate-500"
-        >
-          还没记过
-        </p>
-      </div>
-
-      <p
-        v-if="errorMsg"
-        data-alt="modal-error"
-        class="mt-3 text-sm text-rose-600 dark:text-rose-400"
-      >
-        {{ errorMsg }}
-      </p>
-
-      <!-- 动作 -->
+      <!-- 砍掉收在菜单里：它不可逆，不该和保存、标记完成并排摆在手边 -->
       <div
-        data-alt="modal-actions"
-        class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-700"
+        v-if="menuOpen"
+        data-alt="node-menu"
+        class="absolute right-0 top-10 z-10 w-44 rounded-xl border border-slate-100 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
       >
         <button
-          v-if="isChecklist"
+          data-alt="drop-start"
+          type="button"
+          class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          @click="startDrop"
+        >
+          砍掉这条
+        </button>
+      </div>
+    </template>
+
+    <!-- 状态徽标：完成与否、必修选修、哪天做完的 -->
+    <p data-alt="node-badges" class="flex flex-wrap items-center gap-1.5 text-xs">
+      <span
+        class="rounded px-1.5 py-0.5"
+        :class="
+          isDone
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+        "
+      >
+        {{ isDone ? '已完成' : '未完成' }}
+      </span>
+      <span
+        v-if="isChecklist"
+        class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+      >
+        {{ node.required ? '必修' : '选修' }}
+      </span>
+      <span v-if="node.doneOn" class="text-slate-400 dark:text-slate-500"
+        >{{ node.doneOn }} 完成</span
+      >
+    </p>
+
+    <!-- 手改 -->
+    <div data-alt="modal-edit" class="grid gap-3">
+      <label class="grid gap-1">
+        <span class="text-xs text-slate-500 dark:text-slate-400">标题</span>
+        <input
+          v-model="title"
+          data-alt="edit-title"
+          type="text"
+          maxlength="200"
+          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        />
+      </label>
+      <label class="grid gap-1">
+        <span class="text-xs text-slate-500 dark:text-slate-400"
+          >说明与做完的标准</span
+        >
+        <textarea
+          v-model="description"
+          data-alt="edit-desc"
+          rows="4"
+          maxlength="1000"
+          class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm leading-relaxed text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        />
+      </label>
+      <!--
+        每日项的计分设定。放在这里而不是只让 AI 改：
+        一句话说不清的东西交给模型有误判风险，但完全不给入口
+        等于把路堵死——使用者连自己的计划参数都调不了
+      -->
+      <div v-if="isDaily" data-alt="daily-rule" class="grid gap-2">
+        <div class="grid grid-cols-2 gap-2">
+          <label class="grid gap-1">
+            <span class="text-xs text-slate-500 dark:text-slate-400"
+              >达标时长（分钟）</span
+            >
+            <input
+              v-model.number="threshold"
+              data-alt="edit-threshold"
+              type="number"
+              min="1"
+              max="600"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-xs text-slate-500 dark:text-slate-400"
+              >达标得分</span
+            >
+            <input
+              v-model.number="points"
+              data-alt="edit-points"
+              type="number"
+              min="1"
+              max="20"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm tabular-nums text-slate-800 outline-none transition focus:border-brand-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+        </div>
+        <p v-if="ruleDirty" class="text-[11px] leading-snug text-slate-400">
+          {{ node.thresholdMinutes }} 分钟 / {{ node.points }} 分 →
+          {{ threshold }} 分钟 / {{ points }} 分 · 只改往后的计分，已记的分不动
+        </p>
+      </div>
+    </div>
+
+    <!-- 方向节点才有知识地图；顶层每日项本身也是方向；清单项只有日志 -->
+    <LifeKnowledgeMap
+      v-if="node.level === 'DIRECTION' || (node.level === 'DAILY' && !node.parentId)"
+      ref="knowledgeMap"
+      :node-id="node.id"
+      :api="api"
+    />
+
+    <!-- 学习日志：这一项从开始到现在留下了什么 -->
+    <div data-alt="modal-logs">
+      <div class="mb-2 flex items-baseline justify-between gap-2">
+        <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
+          学习日志
+        </p>
+        <span class="text-[11px] text-slate-400">
+          {{ logsLoading ? '读取中…' : logs.length + ' 条' }}
+        </span>
+      </div>
+
+      <div data-alt="log-tag-picker" class="mb-1.5 flex gap-1.5">
+        <button
+          v-for="t in LOG_TAGS"
+          :key="t.value"
+          data-alt="log-tag"
+          type="button"
+          class="rounded-full px-2.5 py-0.5 text-xs transition"
+          :class="logTag === t.value ? t.cls : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'"
+          @click="logTag = logTag === t.value ? '' : t.value"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+      <!-- 日志会写成几段，框随内容长高；换行给 Enter，提交给 Ctrl/Cmd+Enter -->
+      <LifeAskBar
+        v-model="logDraft"
+        mode="note"
+        :busy="busy"
+        placeholder="记一条：搞懂了什么，或卡在哪"
+        @submit="addLog"
+      />
+      <p class="mt-1 text-[11px] text-slate-400">
+        一条只记一件事 · Ctrl+Enter 记下
+      </p>
+
+      <ul v-if="logs.length" class="mt-2 grid gap-1.5">
+        <li
+          v-for="l in logs"
+          :key="l.id"
+          data-alt="log-row"
+          class="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40"
+        >
+          <div class="min-w-0">
+            <p
+              class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+            >
+              {{ l.text }}
+            </p>
+            <p class="mt-0.5 text-[11px] text-slate-400">
+              {{ l.occurredOn }}
+              <span
+                v-if="l.tag"
+                class="ml-1 rounded px-1 py-px text-[10px]"
+                :class="l.tag === 'GOT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'"
+                >{{ l.tag === 'GOT' ? '搞懂' : '卡点' }}</span
+              >
+              <!-- 方向汇总时会混进子项的日志，标出来才分得清 -->
+              <span v-if="l.nodeId !== node.id"> · {{ l.nodeTitle }}</span>
+            </p>
+          </div>
+          <button
+            data-alt="log-remove"
+            type="button"
+            :disabled="busy"
+            title="删掉这条"
+            aria-label="删掉这条"
+            class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:bg-white hover:text-rose-500 disabled:opacity-40 dark:hover:bg-slate-800"
+            @click="removeLog(l.id)"
+          >
+            <LifeIcon name="close" class="h-3 w-3" />
+          </button>
+        </li>
+      </ul>
+      <p
+        v-else-if="!logsLoading"
+        class="mt-2 text-xs text-slate-400 dark:text-slate-500"
+      >
+        还没记过
+      </p>
+    </div>
+
+    <!--
+      砍掉的原因输入摊在正文底部而不是底栏：底栏只放那一对常规动作，
+      不可逆的事要人多滚一段、多写一句，别和「保存」挤在同一行
+    -->
+    <div
+      v-if="dropping"
+      data-alt="drop-confirm"
+      class="flex gap-2 rounded-xl bg-rose-50 p-2.5 dark:bg-rose-500/10"
+    >
+      <input
+        v-model="dropReason"
+        type="text"
+        placeholder="为什么不做了"
+        class="min-w-0 flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-base sm:text-sm outline-none dark:border-rose-500/40 dark:bg-slate-900"
+      />
+      <button
+        data-alt="drop-confirm-btn"
+        type="button"
+        :disabled="busy"
+        title="确认砍掉"
+        aria-label="确认砍掉"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500 text-white transition hover:bg-rose-600 disabled:opacity-50"
+        @click="drop"
+      >
+        <LifeIcon name="check" class="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        title="算了，不砍"
+        aria-label="算了"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-white dark:hover:bg-slate-700"
+        @click="dropping = false"
+      >
+        <LifeIcon name="close" class="h-4 w-4" />
+      </button>
+    </div>
+
+    <p
+      v-if="errorMsg"
+      data-alt="modal-error"
+      class="text-sm text-rose-600 dark:text-rose-400"
+    >
+      {{ errorMsg }}
+    </p>
+
+    <!-- 底栏：右边一颗主按钮，左边一句文字次按钮 -->
+    <template v-if="anyDirty || isChecklist" #foot>
+      <div class="flex items-center justify-between gap-2">
+        <button
+          v-if="anyDirty"
+          data-alt="discard-edit"
+          type="button"
+          class="text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          @click="reset"
+        >
+          放弃改动
+        </button>
+        <span v-else />
+
+        <button
+          v-if="anyDirty"
+          data-alt="save-edit"
+          type="button"
+          :disabled="busy"
+          class="h-9 shrink-0 rounded-lg bg-brand-500 px-4 text-sm text-white transition hover:bg-brand-600 disabled:opacity-50"
+          @click="save"
+        >
+          保存
+        </button>
+        <button
+          v-else-if="isChecklist"
           data-alt="toggle-check"
           type="button"
           :disabled="busy"
-          :title="isDone ? '取消完成' : '标记完成'"
-          :aria-label="isDone ? '取消完成' : '标记完成'"
-          class="grid h-8 w-8 place-items-center rounded-lg transition disabled:opacity-50"
-          :class="
-            isDone
-              ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300'
-              : 'bg-emerald-500 text-white hover:bg-emerald-600'
-          "
+          class="h-9 shrink-0 rounded-lg bg-brand-500 px-4 text-sm text-white transition hover:bg-brand-600 disabled:opacity-50"
           @click="toggleCheck"
         >
-          <LifeIcon :name="isDone ? 'close' : 'check'" class="h-4 w-4" />
+          {{ isDone ? '取消完成' : '标记完成' }}
         </button>
-        <button
-          v-if="!dropping"
-          data-alt="drop-start"
-          type="button"
-          title="砍掉这条"
-          aria-label="砍掉这条"
-          class="ml-auto grid h-8 w-8 place-items-center rounded-lg text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
-          @click="dropping = true"
-        >
-          <LifeIcon name="trash" class="h-4 w-4" />
-        </button>
-        <div v-else data-alt="drop-confirm" class="flex w-full gap-2">
-          <input
-            v-model="dropReason"
-            type="text"
-            placeholder="为什么不做了"
-            class="min-w-0 flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-base sm:text-sm outline-none dark:border-rose-500/40 dark:bg-slate-900"
-          />
-          <button
-            data-alt="drop-confirm-btn"
-            type="button"
-            :disabled="busy"
-            title="确认砍掉"
-            aria-label="确认砍掉"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500 text-white transition hover:bg-rose-600 disabled:opacity-50"
-            @click="drop"
-          >
-            <LifeIcon name="check" class="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            title="算了，不砍"
-            aria-label="算了"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
-            @click="dropping = false"
-          >
-            <LifeIcon name="close" class="h-4 w-4" />
-          </button>
-        </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </LifeModal>
 </template>
