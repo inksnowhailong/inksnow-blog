@@ -11,7 +11,7 @@ import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeIdeaRow from './lifeIdeaRow.vue';
 import LifeBookModal from './lifeBookModal.vue';
-import LifeReadingCard from './lifeReadingCard.vue';
+import LifeReadingRow from './lifeReadingRow.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
@@ -59,7 +59,7 @@ const pickedPath = ref('');
 /** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
 const showDone = ref(false);
 
-/** 手机上默认只看今日卡与读书卡；点「更多」才展开总览、路线图与研究线 */
+/** 手机上默认只看今日卡；点「更多」才展开总览、路线图与研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -252,11 +252,10 @@ const dailyTitle = computed(() => {
   // 翻到往日时说「今天」就成了错话，补记那天看着像在说当下
   if (activeRest.value)
     return `${isToday.value ? '今天' : '这天'}休息 · 做了算白赚`;
-  // 常驻项已经搬进读书卡，不在这几格里，数进来标题就比格子多一项
-  const n = punchItems.value.length;
+  // 常驻项回到卡里之后又是四项之一（只是独占第一行），得数进来
+  const n = (activeDay.value?.items ?? []).length;
   const when = isToday.value ? '今天' : '这天';
-  // 格子空了有两种：常驻项搬进读书卡之后只剩它，和这天真的什么都没排
-  if (!n) return readingDaily.value ? `${when}只有读书` : `${when}没排计划`;
+  if (!n) return `${when}没排计划`;
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
   return `每日${cn[n] ?? n}项`;
 });
@@ -597,8 +596,8 @@ const hereByNode = computed(() => {
 /**
  * 打卡格里的项
  * @description 配上各自的「在这」，模板里就不必反复查表。
- * 常驻项（读书）不在这里：它整个搬进了读书卡，分钟也在那张卡上记——
- * 两处都能记同一件事，人就得想一下该去哪边记。
+ * 常驻项（读书）不在这里：它在同一张卡上另占第一整行，格子只排剩下那几项——
+ * 它多了「在读哪本、读到什么」两问，塞进半格的格子里排不开。
  * 按 pinned 认而不按标题，标题是可以改的
  */
 const punchItems = computed(() =>
@@ -610,14 +609,14 @@ const punchItems = computed(() =>
     })),
 );
 
-/** 读书卡标题行上那条常驻每日项；这天没排到时为 null */
+/** 读书行上那条常驻每日项；这天没排到时为 null */
 const readingDaily = computed<any>(
   () => (activeDay.value?.items ?? []).find((i: any) => i.pinned) ?? null,
 );
 
 /**
- * 读书卡上记一笔分钟
- * @description 走的还是打卡那条路，只是入口从格子换到了卡上
+ * 读书行上记一笔分钟
+ * @description 走的还是打卡那条路，只是那一项的入口换成了整行
  * @param minutes 这一笔投入多少分钟
  */
 function punchReading(minutes: number) {
@@ -907,7 +906,7 @@ function openIdeaAsk(payload: { prefix: string }) {
   });
 }
 
-/** 在读与读完的书，留给弹窗按ID换新对象；列表本身已搬进读书卡 */
+/** 在读与读完的书，留给弹窗按ID换新对象；列表本身摆在读书行上 */
 const readingBooks = computed<any[]>(() => books.value?.reading ?? []);
 const doneBooks = computed<any[]>(() => books.value?.done ?? []);
 
@@ -1402,11 +1401,34 @@ onMounted(() => {
             </div>
 
             <div data-alt="punch-grid" class="grid gap-2 sm:grid-cols-2">
+              <!--
+                读书排在最前、独占整行：它比另外三项多「在读哪本、读到什么」两问，
+                这两问要的横向空间，半格的格子给不了
+              -->
+              <LifeReadingRow
+                :daily="readingDaily"
+                :books="books"
+                :is-today="isToday"
+                :busy="busy"
+                :api="api"
+                class="sm:col-span-2"
+                @punch="punchReading"
+                @clear="clearReading"
+                @changed="refresh(loadBooks)"
+                @ask="openBooksAsk"
+                @open="activeBook = $event"
+              />
+
+              <!--
+                落单的末项铺满整行，不留半格的空。判据是 even 不是 odd：
+                读书行占掉了第 1 个子元素，这几格从第 2 个起排，
+                三项时末项的序号是 4——序号的奇偶与它在两列里的左右正好反过来
+              -->
               <div
                 v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
-                class="rounded-xl border p-3 transition sm:last:odd:col-span-2"
+                class="rounded-xl border p-3 transition sm:[&:nth-child(even):last-child]:col-span-2"
                 :class="
                   it.reached
                     ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
@@ -1524,23 +1546,6 @@ onMounted(() => {
               </div>
             </div>
           </section>
-
-          <!--
-            读书卡紧挨着打卡卡：同为「今天要做的」，手机上也一起留在首屏。
-            分钟与内容都在这一张卡上记，所以它不再是打卡格里的一格
-          -->
-          <LifeReadingCard
-            :daily="readingDaily"
-            :is-today="isToday"
-            :books="books"
-            :busy="busy"
-            :api="api"
-            @punch="punchReading"
-            @clear="clearReading"
-            @changed="refresh(loadBooks)"
-            @ask="openBooksAsk"
-            @open-book="activeBook = $event"
-          />
 
           <section
             data-alt="ideas-section"
