@@ -240,7 +240,7 @@ watch(
           v-if="!dropping"
           data-alt="book-drop"
           type="button"
-          class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          class="min-h-10 w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 sm:min-h-0"
           @click="dropping = true"
         >
           删掉这本书
@@ -257,7 +257,7 @@ watch(
               data-alt="book-drop-yes"
               type="button"
               :disabled="busy"
-              class="rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40"
+              class="min-h-10 rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40 sm:min-h-0"
               @click="drop"
             >
               删
@@ -265,7 +265,7 @@ watch(
             <button
               data-alt="book-drop-no"
               type="button"
-              class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+              class="min-h-10 rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:min-h-0"
               @click="dropping = false"
             >
               不删
@@ -301,7 +301,7 @@ watch(
           :disabled="busy"
           title="删掉这条"
           aria-label="删掉这条"
-          class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:opacity-0 sm:group-hover:opacity-100"
+          class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
           @click="removeLog(l.id)"
         >
           <LifeIcon name="close" class="h-3 w-3" />
@@ -333,12 +333,12 @@ watch(
 
     <!-- 底栏只剩「读完」；读完的书整窗转只读 -->
     <template v-if="!isDone" #foot>
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
         <button
           data-alt="book-finish"
           type="button"
           :disabled="busy"
-          class="shrink-0 text-sm transition disabled:opacity-40"
+          class="min-h-10 shrink-0 px-2 text-sm transition disabled:opacity-40 sm:min-h-0 sm:px-0"
           :class="
             finishArmed
               ? 'text-amber-600 dark:text-amber-400'
@@ -348,11 +348,6 @@ watch(
         >
           {{ finishArmed ? '确定读完？' : '读完' }}
         </button>
-        <p
-          class="text-right text-[11px] leading-snug text-slate-400 dark:text-slate-500"
-        >
-          读到什么去打卡卡那行记
-        </p>
       </div>
     </template>
   </LifeModal>

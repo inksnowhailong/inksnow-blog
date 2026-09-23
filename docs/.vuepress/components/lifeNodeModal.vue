@@ -287,7 +287,7 @@ function drop() {
           v-if="!isPinned"
           data-alt="drop-start"
           type="button"
-          class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          class="min-h-10 w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 sm:min-h-0"
           @click="startDrop"
         >
           砍掉这条
@@ -447,7 +447,7 @@ function drop() {
             :disabled="busy"
             title="删掉这条"
             aria-label="删掉这条"
-            class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:bg-white hover:text-rose-500 disabled:opacity-40 dark:hover:bg-slate-800"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:bg-white hover:text-rose-500 disabled:opacity-40 dark:hover:bg-slate-800 sm:h-6 sm:w-6"
             @click="removeLog(l.id)"
           >
             <LifeIcon name="close" class="h-3 w-3" />
@@ -483,7 +483,7 @@ function drop() {
         :disabled="busy"
         title="确认砍掉"
         aria-label="确认砍掉"
-        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500 text-white transition hover:bg-rose-600 disabled:opacity-50"
+        class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-rose-500 text-white transition hover:bg-rose-600 disabled:opacity-50 sm:h-9 sm:w-9"
         @click="drop"
       >
         <LifeIcon name="check" class="h-4 w-4" />
@@ -492,7 +492,7 @@ function drop() {
         type="button"
         title="算了，不砍"
         aria-label="算了"
-        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-white dark:hover:bg-slate-700"
+        class="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-white dark:hover:bg-slate-700 sm:h-9 sm:w-9"
         @click="dropping = false"
       >
         <LifeIcon name="close" class="h-4 w-4" />
@@ -514,7 +514,7 @@ function drop() {
           v-if="anyDirty"
           data-alt="discard-edit"
           type="button"
-          class="text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          class="min-h-10 px-2 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100 sm:min-h-0 sm:px-0"
           @click="reset"
         >
           放弃改动
@@ -526,7 +526,7 @@ function drop() {
           data-alt="save-edit"
           type="button"
           :disabled="busy"
-          class="h-9 shrink-0 rounded-lg bg-brand-500 px-4 text-sm text-white transition hover:bg-brand-600 disabled:opacity-50"
+          class="h-11 shrink-0 rounded-lg bg-brand-500 px-5 text-base text-white transition hover:bg-brand-600 disabled:opacity-50 sm:h-9 sm:px-4 sm:text-sm"
           @click="save"
         >
           保存
@@ -536,7 +536,7 @@ function drop() {
           data-alt="toggle-check"
           type="button"
           :disabled="busy"
-          class="h-9 shrink-0 rounded-lg bg-brand-500 px-4 text-sm text-white transition hover:bg-brand-600 disabled:opacity-50"
+          class="h-11 shrink-0 rounded-lg bg-brand-500 px-5 text-base text-white transition hover:bg-brand-600 disabled:opacity-50 sm:h-9 sm:px-4 sm:text-sm"
           @click="toggleCheck"
         >
           {{ isDone ? '取消完成' : '标记完成' }}

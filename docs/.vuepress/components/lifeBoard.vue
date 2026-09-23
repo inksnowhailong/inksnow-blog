@@ -1200,7 +1200,7 @@ onMounted(() => {
                   type="button"
                   :disabled="busy"
                   :title="'点开说说这一个怎么还'"
-                  class="h-6 w-6 rounded bg-rose-400 transition hover:bg-rose-500 hover:ring-2 hover:ring-rose-200 disabled:opacity-40 dark:bg-rose-500/70 dark:hover:ring-rose-500/30"
+                  class="h-9 w-9 rounded bg-rose-400 transition hover:bg-rose-500 hover:ring-2 hover:ring-rose-200 disabled:opacity-40 dark:bg-rose-500/70 dark:hover:ring-rose-500/30 sm:h-6 sm:w-6"
                   @click="openDebtAsk(i - 1)"
                 />
               </div>
@@ -1224,7 +1224,7 @@ onMounted(() => {
                   }}
                   个，自动抵未来欠债</span
                 >
-                <div class="mt-1 flex flex-wrap gap-1">
+                <div class="mt-1 flex flex-wrap items-center gap-1">
                   <span
                     v-for="i in ledger.exerciseBank"
                     :key="'bank' + i"
@@ -1238,10 +1238,11 @@ onMounted(() => {
                     "
                     title="主动锻炼，存一个储备"
                     aria-label="存运动储备"
-                    class="grid h-4 w-4 place-items-center rounded border border-dashed border-emerald-400 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+                    class="grid h-9 w-9 place-items-center rounded border border-dashed border-emerald-400 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-500/15 sm:h-4 sm:w-4"
                     @click="openBankAsk()"
                   >
-                    <LifeIcon name="rise" class="h-2.5 w-2.5" />
+                    <!-- 手机上按钮放大到 36，10px 的箭头摊在里面看不清，跟着放到 16 -->
+                    <LifeIcon name="rise" class="h-4 w-4 sm:h-2.5 sm:w-2.5" />
                   </button>
                 </div>
               </div>
@@ -1259,7 +1260,7 @@ onMounted(() => {
                 type="button"
                 title="上个月"
                 aria-label="上个月"
-                class="grid h-7 w-7 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800"
+                class="grid h-10 w-10 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800 sm:h-7 sm:w-7"
                 @click="moveMonth(-1)"
               >
                 <LifeIcon name="left" class="h-4 w-4" />
@@ -1274,7 +1275,7 @@ onMounted(() => {
                 :disabled="atLatestMonth"
                 title="下个月"
                 aria-label="下个月"
-                class="grid h-7 w-7 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 disabled:opacity-30 dark:hover:bg-slate-800"
+                class="grid h-10 w-10 place-items-center rounded text-slate-400 transition hover:bg-white hover:text-slate-600 disabled:opacity-30 dark:hover:bg-slate-800 sm:h-7 sm:w-7"
                 @click="moveMonth(1)"
               >
                 <LifeIcon name="right" class="h-4 w-4" />
@@ -1366,7 +1367,7 @@ onMounted(() => {
                   type="button"
                   title="前一天"
                   aria-label="前一天"
-                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+                  class="grid h-10 w-10 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:h-7 sm:w-7"
                   @click="moveDate(-1)"
                 >
                   <LifeIcon name="left" class="h-4 w-4" />
@@ -1381,7 +1382,7 @@ onMounted(() => {
                   :disabled="isToday"
                   title="后一天"
                   aria-label="后一天"
-                  class="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-700"
+                  class="grid h-10 w-10 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-700 sm:h-7 sm:w-7"
                   @click="moveDate(1)"
                 >
                   <LifeIcon name="right" class="h-4 w-4" />
@@ -1392,7 +1393,7 @@ onMounted(() => {
                   type="button"
                   title="回到今天"
                   aria-label="回到今天"
-                  class="ml-1 grid h-7 w-7 place-items-center rounded-md bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
+                  class="ml-1 grid h-10 w-10 place-items-center rounded-md bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 sm:h-7 sm:w-7"
                   @click="backToToday"
                 >
                   <LifeIcon name="undo" class="h-3.5 w-3.5" />
@@ -1489,7 +1490,7 @@ onMounted(() => {
                       data-alt="punch-quick"
                       type="button"
                       :disabled="busy"
-                      class="rounded px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700"
+                      class="h-10 rounded-lg px-3 text-sm text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
                       @click="punch(it.nodeId, m)"
                     >
                       +{{ m }}
@@ -1501,7 +1502,7 @@ onMounted(() => {
                       :disabled="busy"
                       :title="`清掉这一项今天的 ${it.minutes} 分钟`"
                       aria-label="清零这一项"
-                      class="grid h-6 w-6 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
+                      class="grid h-10 w-10 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400 sm:h-6 sm:w-6"
                       @click="clearDay(it.nodeId)"
                     >
                       <LifeIcon name="undo" class="h-3.5 w-3.5" />
@@ -1513,7 +1514,7 @@ onMounted(() => {
                       :disabled="busy"
                       title="一次补到达标"
                       aria-label="一次补到达标"
-                      class="grid h-6 w-6 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15"
+                      class="grid h-10 w-10 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15 sm:h-6 sm:w-6"
                       @click="punchToThreshold(it)"
                     >
                       <LifeIcon name="target" class="h-4 w-4" />
@@ -1527,7 +1528,7 @@ onMounted(() => {
                   data-alt="punch-here"
                   type="button"
                   :title="'打开清单项「' + it.here.item.title + '」'"
-                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  class="mt-1.5 flex min-h-10 w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40 sm:min-h-0"
                   @click="openNode(it.here.item, it.here.path)"
                 >
                   <span
@@ -1593,7 +1594,7 @@ onMounted(() => {
                       v-if="seg.key === 'DONE'"
                       data-alt="idea-done-toggle"
                       type="button"
-                      class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
+                      class="flex min-h-10 items-center gap-1 px-2 text-sm text-slate-400 dark:text-slate-500 sm:min-h-0 sm:px-0 sm:text-[11px]"
                       @click="showDone = !showDone"
                     >
                       {{ seg.label }} ({{ seg.items.length }})
@@ -1665,7 +1666,7 @@ onMounted(() => {
         <button
           data-alt="show-more"
           type="button"
-          class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          class="order-3 min-h-10 sm:min-h-0 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
           {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}

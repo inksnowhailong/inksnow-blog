@@ -17,7 +17,7 @@
  * 写完就落库，没有第二步。note 的按钮文字与底色可由调用处改（actionText / tone），
  * 因为「记进展」和「结项 +15 元」是同一条输入栏的两种去向，换个框会让人以为换了地方。
  */
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import LifeIcon from './lifeIcon.vue';
 
 const props = withDefaults(
@@ -71,7 +71,43 @@ function autoGrow() {
   el.style.height = Math.min(el.scrollHeight, MAX_H) + 'px';
 }
 
-onMounted(autoGrow);
+/**
+ * 上一次量到的宽度，0 表示这会儿还没露面
+ * @description 只认宽度变化：autoGrow 自己就在改高度，若见高变也重算会自激成死循环
+ */
+let lastWidth = 0;
+let ro: ResizeObserver | null = null;
+
+/**
+ * 挂载：先量一次，再盯着「真正露面」的那一刻
+ * @description 挂载时框未必看得见——研究线那一摊在手机上是 `hidden` 收着的，
+ * display:none 的元素 scrollHeight 量到 0，于是那一次 autoGrow 把高度定成 0px，
+ * 展开之后框就塌成一条线、框内那颗按钮飘到标题上。
+ *
+ * 展开的动作在调用方（面板的「更多」），但不让调用方记得来喊一声重算：
+ * 自己多高是这个组件的私事，外面每多一个入口就多一处会忘。
+ * ResizeObserver 在元素从 display:none 回来、以及容器变宽时都会回调，
+ * 正好覆盖「露面了」和「转屏了」两种要重量的时机
+ */
+onMounted(() => {
+  autoGrow();
+  if (typeof ResizeObserver === 'undefined') return;
+  ro = new ResizeObserver(([entry]) => {
+    const w = entry.contentRect.width;
+    if (w === lastWidth) return;
+    lastWidth = w;
+    // 宽度回到 0 是被藏起来了，这时量什么都是 0，等它再露面
+    if (w > 0) autoGrow();
+  });
+  if (ta.value) ro.observe(ta.value);
+});
+
+// 组件拆了还留着观察器就是泄漏
+onUnmounted(() => {
+  ro?.disconnect();
+  ro = null;
+});
+
 // 外部清空（提交后）也要把高度收回去，所以盯的是值不是输入事件
 watch(() => props.modelValue, () => nextTick(autoGrow));
 

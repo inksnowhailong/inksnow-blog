@@ -258,7 +258,7 @@ const showDone = ref(false);
           data-alt="reading-punch-quick"
           type="button"
           :disabled="anyBusy"
-          class="rounded px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700"
+          class="h-10 rounded-lg px-3 text-sm text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
           @click="emit('punch', m)"
         >
           +{{ m }}
@@ -270,7 +270,7 @@ const showDone = ref(false);
           :disabled="anyBusy"
           :title="`清掉${isToday ? '今天' : '这天'}的 ${daily.minutes} 分钟`"
           aria-label="清零这一项"
-          class="grid h-6 w-6 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
+          class="grid h-10 w-10 place-items-center rounded text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-500/15 dark:hover:text-rose-400 sm:h-6 sm:w-6"
           @click="emit('clear')"
         >
           <LifeIcon name="undo" class="h-3.5 w-3.5" />
@@ -282,7 +282,7 @@ const showDone = ref(false);
           :disabled="anyBusy"
           title="一次补到达标"
           aria-label="一次补到达标"
-          class="grid h-6 w-6 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15"
+          class="grid h-10 w-10 place-items-center rounded text-brand-600 transition hover:bg-brand-50 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/15 sm:h-6 sm:w-6"
           @click="emit('punch', gapMinutes)"
         >
           <LifeIcon name="target" class="h-4 w-4" />
@@ -300,7 +300,7 @@ const showDone = ref(false);
         :key="b.id"
         data-alt="reading-chip"
         type="button"
-        class="max-w-full truncate rounded-lg px-2 py-1 text-xs transition"
+        class="max-w-full truncate rounded-lg px-3 py-2 text-sm transition sm:px-2 sm:py-1 sm:text-xs"
         :class="
           b.id === openId
             ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
@@ -320,7 +320,7 @@ const showDone = ref(false);
         type="text"
         maxlength="200"
         placeholder="书名"
-        class="w-32 rounded-lg bg-slate-50 px-2 py-1 text-xs outline-none dark:bg-slate-700/40 dark:text-slate-100"
+        class="w-40 rounded-lg bg-slate-50 px-3 py-1.5 text-base outline-none dark:bg-slate-700/40 dark:text-slate-100 sm:w-32 sm:px-2 sm:py-1 sm:text-xs"
         @keydown.enter.prevent="submitBook"
         @keydown.esc="cancelAdd"
         @blur="blurAdd"
@@ -331,7 +331,7 @@ const showDone = ref(false);
         type="button"
         title="记一本在读的书"
         aria-label="记一本在读的书"
-        class="grid h-6 w-6 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700"
+        class="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-slate-700 sm:h-6 sm:w-6"
         @click="startAdd"
       >
         ＋
@@ -342,7 +342,7 @@ const showDone = ref(false);
         v-if="doneBooks.length"
         data-alt="reading-done-toggle"
         type="button"
-        class="flex items-center gap-0.5 text-[11px] text-slate-400 transition hover:text-brand-500 dark:text-slate-500"
+        class="flex min-h-10 items-center gap-0.5 px-2 text-sm text-slate-400 transition hover:text-brand-500 dark:text-slate-500 sm:min-h-0 sm:px-0 sm:text-[11px]"
         @click="showDone = !showDone"
       >
         读完 {{ doneBooks.length }}
@@ -363,14 +363,18 @@ const showDone = ref(false);
     <div
       v-if="openBook"
       data-alt="reading-note"
-      class="mt-2 flex items-start gap-1.5"
+      class="mt-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-1.5"
     >
-      <!-- 书名带「›」：既说清这一句记到哪本，又是那本书弹窗的入口 -->
+      <!--
+        书名带「›」：既说清这一句记到哪本，又是那本书弹窗的入口。
+        手机上独占一行：并排时书名标签吃掉固定宽度，输入框只剩一百多像素，
+        一句「读到什么」打两个字就换行。宽屏够宽，仍旧并排
+      -->
       <button
         data-alt="reading-open"
         type="button"
         :title="`打开《${openBook.title}》`"
-        class="flex max-w-[7rem] shrink-0 items-center gap-0.5 rounded-md px-1 py-1.5 text-xs text-slate-500 transition hover:bg-slate-50 hover:text-brand-500 dark:text-slate-400 dark:hover:bg-slate-700"
+        class="flex h-9 max-w-full shrink-0 self-start items-center gap-0.5 rounded-md px-2 text-sm text-slate-500 transition hover:bg-slate-50 hover:text-brand-500 dark:text-slate-400 dark:hover:bg-slate-700 sm:h-auto sm:max-w-[7rem] sm:px-1 sm:py-1.5 sm:text-xs"
         @click="emit('open', openBook)"
       >
         <span class="truncate">{{ openBook.title }}</span>
