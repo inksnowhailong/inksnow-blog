@@ -342,6 +342,8 @@ export async function applyDraft(
       body: JSON.stringify(p.apply.body),
     });
   } else if (p.kind === 'plan_create') {
+    // 落在哪一位是出草稿那一步算好的：新项的 sortOrder 加上被它挤开的兄弟们的新序号。
+    // 两者必须同一发写进去，分两次发会出现中途重号的顺序
     await api('/life/plan', {
       method: 'POST',
       body: JSON.stringify({
@@ -349,6 +351,8 @@ export async function applyDraft(
         title: p.title,
         description: p.description,
         level: 'CHECKLIST',
+        ...(p.sortOrder != null ? { sortOrder: p.sortOrder } : {}),
+        ...(p.siblingsReorder ? { siblingsReorder: p.siblingsReorder } : {}),
       }),
     });
   } else if (p.kind === 'calendar') {
