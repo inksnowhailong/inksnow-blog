@@ -31,6 +31,26 @@ const DESTRUCTIVE_KINDS = [
 /** 星期编号转中文，0 是周日，与后端 weekdays 一致 */
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
 
+/**
+ * 通用补丁里的一处改动
+ * @description 值本身（before/after）只用来判断改成了什么（如砍掉），
+ * 给人看的一律用后端按字段说明书格式化好的 beforeText/afterText——
+ * 周几、状态、挂靠这些怎么说成人话是后端说明书的事，前端不重复一遍
+ */
+interface PatchChange {
+  field: string;
+  label: string;
+  before: unknown;
+  after: unknown;
+  beforeText: string;
+  afterText: string;
+}
+
+/** 取补丁里某个字段的改动 */
+function changeOf(draft: any, field: string): PatchChange | undefined {
+  return (draft?.changes ?? []).find((c: PatchChange) => c.field === field);
+}
+
 /** 一天的安排说成两个字 */
 function kindText(kind?: string | null): string {
   return kind === 'REST' ? '休息' : kind === 'WORK' ? '上班' : '恢复默认';
@@ -42,13 +62,19 @@ function weekdaysText(weekdays?: number[]): string {
   return list || '一天都不';
 }
 
-/** 这条草稿是否动计划结构 */
+/**
+ * 这条草稿是否动计划结构
+ * @description 通用补丁改的是什么、有多要紧，由后端字段说明书算成 risk 给过来，
+ * 前端不认字段名——认了就等于把说明书抄一份在这儿，加个字段两边都要改
+ */
 export function touchesPlan(draft: any): boolean {
+  if (draft?.kind === 'entity_patch') return draft.risk !== 'LOW';
   return PLAN_KINDS.includes(draft?.kind);
 }
 
 /** 这条草稿是否会删掉东西 */
 export function isDestructive(draft: any): boolean {
+  if (draft?.kind === 'entity_patch') return draft.risk === 'HIGH';
   return DESTRUCTIVE_KINDS.includes(draft?.kind);
 }
 
@@ -85,6 +111,16 @@ export function describeDraft(
     );
   if (p.kind === 'undo')
     return `删掉「${p.nodeTitle}」${p.occurredOn} 的 ${p.events.length} 条记录，共 ${p.totalMinutes} 分钟`;
+  if (p.kind === 'entity_patch') {
+    // 砍掉得单说一句。逐字段念成「状态 进行中 → 砍掉；砍掉的原因 空 → 太散」，
+    // 没人听得出这是在砍一整项，而这恰恰是最该看清的那一种
+    if (changeOf(p, 'status')?.after === 'DROPPED')
+      return `砍掉「${p.title}」：${changeOf(p, 'droppedReason')?.afterText ?? ''}`;
+    const parts = (p.changes ?? []).map(
+      (c: PatchChange) => `${c.label} ${c.beforeText} → ${c.afterText}`,
+    );
+    return `改「${p.title}」：${parts.join('；')}`;
+  }
   if (p.kind === 'plan_update') {
     const parts = [
       p.title ? `标题改成「${p.title}」` : '',
@@ -138,6 +174,52 @@ export function describeDraft(
     .join('；');
 }
 
+/**
+ * 未来七天摊开成逐日的明细
+ * @description 排期的后果是一张表不是一个数。不把这七天摊开，
+ * 「改了排期」这四个字等于没说——人据此判断不了要不要点头
+ */
+function previewDetails(preview: any[]): DraftDetail[] {
+  return (preview ?? []).map((d: any) => ({
+    label: `${shortDate(d.date)} 周${WEEK_CN[d.weekday]}`,
+    // 休息日那行要点明是日历压掉的，否则「不做」会被当成排期本身的意思
+    value:
+      (d.dayKind === 'REST' ? '休息日 · ' : '') +
+      (d.active ? '做' : '不做') +
+      ` · 当天 ${d.itemCount} 项 · 满分 ${d.fullScore} · 免债线 ${d.debtFreeScore}`,
+  }));
+}
+
+/**
+ * 砍掉一项牵连到什么，摊成几行
+ * @description 砍掉是不可逆的一刀，只说「砍掉 X」看不出这一刀连着多少东西——
+ * 子项会一并失效、投入的时间作废、上级方向可能就此空掉，都得摆在点头之前
+ */
+function impactDetails(impact: any): DraftDetail[] {
+  if (!impact) return [];
+  const out: DraftDetail[] = [];
+  const kids: any[] = impact.descendants ?? [];
+  if (kids.length)
+    out.push({
+      label: '连带',
+      value: `${kids.length} 项一并失效：${kids.map((k) => k.title).join('、')}`,
+    });
+  if (impact.investedMinutes)
+    out.push({
+      label: '已投入',
+      value:
+        `${impact.investedMinutes} 分钟` +
+        (impact.lastActivityOn ? ` · 最后动手 ${impact.lastActivityOn}` : ''),
+    });
+  (impact.ancestors ?? []).forEach((a: any) => {
+    out.push({
+      label: '上级',
+      value: `「${a.title}」砍完只剩 ${a.remainingActiveChildren} 项在做`,
+    });
+  });
+  return out;
+}
+
 /** 高风险草稿的一行明细 */
 export interface DraftDetail {
   label: string;
@@ -156,6 +238,23 @@ export interface DraftDetail {
 export function draftDetails(draft: any): DraftDetail[] {
   const p = draft;
   if (!p) return [];
+
+  if (p.kind === 'entity_patch') {
+    // 逐字段摆前后：哪条改对了、哪条是模型自作主张，只有并排才看得出来
+    const out: DraftDetail[] = (p.changes ?? []).map((c: PatchChange) => ({
+      label: c.label,
+      before: c.beforeText,
+      after: c.afterText,
+    }));
+    // 路径是这一项在计划树里的位置，同名的两项只能靠它分辨
+    if (p.path) out.push({ label: '位置', value: p.path });
+    if (p.preview?.length) {
+      out.push(...previewDetails(p.preview));
+      out.push({ label: '影响', value: '只改往后排哪些天，已经记过的分不动' });
+    }
+    out.push(...impactDetails(p.impact));
+    return out;
+  }
 
   if (p.kind === 'plan_update') {
     const out: DraftDetail[] = [];
@@ -207,18 +306,7 @@ export function draftDetails(draft: any): DraftDetail[] {
       { label: '排期', before: p.summary?.before, after: p.summary?.after },
     ];
 
-    // 排期的后果是一张表不是一个数。不把这七天摊开，
-    // 「改了排期」这四个字等于没说——人据此判断不了要不要点头
-    (p.preview ?? []).forEach((d: any) => {
-      out.push({
-        label: `${shortDate(d.date)} 周${WEEK_CN[d.weekday]}`,
-        // 休息日那行要点明是日历压掉的，否则「不做」会被当成排期本身的意思
-        value:
-          (d.dayKind === 'REST' ? '休息日 · ' : '') +
-          (d.active ? '做' : '不做') +
-          ` · 当天 ${d.itemCount} 项 · 满分 ${d.fullScore} · 免债线 ${d.debtFreeScore}`,
-      });
-    });
+    out.push(...previewDetails(p.preview));
 
     out.push({ label: '影响', value: '只改往后排哪些天，已经记过的分不动' });
     return out;
@@ -314,6 +402,14 @@ export async function applyDraft(
     await api(`/life/books/${p.bookId}/finish`, { method: 'POST' });
   } else if (p.kind === 'idea_drop') {
     await api(`/life/ideas/${p.ideaId}`, { method: 'DELETE' });
+  } else if (p.kind === 'entity_patch') {
+    // 改哪个实体、哪个字段、改成什么，全在后端出草稿那一步定死了，
+    // 这里原样转发。前端一旦按字段拆一次，等于把校验与白名单抄了第二份，
+    // 后端加个可改字段就得记得回来同步——通用的意义正在于不必记得
+    await api(p.apply.path, {
+      method: p.apply.method,
+      body: JSON.stringify(p.apply.body),
+    });
   } else if (p.kind === 'plan_update') {
     await api(`/life/plan/${p.nodeId}`, {
       method: 'PATCH',
