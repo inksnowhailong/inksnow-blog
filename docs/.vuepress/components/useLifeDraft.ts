@@ -118,12 +118,19 @@ export function describeDraft(
     );
     return `改「${p.title}」：${parts.join('；')}`;
   }
-  if (p.kind === 'plan_create')
+  if (p.kind === 'plan_create') {
     const what =
-      p.level === 'DIRECTION' ? (p.parentId ? '组' : '顶层方向') : p.level === 'DAILY' ? '每日项' : '清单项';
+      p.level === 'DIRECTION'
+        ? p.parentId
+          ? '组'
+          : '顶层方向'
+        : p.level === 'DAILY'
+          ? '每日项'
+          : '清单项';
     return p.parentId
       ? `在「${p.parentTitle}」下新增${what}「${p.title}」`
       : `新增${what}「${p.title}」`;
+  }
   if (p.kind === 'calendar') {
     const days: any[] = p.days ?? [];
     if (!days.length) return '日历不动';
