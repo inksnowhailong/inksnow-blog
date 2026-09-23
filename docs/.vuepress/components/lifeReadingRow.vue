@@ -363,14 +363,18 @@ const showDone = ref(false);
     <div
       v-if="openBook"
       data-alt="reading-note"
-      class="mt-2 flex items-start gap-1.5"
+      class="mt-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-1.5"
     >
-      <!-- 书名带「›」：既说清这一句记到哪本，又是那本书弹窗的入口 -->
+      <!--
+        书名带「›」：既说清这一句记到哪本，又是那本书弹窗的入口。
+        手机上独占一行：并排时书名标签吃掉固定宽度，输入框只剩一百多像素，
+        一句「读到什么」打两个字就换行。宽屏够宽，仍旧并排
+      -->
       <button
         data-alt="reading-open"
         type="button"
         :title="`打开《${openBook.title}》`"
-        class="flex max-w-[7rem] shrink-0 items-center gap-0.5 rounded-md px-1 py-1.5 text-xs text-slate-500 transition hover:bg-slate-50 hover:text-brand-500 dark:text-slate-400 dark:hover:bg-slate-700"
+        class="flex max-w-full shrink-0 self-start items-center gap-0.5 rounded-md px-1 py-1.5 text-xs text-slate-500 transition hover:bg-slate-50 hover:text-brand-500 dark:text-slate-400 dark:hover:bg-slate-700 sm:max-w-[7rem]"
         @click="emit('open', openBook)"
       >
         <span class="truncate">{{ openBook.title }}</span>

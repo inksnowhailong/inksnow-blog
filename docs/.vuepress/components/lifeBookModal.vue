@@ -348,11 +348,6 @@ watch(
         >
           {{ finishArmed ? '确定读完？' : '读完' }}
         </button>
-        <p
-          class="text-right text-[11px] leading-snug text-slate-400 dark:text-slate-500"
-        >
-          读到什么去打卡卡那行记
-        </p>
       </div>
     </template>
   </LifeModal>
