@@ -1666,7 +1666,7 @@ onMounted(() => {
         <button
           data-alt="show-more"
           type="button"
-          class="order-3 min-h-10 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          class="order-3 min-h-10 sm:min-h-0 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
           {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}

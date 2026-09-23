@@ -333,7 +333,7 @@ watch(
 
     <!-- 底栏只剩「读完」；读完的书整窗转只读 -->
     <template v-if="!isDone" #foot>
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
         <button
           data-alt="book-finish"
           type="button"
