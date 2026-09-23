@@ -24,6 +24,8 @@ const props = defineProps<{
   daily: any | null;
   /** /life/books 的返回 `{ reading, done }`，由面板统一拉 */
   books: any;
+  /** 选中的是不是今天；翻到往日时那句小字要改口，不然补记像是在说当下 */
+  isToday: boolean;
   /** 面板的全局忙碌态，打卡那几颗按钮跟着它禁用 */
   busy: boolean;
   /** 带密钥的请求函数，由面板注入 */
@@ -91,7 +93,8 @@ function pick(book: any) {
 const dailyText = computed(() => {
   const d = props.daily;
   if (!d) return '';
-  return `今天 ${d.minutes}/${d.thresholdMinutes} 分钟 · ${d.points} 分`;
+  const when = props.isToday ? '今天' : '这天';
+  return `${when} ${d.minutes}/${d.thresholdMinutes} 分钟 · ${d.points} 分`;
 });
 
 /** 还差多少分钟到达标，「补到达标」按这个数记一笔 */
@@ -162,7 +165,6 @@ function addLog() {
       body: JSON.stringify({ text }),
     });
     logDraft.value = '';
-    await loadLogs();
   });
 }
 
@@ -170,7 +172,6 @@ function addLog() {
 function removeLog(id: string) {
   run(async () => {
     await props.api(`/life/logs/${id}`, { method: 'DELETE' });
-    await loadLogs();
   });
 }
 
@@ -185,17 +186,19 @@ function captureBook() {
   const title = bookDraft.value.trim();
   if (!title) return;
   run(async () => {
-    await props.api('/life/books', {
+    // 刚记下的这本就是接下来要读的那本，直接选中；
+    // 不选的话手上已有书时，笔记还会继续落到上一本
+    const created = await props.api('/life/books', {
       method: 'POST',
       body: JSON.stringify({ title }),
     });
+    if (created?.id) pick(created);
     bookDraft.value = '';
   });
 }
 
 /** 读完的书默认折起来：它们是存量，日常要看的是手上这几本 */
 const showDone = ref(false);
-
 </script>
 
 <template>
@@ -291,7 +294,7 @@ const showDone = ref(false);
         @click="pick(b)"
       >
         <!-- 只有一本时不画实心/空心：那一圈点没有要分辨的对象 -->
-        <span v-if="readingBooks.length > 1">{{
+        <span v-if="readingBooks.length > 1" class="mr-1">{{
           b.id === activeBook?.id ? '●' : '○'
         }}</span>
         《{{ b.title }}》

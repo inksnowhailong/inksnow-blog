@@ -59,7 +59,7 @@ const pickedPath = ref('');
 /** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
 const showDone = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、读书与研究线 */
+/** 手机上默认只看今日卡与读书卡；点「更多」才展开总览、路线图与研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -254,7 +254,9 @@ const dailyTitle = computed(() => {
     return `${isToday.value ? '今天' : '这天'}休息 · 做了算白赚`;
   // 常驻项已经搬进读书卡，不在这几格里，数进来标题就比格子多一项
   const n = punchItems.value.length;
-  if (!n) return '今天没排计划';
+  const when = isToday.value ? '今天' : '这天';
+  // 格子空了有两种：常驻项搬进读书卡之后只剩它，和这天真的什么都没排
+  if (!n) return readingDaily.value ? `${when}只有读书` : `${when}没排计划`;
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
   return `每日${cn[n] ?? n}项`;
 });
@@ -967,7 +969,10 @@ onMounted(() => {
     24px 上下边距，而本页的 p 全是界面标签不是段落。标题同理不能用 h1~h6，
     主题给它们挂了锚点偏移（负 margin + 大 padding），会把文字顶出卡片
   -->
-  <div data-alt="life-board" class="my-6 [&_p]:!my-0">
+  <div
+    data-alt="life-board"
+    class="my-6 pb-[calc(5rem+env(safe-area-inset-bottom))] [&_p]:!my-0 lg:pb-0"
+  >
     <!-- 密钥入口 -->
     <form
       v-if="mounted && !unlocked"
@@ -1401,7 +1406,7 @@ onMounted(() => {
                 v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
-                class="rounded-xl border p-3 transition"
+                class="rounded-xl border p-3 transition sm:last:odd:col-span-2"
                 :class="
                   it.reached
                     ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
@@ -1526,6 +1531,7 @@ onMounted(() => {
           -->
           <LifeReadingCard
             :daily="readingDaily"
+            :is-today="isToday"
             :books="books"
             :busy="busy"
             :api="api"
@@ -1657,7 +1663,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：总览 · 路线图 · 读书 · 研究线' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}
         </button>
       </div>
 
