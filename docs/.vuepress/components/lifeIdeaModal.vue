@@ -304,11 +304,12 @@ watch(
     <!-- 进展流：左栏日期对齐成一列，右栏是当时记的原话 -->
     <ul
       data-alt="idea-logs"
-      class="grid content-start gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-700"
+      class="grid min-w-0 content-start gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-700"
     >
       <LifeNoteRow
         v-for="l in logs"
         :key="l.id"
+        alt="idea-log-row"
         :text="l.text"
         :date="l.occurredOn"
       >

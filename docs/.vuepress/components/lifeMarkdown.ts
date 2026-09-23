@@ -20,8 +20,12 @@
  */
 export const NOTE_MAX = 20000;
 
-/** 允许出现在 href 上的协议：其余（尤其 `javascript:`）一律当普通文字 */
-const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
+/**
+ * 允许出现在 href 上的协议：其余（尤其 `javascript:`）一律当普通文字
+ * @description 站内路径那一支要挡住第二个斜杠：`//evil.com` 看着像路径，
+ * 浏览器却按「跟当前页同协议的外站」解析，等于放行了一个站外地址
+ */
+const SAFE_HREF = /^(https?:\/\/|mailto:|\/(?!\/)|#)/i;
 
 /** 自动链接尾部常见的标点，不该被吞进 URL 里 */
 const TAIL_PUNCT = /[.,;:!?，。；：！？、)）]+$/;
@@ -68,6 +72,40 @@ function renderInline(escaped: string): string {
   );
 }
 
+/** 引用行，认的是转义之后的 `&gt;` */
+const QUOTE_LINE = /^\s*&gt;\s?(.*)$/;
+
+/** 表格的一行：两头都要有竖线，中间是各个单元格 */
+const TABLE_ROW = /^\s*\|(.*)\|\s*$/;
+
+/**
+ * 是不是表头下面那条分隔行
+ * @description 除了形状还要求里面真有横线：`| |` 这种空行也符合形状，
+ * 但它是一行空单元格，不是分隔行
+ */
+function isTableSep(line: string): boolean {
+  return /^\s*\|[\s:|-]+\|\s*$/.test(line) && line.includes('-');
+}
+
+/** 拆一行的单元格；单元格里仍旧走行内渲染，链接、粗体、行内代码都认 */
+function splitCells(row: string): string[] {
+  return row.split('|').map((cell) => renderInline(cell.trim()));
+}
+
+/**
+ * 拼一张表
+ * @description 外面套一层 `note-table`：宽表在 375 的屏上会把整页顶出横向滚动条，
+ * 得让它自己滚。这个类名不是 Tailwind 工具类，只是给 lifeNoteRow 的任意变体
+ * 一个挂点——渲染器不认识 Tailwind，样式该留在组件那边
+ */
+function renderTable(head: string[], body: string[][]): string {
+  const headRow = head.map((c) => `<th>${c}</th>`).join('');
+  const bodyRows = body
+    .map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+    .join('');
+  return `<div class="note-table"><table><thead><tr>${headRow}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+}
+
 /** 一个外链；target=_blank 必须配 noopener，否则新页能反手改写来源页 */
 function anchor(href: string, text: string): string {
   return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
@@ -76,8 +114,10 @@ function anchor(href: string, text: string): string {
 /**
  * 把一段 Markdown 渲染成 HTML
  * @description 支持的就这些：`#`~`###` 标题、`-`/`*`/`1.` 列表（按缩进嵌套）、
- * ``` 围栏代码块、行内 `code`、`**粗体**`、`[文字](链接)` 与裸 URL、段落。
- * 其余语法（表格、引用、图片）原样当文字显示——日志里没出现过，先不养。
+ * ``` 围栏代码块、`>` 引用、`|` 管道表格、行内 `code`、`**粗体**`、
+ * `[文字](链接)` 与裸 URL、段落。其余语法（图片、脚注）原样当文字显示。
+ * 引用和表格是后补的：会话整理稿里这两样出现得比想象中频繁，
+ * 平铺成 `| a | b |` 比不渲染还难读。
  * @param text 日志正文
  * @returns 可以直接喂 `v-html` 的 HTML 串
  */
@@ -114,6 +154,42 @@ export function renderMarkdown(text: string): string {
       i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) body.push(lines[i++]);
       out.push(`<pre><code>${body.join('\n')}</code></pre>`);
+      continue;
+    }
+
+    // 引用：转义之后 `>` 已经变成 `&gt;`，所以这里认的是转义后的那个形
+    const quote = line.match(QUOTE_LINE);
+    if (quote) {
+      flushPara();
+      closeLists(0);
+      const body = [quote[1]];
+      // 连续几行合成一块，而不是一行一个 blockquote——那样会排成一串断开的竖线
+      while (i + 1 < lines.length) {
+        const next = lines[i + 1].match(QUOTE_LINE);
+        if (!next) break;
+        body.push(next[1]);
+        i++;
+      }
+      out.push(`<blockquote>${renderInline(body.join('<br>'))}</blockquote>`);
+      continue;
+    }
+
+    // 表格：光看第一行分不清是不是表格，要下一行是 |---| 那种分隔行才算
+    const tableHead = line.match(TABLE_ROW);
+    if (tableHead && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      flushPara();
+      closeLists(0);
+      const head = splitCells(tableHead[1]);
+      i += 2;
+      const body: string[][] = [];
+      while (i < lines.length) {
+        const row = lines[i].match(TABLE_ROW);
+        if (!row) break;
+        body.push(splitCells(row[1]));
+        i++;
+      }
+      i--; // 外层 for 还会 i++，这里先退一格
+      out.push(renderTable(head, body));
       continue;
     }
 
@@ -185,8 +261,8 @@ export function firstParagraph(text: string, max = 160): string {
   const picked: string[] = [];
   for (const raw of lines) {
     const line = raw.trim();
-    // 开头的空行和围栏跳过，正文开始之后遇到它们就收尾
-    if (!line || /^```/.test(line)) {
+    // 开头的空行、围栏、表格分隔行跳过，正文开始之后遇到它们就收尾
+    if (!line || /^```/.test(line) || isTableSep(line)) {
       if (picked.length) break;
       continue;
     }
@@ -195,6 +271,24 @@ export function firstParagraph(text: string, max = 160): string {
 
   const brief = picked.join(' ').replace(/\s+/g, ' ').trim();
   return brief.length > max ? brief.slice(0, max) + '…' : brief;
+}
+
+/**
+ * 整篇去掉 Markdown 标记后的纯文字
+ * @description 给「折叠态是不是已经把话说完了」这个判断用：拿它和首段比长度，
+ * 两边都按同一套规则抹平了空白与标记，于是换行、缩进这些看不见的差别
+ * 不会被当成「还有下文」
+ * @param text 日志正文
+ * @returns 纯文本，同样**不要**喂 v-html
+ */
+export function plainText(text: string): string {
+  return String(text ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => stripMarks(line.trim()))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** 去掉一行上的 Markdown 标记，只留字 */
@@ -207,5 +301,8 @@ function stripMarks(line: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    // 表格行拆掉竖线只留字，折叠态里 `| a | b |` 比一句话还难认
+    .replace(/^\|(.*)\|$/, '$1')
+    .replace(/\s*\|\s*/g, ' ')
     .trim();
 }

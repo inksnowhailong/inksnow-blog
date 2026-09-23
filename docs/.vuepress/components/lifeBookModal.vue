@@ -277,10 +277,11 @@ watch(
     </template>
 
     <!-- 笔记时间线：左栏日期对齐成一列，右栏是当时记的原话 -->
-    <ul data-alt="book-logs" class="grid content-start gap-0.5">
+    <ul data-alt="book-logs" class="grid min-w-0 content-start gap-0.5">
       <LifeNoteRow
         v-for="l in logs"
         :key="l.id"
+        alt="book-log-row"
         :text="l.text"
         :date="l.occurredOn"
       >

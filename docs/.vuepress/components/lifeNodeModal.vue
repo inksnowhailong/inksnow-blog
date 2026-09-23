@@ -402,7 +402,7 @@ function drop() {
     />
 
     <!-- 学习日志：这一项从开始到现在留下了什么 -->
-    <div data-alt="modal-logs">
+    <div data-alt="modal-logs" class="min-w-0">
       <div class="mb-2 flex items-baseline justify-between gap-2">
         <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
           学习日志
@@ -425,11 +425,12 @@ function drop() {
         一句话或一篇整理稿 · Ctrl+Enter 记下
       </p>
 
-      <ul v-if="logs.length" class="mt-2 grid content-start gap-0.5">
+      <ul v-if="logs.length" class="mt-2 grid min-w-0 content-start gap-0.5">
         <!-- 方向汇总时会混进子项的日志，把子项标题放 meta 才分得清是谁的 -->
         <LifeNoteRow
           v-for="l in logs"
           :key="l.id"
+          alt="log-row"
           :text="l.text"
           :date="l.occurredOn"
           :meta="l.nodeId !== node.id ? l.nodeTitle : ''"
