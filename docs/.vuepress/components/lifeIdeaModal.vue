@@ -249,7 +249,7 @@ watch(
           v-if="!dropping"
           data-alt="idea-drop"
           type="button"
-          class="w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+          class="min-h-10 w-full rounded-lg px-2.5 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 sm:min-h-0"
           @click="dropping = true"
         >
           删掉这条线
@@ -268,7 +268,7 @@ watch(
               data-alt="idea-drop-yes"
               type="button"
               :disabled="busy"
-              class="rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40"
+              class="min-h-10 rounded-lg bg-rose-500 px-2.5 py-1 text-xs text-white transition hover:bg-rose-600 disabled:opacity-40 sm:min-h-0"
               @click="drop"
             >
               删
@@ -276,7 +276,7 @@ watch(
             <button
               data-alt="idea-drop-no"
               type="button"
-              class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700"
+              class="min-h-10 rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-700 sm:min-h-0"
               @click="dropping = false"
             >
               不删
@@ -328,7 +328,7 @@ watch(
           :disabled="busy"
           title="删掉这条"
           aria-label="删掉这条"
-          class="grid h-6 w-6 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:opacity-0 sm:group-hover:opacity-100"
+          class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
           @click="removeLog(l.id)"
         >
           <LifeIcon name="close" class="h-3 w-3" />
@@ -386,7 +386,7 @@ watch(
         <button
           data-alt="idea-conclude-toggle"
           type="button"
-          class="shrink-0 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          class="min-h-10 shrink-0 px-2 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100 sm:min-h-0 sm:px-0"
           @click="closing = !closing"
         >
           {{ closing ? '取消' : '收尾' }}
