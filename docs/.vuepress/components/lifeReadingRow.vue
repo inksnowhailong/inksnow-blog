@@ -93,13 +93,13 @@ const noteBar = ref<any>(null);
 /**
  * 点一本书
  * @description 同一本再点一下就收起，于是「收起」不必再画一颗按钮；
- * 展开之后光标直接落进输入条，点书本来就是为了写下一句
+ * 展开之后光标直接落进输入条，点书本来就是为了写下一句。
+ * 收起不清草稿：写了一半的半句再展开还在，只有真记下去了才清
  * @param book 被点的那本
  */
 function pick(book: any) {
   const same = openId.value === book.id;
   openId.value = same ? '' : book.id;
-  logDraft.value = '';
   if (!same) nextTick(() => noteBar.value?.focus());
 }
 
@@ -162,6 +162,16 @@ function cancelAdd() {
 }
 
 /**
+ * 加书输入框失焦
+ * @description 写了书名才走开，多半是以为打完就算数了，那就替他记下；
+ * 一个字都没写才当没点过那个「＋」。想反悔走 Esc，那一下明确是「不要了」
+ */
+function blurAdd() {
+  if (titleDraft.value.trim()) submitBook();
+  else cancelAdd();
+}
+
+/**
  * 记下一本在读的书
  * @description 走确定性接口不过模型：书名就是一行字，让模型过一道手只会多一次失败的机会。
  * 落库之后直接展开它的输入条——加一本书多半是因为刚翻开，接着就要写第一条
@@ -179,7 +189,6 @@ function submitBook() {
     });
     adding.value = false;
     titleDraft.value = '';
-    logDraft.value = '';
     if (created?.id) {
       openId.value = created.id;
       nextTick(() => noteBar.value?.focus());
@@ -214,7 +223,22 @@ const showDone = ref(false);
       </span>
     </div>
 
-    <!-- 分钟：这一项今天做了多久，与另外三项同一套记法 -->
+    <!-- 进度条与分钟：这一项今天做了多久，与另外三项同一套记法 -->
+    <div
+      v-if="daily"
+      class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
+    >
+      <div
+        class="h-full rounded-full transition-all"
+        :class="
+          daily.reached ? 'bg-brand-500 dark:bg-brand-300' : 'bg-brand-500/50'
+        "
+        :style="{
+          width:
+            Math.min(100, (daily.minutes / daily.thresholdMinutes) * 100) + '%',
+        }"
+      />
+    </div>
     <div
       v-if="daily"
       data-alt="reading-punch"
@@ -299,7 +323,7 @@ const showDone = ref(false);
         class="w-32 rounded-lg bg-slate-50 px-2 py-1 text-xs outline-none dark:bg-slate-700/40 dark:text-slate-100"
         @keydown.enter.prevent="submitBook"
         @keydown.esc="cancelAdd"
-        @blur="cancelAdd"
+        @blur="blurAdd"
       />
       <button
         v-else

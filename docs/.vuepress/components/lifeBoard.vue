@@ -1419,11 +1419,16 @@ onMounted(() => {
                 @open="activeBook = $event"
               />
 
+              <!--
+                落单的末项铺满整行，不留半格的空。判据是 even 不是 odd：
+                读书行占掉了第 1 个子元素，这几格从第 2 个起排，
+                三项时末项的序号是 4——序号的奇偶与它在两列里的左右正好反过来
+              -->
               <div
                 v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
-                class="rounded-xl border p-3 transition sm:last:odd:col-span-2"
+                class="rounded-xl border p-3 transition sm:[&:nth-child(even):last-child]:col-span-2"
                 :class="
                   it.reached
                     ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
