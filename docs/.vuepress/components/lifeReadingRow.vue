@@ -21,6 +21,7 @@ import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeBookRow from './lifeBookRow.vue';
 import LifeIcon from './lifeIcon.vue';
+import { NOTE_MAX } from './lifeMarkdown';
 
 const props = defineProps<{
   /** 当日结算里那条常驻的读书每日项；这天没排到时为 null，只剩书那部分 */
@@ -386,7 +387,7 @@ const showDone = ref(false);
         mode="note"
         class="min-w-0 flex-1"
         :busy="anyBusy"
-        :maxlength="1000"
+        :maxlength="NOTE_MAX"
         placeholder="读到什么，想到什么"
         action-text="记下"
         @submit="addLog"

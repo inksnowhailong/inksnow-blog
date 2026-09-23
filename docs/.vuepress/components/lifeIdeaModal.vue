@@ -20,6 +20,7 @@ import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 import { shortDate } from './lifeFormat';
 import LifeNoteRow from './lifeNoteRow.vue';
+import { NOTE_MAX } from './lifeMarkdown';
 
 const props = defineProps<{
   /** 选中的研究线，为 null 时不显示 */
@@ -365,11 +366,14 @@ watch(
         :action-text="concludeText"
         @submit="conclude"
       />
+      <!-- 进展可以是一整篇整理稿，所以上限跟日志同一个数；上面那条写的是结论，
+           那是另一个字段，仍旧只要一句话 -->
       <LifeAskBar
         v-else
         v-model="logDraft"
         mode="note"
         :busy="busy"
+        :maxlength="NOTE_MAX"
         placeholder="记一条进展"
         action-text="记进展"
         @submit="addLog"

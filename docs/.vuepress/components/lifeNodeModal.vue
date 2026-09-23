@@ -14,6 +14,7 @@ import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
 import LifeNoteRow from './lifeNoteRow.vue';
+import { NOTE_MAX } from './lifeMarkdown';
 
 const props = defineProps<{
   /** 选中的节点，为 null 时不显示 */
@@ -416,11 +417,12 @@ function drop() {
         v-model="logDraft"
         mode="note"
         :busy="busy"
-        placeholder="记一条"
+        :maxlength="NOTE_MAX"
+        placeholder="记一条，也可以粘一篇整理稿"
         @submit="addLog"
       />
       <p class="mt-1 text-[11px] text-slate-400">
-        一条只记一件事 · Ctrl+Enter 记下
+        一句话或一篇整理稿 · Ctrl+Enter 记下
       </p>
 
       <ul v-if="logs.length" class="mt-2 grid content-start gap-0.5">

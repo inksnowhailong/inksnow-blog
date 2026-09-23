@@ -12,6 +12,14 @@
  * 顺序反过来（先渲染再转义）等于把自己插的标签也转义掉，是另一个方向的错。
  */
 
+/**
+ * 日志正文的字数上限
+ * @description 与后端 rules.ts 的 NOTE_MAX 是同一个数，写在一处是因为它在
+ * 三条输入条上都要用：输入框的 maxlength 比后端小，多打的字会被悄悄吃掉；
+ * 比后端大，人写完提交才被打回来
+ */
+export const NOTE_MAX = 20000;
+
 /** 允许出现在 href 上的协议：其余（尤其 `javascript:`）一律当普通文字 */
 const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
 
