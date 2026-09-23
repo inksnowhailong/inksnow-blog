@@ -19,6 +19,7 @@ import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 import { shortDate } from './lifeFormat';
+import LifeNoteRow from './lifeNoteRow.vue';
 
 const props = defineProps<{
   /** 选中的研究线，为 null 时不显示 */
@@ -304,36 +305,28 @@ watch(
       data-alt="idea-logs"
       class="grid content-start gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-700"
     >
-      <li
+      <LifeNoteRow
         v-for="l in logs"
         :key="l.id"
-        data-alt="idea-log-row"
-        class="group flex items-start gap-2 rounded-lg px-1 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+        :text="l.text"
+        :date="l.occurredOn"
       >
-        <span
-          class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
-        >
-          {{ shortDate(l.occurredOn) }}
-        </span>
-        <p
-          class="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
-        >
-          {{ l.text }}
-        </p>
-        <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
-        <button
-          v-if="!isDone"
-          data-alt="idea-log-remove"
-          type="button"
-          :disabled="busy"
-          title="删掉这条"
-          aria-label="删掉这条"
-          class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
-          @click="removeLog(l.id)"
-        >
-          <LifeIcon name="close" class="h-3 w-3" />
-        </button>
-      </li>
+        <template #actions>
+          <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
+          <button
+            v-if="!isDone"
+            data-alt="idea-log-remove"
+            type="button"
+            :disabled="busy"
+            title="删掉这条"
+            aria-label="删掉这条"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
+            @click="removeLog(l.id)"
+          >
+            <LifeIcon name="close" class="h-3 w-3" />
+          </button>
+        </template>
+      </LifeNoteRow>
 
       <li v-if="logsLoading" data-alt="idea-logs-loading" class="px-1 py-1.5">
         <span class="text-xs text-slate-400">读取中…</span>
