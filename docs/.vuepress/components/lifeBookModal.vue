@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
  * 一本书的详情弹窗
- * @description 一本书从开读到读完都在这里：哪天开的、这一路读到了什么、
- * 什么时候收的尾。版式按「一条时间线」排，底栏那条输入栏接在流的末尾——
- * 写一句就多一行，看得见自己在往前推。
+ * @description 读书的主入口是读书卡，这里是它的次级入口：翻这本书的全部笔记、
+ * 把它读完、或者删掉。版式按「一条时间线」排，最后一行固定是哪天开读的。
+ *
+ * 底栏不再有笔记输入条——记一条读到什么只在读书卡上做。两处都能写的话，
+ * 「记读书要编辑哪个位置」这个问题就又回来了，而这正是读书卡要消掉的那件事。
  *
  * 壳（遮罩、抽屉、Esc、滚动锁、头部与底栏版式）在 LifeModal 里，与另几个弹窗同一份。
  *
@@ -12,7 +14,6 @@
  */
 import { ref, computed, watch, onUnmounted } from 'vue';
 import LifeModal from './lifeModal.vue';
-import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 import { shortDate } from './lifeFormat';
@@ -38,7 +39,6 @@ const errorMsg = ref('');
 /** 笔记时间线 */
 const logs = ref<any[]>([]);
 const logsLoading = ref(false);
-const logDraft = ref('');
 
 /** 更多菜单，删除藏在里面 */
 const menuOpen = ref(false);
@@ -97,20 +97,6 @@ async function loadLogs() {
   } finally {
     logsLoading.value = false;
   }
-}
-
-/** 记一条笔记 */
-function addLog() {
-  const text = logDraft.value.trim();
-  if (!text || busy.value) return;
-  run(async () => {
-    await props.api(`/life/books/${props.book.id}/logs`, {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    });
-    logDraft.value = '';
-    await loadLogs();
-  });
 }
 
 /** 删掉一条记错的笔记 */
@@ -189,12 +175,11 @@ function ask() {
   });
 }
 
-/** 换了一本书就把手上的草稿与开着的菜单清掉，免得上一本的字串到这一本 */
+/** 换了一本书就把开着的菜单与半路的确认清掉，免得上一本的状态串到这一本 */
 watch(
   () => props.book?.id,
   () => {
     errorMsg.value = '';
-    logDraft.value = '';
     menuOpen.value = false;
     dropping.value = false;
     disarmFinish();
@@ -346,18 +331,8 @@ watch(
       {{ errorMsg }}
     </p>
 
-    <!-- 底栏：读完的书不再往里写字，整窗转只读 -->
+    <!-- 底栏只剩「读完」；读完的书整窗转只读 -->
     <template v-if="!isDone" #foot>
-      <LifeAskBar
-        v-model="logDraft"
-        mode="note"
-        :busy="busy"
-        :maxlength="1000"
-        placeholder="读到什么，想到什么"
-        action-text="记一条"
-        @submit="addLog"
-      />
-
       <div class="flex items-center justify-between gap-2">
         <button
           data-alt="book-finish"
@@ -376,7 +351,7 @@ watch(
         <p
           class="text-right text-[11px] leading-snug text-slate-400 dark:text-slate-500"
         >
-          一条只记一件事 · Ctrl+Enter 记下
+          读到什么去读书卡上记
         </p>
       </div>
     </template>

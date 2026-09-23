@@ -5,13 +5,13 @@
  * 打卡区管每天重复的四项，路线图管一次性的清单进度，两者不重叠。
  * 单位只认「分」这一种主货币，元与体能债都是它的换算面。
  */
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import LifePlanTree from './lifePlanTree.vue';
 import LifeNodeModal from './lifeNodeModal.vue';
 import LifeIdeaModal from './lifeIdeaModal.vue';
 import LifeIdeaRow from './lifeIdeaRow.vue';
-import LifeBookRow from './lifeBookRow.vue';
 import LifeBookModal from './lifeBookModal.vue';
+import LifeReadingCard from './lifeReadingCard.vue';
 import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
@@ -59,7 +59,7 @@ const pickedPath = ref('');
 /** 已结的线默认折起来：它们是存量，日常要看的是还在动的那几条 */
 const showDone = ref(false);
 
-/** 手机上默认只看今日卡；点「更多」才展开总览、路线图、读书与研究线 */
+/** 手机上默认只看今日卡与读书卡；点「更多」才展开总览、路线图与研究线 */
 const showMore = ref(false);
 
 /** 带密钥调用后端 */
@@ -252,8 +252,11 @@ const dailyTitle = computed(() => {
   // 翻到往日时说「今天」就成了错话，补记那天看着像在说当下
   if (activeRest.value)
     return `${isToday.value ? '今天' : '这天'}休息 · 做了算白赚`;
-  const n = activeDay.value?.items?.length ?? 0;
-  if (!n) return '今天没排计划';
+  // 常驻项已经搬进读书卡，不在这几格里，数进来标题就比格子多一项
+  const n = punchItems.value.length;
+  const when = isToday.value ? '今天' : '这天';
+  // 格子空了有两种：常驻项搬进读书卡之后只剩它，和这天真的什么都没排
+  if (!n) return readingDaily.value ? `${when}只有读书` : `${when}没排计划`;
   const cn = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
   return `每日${cn[n] ?? n}项`;
 });
@@ -591,13 +594,40 @@ const hereByNode = computed(() => {
   return map;
 });
 
-/** 打卡项配上它的「在这」，模板里就不必反复查表 */
+/**
+ * 打卡格里的项
+ * @description 配上各自的「在这」，模板里就不必反复查表。
+ * 常驻项（读书）不在这里：它整个搬进了读书卡，分钟也在那张卡上记——
+ * 两处都能记同一件事，人就得想一下该去哪边记。
+ * 按 pinned 认而不按标题，标题是可以改的
+ */
 const punchItems = computed(() =>
-  (activeDay.value?.items ?? []).map((i: any) => ({
-    ...i,
-    here: hereByNode.value.get(i.nodeId) ?? null,
-  })),
+  (activeDay.value?.items ?? [])
+    .filter((i: any) => !i.pinned)
+    .map((i: any) => ({
+      ...i,
+      here: hereByNode.value.get(i.nodeId) ?? null,
+    })),
 );
+
+/** 读书卡标题行上那条常驻每日项；这天没排到时为 null */
+const readingDaily = computed<any>(
+  () => (activeDay.value?.items ?? []).find((i: any) => i.pinned) ?? null,
+);
+
+/**
+ * 读书卡上记一笔分钟
+ * @description 走的还是打卡那条路，只是入口从格子换到了卡上
+ * @param minutes 这一笔投入多少分钟
+ */
+function punchReading(minutes: number) {
+  if (readingDaily.value) punch(readingDaily.value.nodeId, minutes);
+}
+
+/** 清掉读书这一项当天的记录 */
+function clearReading() {
+  if (readingDaily.value) clearDay(readingDaily.value.nodeId);
+}
 
 const isToday = computed(() => activeDate.value === today());
 
@@ -877,80 +907,12 @@ function openIdeaAsk(payload: { prefix: string }) {
   });
 }
 
-/** 在读的书；读完的收在折叠段里 */
+/** 在读与读完的书，留给弹窗按ID换新对象；列表本身已搬进读书卡 */
 const readingBooks = computed<any[]>(() => books.value?.reading ?? []);
 const doneBooks = computed<any[]>(() => books.value?.done ?? []);
 
-/**
- * 标题行右侧的计数
- * @description 空的那一段不占位置；一本都没有时给句固定文案，
- * 否则标题行右边只剩一颗星芒，像是没加载出来
- */
-const bookCountText = computed(
-  () =>
-    [
-      readingBooks.value.length ? `在读 ${readingBooks.value.length}` : '',
-      doneBooks.value.length ? `读完 ${doneBooks.value.length}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ') || '还没有',
-);
-
-/** 读完的书默认折起来：它们是存量，日常要看的是手上这几本 */
-const showDoneBooks = ref(false);
-
-/** 新书的输入框 */
-const bookDraft = ref('');
-
-/**
- * 记下一本在读的书
- * @description 与记研究线同理走确定性接口：书名就是一行字，
- * 让模型过一道手只会多一次失败的机会
- */
-async function captureBook() {
-  const title = bookDraft.value.trim();
-  if (!title || busy.value) return;
-  busy.value = true;
-  try {
-    await api('/life/books', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    });
-    bookDraft.value = '';
-    await loadBooks();
-  } catch (e: any) {
-    errorMsg.value = e.message;
-  } finally {
-    busy.value = false;
-  }
-}
-
-/** 打开详情的那本书 */
+/** 打开详情的那本书，只作看全部笔记 / 读完 / 删书的次级入口 */
 const activeBook = ref<any>(null);
-
-/** 打卡项那行「在读」指向手上第一本书 */
-const firstReadingBook = computed<any>(() => readingBooks.value[0] ?? null);
-
-/** 读书卡与卡里那条输入条，打卡项那行「还没记书」要把人送过去 */
-const booksSection = ref<HTMLElement | null>(null);
-const bookBar = ref<InstanceType<typeof LifeAskBar> | null>(null);
-
-/**
- * 点打卡项下面那行「在读」
- * @description 有书就开书弹窗；一本都没有时不弹空窗，把人送到读书卡的输入条上——
- * 这一行要解决的是「该记一本书了」，光提示没有用
- */
-async function openReading() {
-  if (firstReadingBook.value) {
-    activeBook.value = firstReadingBook.value;
-    return;
-  }
-  // 手机上读书卡折在「更多」里，先展开再滚，否则滚向一个 display:none 的元素
-  showMore.value = true;
-  await nextTick();
-  booksSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  bookBar.value?.focus();
-}
 
 // 记笔记或读完之后重新拉数据，弹窗里拿的还是旧对象，
 // 得按ID换成新的，否则头部那行小字会停在改之前。
@@ -1007,7 +969,10 @@ onMounted(() => {
     24px 上下边距，而本页的 p 全是界面标签不是段落。标题同理不能用 h1~h6，
     主题给它们挂了锚点偏移（负 margin + 大 padding），会把文字顶出卡片
   -->
-  <div data-alt="life-board" class="my-6 [&_p]:!my-0">
+  <div
+    data-alt="life-board"
+    class="my-6 pb-[calc(5rem+env(safe-area-inset-bottom))] [&_p]:!my-0 lg:pb-0"
+  >
     <!-- 密钥入口 -->
     <form
       v-if="mounted && !unlocked"
@@ -1441,7 +1406,7 @@ onMounted(() => {
                 v-for="it in punchItems"
                 :key="it.nodeId"
                 data-alt="punch-item"
-                class="rounded-xl border p-3 transition"
+                class="rounded-xl border p-3 transition sm:last:odd:col-span-2"
                 :class="
                   it.reached
                     ? 'border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10'
@@ -1556,121 +1521,26 @@ onMounted(() => {
                     class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
                   />
                 </button>
-
-                <!--
-                  「在读」：常驻的那一项手上正在读哪本书。
-                  按 pinned 认而不按标题——标题是可以改的，改完这一行就不见了
-                -->
-                <button
-                  v-if="it.pinned"
-                  data-alt="punch-reading"
-                  type="button"
-                  :title="
-                    firstReadingBook
-                      ? '打开《' + firstReadingBook.title + '》'
-                      : '去记一本在读的书'
-                  "
-                  class="mt-1.5 flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
-                  @click="openReading"
-                >
-                  <span
-                    class="shrink-0 rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-                    >在读</span
-                  >
-                  <span
-                    class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300"
-                    >{{
-                      firstReadingBook
-                        ? '《' + firstReadingBook.title + '》'
-                        : '还没记书'
-                    }}</span
-                  >
-                  <LifeIcon
-                    name="right"
-                    class="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600"
-                  />
-                </button>
               </div>
             </div>
-
           </section>
 
           <!--
-            读书排在研究线上面：读书是每天都排、砍不掉的那一项，
-            研究线是想起来才记一句的地方——天天要看的那摊摆在手边
+            读书卡紧挨着打卡卡：同为「今天要做的」，手机上也一起留在首屏。
+            分钟与内容都在这一张卡上记，所以它不再是打卡格里的一格
           -->
-          <section
-            ref="booksSection"
-            data-alt="books-section"
-            :class="showMore ? '' : 'hidden lg:block'"
-            class="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                读书
-              </p>
-              <span
-                data-alt="books-counts"
-                class="flex items-center gap-1 text-xs text-slate-400"
-              >
-                {{ bookCountText }}
-                <LifeAskButton title="就读书问 AI" @click="openBooksAsk" />
-              </span>
-            </div>
-            <div class="mt-3">
-              <!-- 上限对齐后端的 200，多打的字不该被悄悄吃掉 -->
-              <LifeAskBar
-                ref="bookBar"
-                v-model="bookDraft"
-                mode="note"
-                :busy="busy"
-                :maxlength="200"
-                placeholder="记一本书"
-                label="记下这本书"
-                @submit="captureBook"
-              />
-
-              <ul
-                v-if="readingBooks.length"
-                data-alt="book-list"
-                class="mt-3 grid"
-              >
-                <LifeBookRow
-                  v-for="b in readingBooks"
-                  :key="b.id"
-                  :book="b"
-                  @click="activeBook = b"
-                />
-              </ul>
-              <p v-else class="mt-2 text-sm text-slate-400 dark:text-slate-500">
-                还没在读的书
-              </p>
-
-              <!-- 读完的收起来，点一下才摊开 -->
-              <div v-if="doneBooks.length" data-alt="books-done" class="mt-2">
-                <button
-                  data-alt="books-done-toggle"
-                  type="button"
-                  class="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"
-                  @click="showDoneBooks = !showDoneBooks"
-                >
-                  读完 ({{ doneBooks.length }})
-                  <LifeIcon
-                    :name="showDoneBooks ? 'up' : 'down'"
-                    class="h-3 w-3"
-                  />
-                </button>
-                <ul v-if="showDoneBooks" data-alt="book-done-list" class="mt-1 grid">
-                  <LifeBookRow
-                    v-for="b in doneBooks"
-                    :key="b.id"
-                    :book="b"
-                    @click="activeBook = b"
-                  />
-                </ul>
-              </div>
-            </div>
-          </section>
+          <LifeReadingCard
+            :daily="readingDaily"
+            :is-today="isToday"
+            :books="books"
+            :busy="busy"
+            :api="api"
+            @punch="punchReading"
+            @clear="clearReading"
+            @changed="refresh(loadBooks)"
+            @ask="openBooksAsk"
+            @open-book="activeBook = $event"
+          />
 
           <section
             data-alt="ideas-section"
@@ -1793,7 +1663,7 @@ onMounted(() => {
           class="order-3 lg:hidden rounded-2xl border border-dashed border-slate-200 py-2 text-sm text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
           @click="showMore = !showMore"
         >
-          {{ showMore ? '收起' : '更多：总览 · 路线图 · 读书 · 研究线' }}
+          {{ showMore ? '收起' : '更多：总览 · 路线图 · 研究线' }}
         </button>
       </div>
 
