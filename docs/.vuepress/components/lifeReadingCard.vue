@@ -196,20 +196,6 @@ function captureBook() {
 /** 读完的书默认折起来：它们是存量，日常要看的是手上这几本 */
 const showDone = ref(false);
 
-const logBar = ref<InstanceType<typeof LifeAskBar> | null>(null);
-const bookBar = ref<InstanceType<typeof LifeAskBar> | null>(null);
-
-/**
- * 把光标放到卡里的输入条上
- * @description 给外面「该记读书了」那类入口用；一本书都没有时直接落到加书那条，
- * 因为那才是当下该做的那一步
- */
-function focus() {
-  if (activeBook.value) logBar.value?.focus();
-  else bookBar.value?.focus();
-}
-
-defineExpose({ focus });
 </script>
 
 <template>
@@ -323,7 +309,6 @@ defineExpose({ focus });
     <div class="mt-2">
       <LifeAskBar
         v-if="activeBook"
-        ref="logBar"
         v-model="logDraft"
         mode="note"
         :busy="anyBusy"
@@ -412,7 +397,6 @@ defineExpose({ focus });
     >
       <!-- 上限对齐后端的 200，多打的字不该被悄悄吃掉 -->
       <LifeAskBar
-        ref="bookBar"
         v-model="bookDraft"
         mode="note"
         :busy="anyBusy"
