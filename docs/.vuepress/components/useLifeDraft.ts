@@ -119,7 +119,11 @@ export function describeDraft(
     return `改「${p.title}」：${parts.join('；')}`;
   }
   if (p.kind === 'plan_create')
-    return `在「${p.parentTitle}」下新增「${p.title}」`;
+    const what =
+      p.level === 'DIRECTION' ? (p.parentId ? '组' : '顶层方向') : p.level === 'DAILY' ? '每日项' : '清单项';
+    return p.parentId
+      ? `在「${p.parentTitle}」下新增${what}「${p.title}」`
+      : `新增${what}「${p.title}」`;
   if (p.kind === 'calendar') {
     const days: any[] = p.days ?? [];
     if (!days.length) return '日历不动';
@@ -347,10 +351,14 @@ export async function applyDraft(
     await api('/life/plan', {
       method: 'POST',
       body: JSON.stringify({
+        // 层级由草稿给：清单项 / 方向或组（顶层时 parentId 为 null）/ 每日项
         parentId: p.parentId,
         title: p.title,
         description: p.description,
-        level: 'CHECKLIST',
+        level: p.level ?? 'CHECKLIST',
+        ...(p.level === 'DAILY'
+          ? { thresholdMinutes: p.thresholdMinutes, points: p.points }
+          : {}),
         ...(p.sortOrder != null ? { sortOrder: p.sortOrder } : {}),
         ...(p.siblingsReorder ? { siblingsReorder: p.siblingsReorder } : {}),
       }),
