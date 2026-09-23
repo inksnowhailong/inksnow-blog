@@ -1105,8 +1105,12 @@ onMounted(() => {
 
             <div data-alt="kpi-mainline">
               <div class="flex items-baseline justify-between gap-2">
+                <!-- 右边那个 3 是"每周至少几天"的规则线，不是这周有几天；标签里点明，免得再被当成周长 -->
                 <span class="text-xs text-slate-500 dark:text-slate-400"
-                  >本周主线</span
+                  >本周主线达标
+                  <span class="text-[11px] text-slate-400 dark:text-slate-500"
+                    >· 每周至少 {{ diagnosis.week.mainlineRequired }} 天</span
+                  ></span
                 >
                 <span
                   class="text-sm font-semibold tabular-nums"
