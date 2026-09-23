@@ -13,6 +13,8 @@ import LifeIcon from './lifeIcon.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
+import LifeNoteRow from './lifeNoteRow.vue';
+import { NOTE_MAX } from './lifeMarkdown';
 
 const props = defineProps<{
   /** 选中的节点，为 null 时不显示 */
@@ -400,7 +402,7 @@ function drop() {
     />
 
     <!-- 学习日志：这一项从开始到现在留下了什么 -->
-    <div data-alt="modal-logs">
+    <div data-alt="modal-logs" class="min-w-0">
       <div class="mb-2 flex items-baseline justify-between gap-2">
         <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
           学习日志
@@ -415,44 +417,38 @@ function drop() {
         v-model="logDraft"
         mode="note"
         :busy="busy"
-        placeholder="记一条"
+        :maxlength="NOTE_MAX"
+        placeholder="记一条，也可以粘一篇整理稿"
         @submit="addLog"
       />
       <p class="mt-1 text-[11px] text-slate-400">
-        一条只记一件事 · Ctrl+Enter 记下
+        一句话或一篇整理稿 · Ctrl+Enter 记下
       </p>
 
-      <ul v-if="logs.length" class="mt-2 grid gap-1.5">
-        <li
+      <ul v-if="logs.length" class="mt-2 grid min-w-0 content-start gap-0.5">
+        <!-- 方向汇总时会混进子项的日志，把子项标题放 meta 才分得清是谁的 -->
+        <LifeNoteRow
           v-for="l in logs"
           :key="l.id"
-          data-alt="log-row"
-          class="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40"
+          alt="log-row"
+          :text="l.text"
+          :date="l.occurredOn"
+          :meta="l.nodeId !== node.id ? l.nodeTitle : ''"
         >
-          <div class="min-w-0">
-            <p
-              class="whitespace-pre-wrap text-sm leading-snug text-slate-700 dark:text-slate-200"
+          <template #actions>
+            <button
+              data-alt="log-remove"
+              type="button"
+              :disabled="busy"
+              title="删掉这条"
+              aria-label="删掉这条"
+              class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
+              @click="removeLog(l.id)"
             >
-              {{ l.text }}
-            </p>
-            <p class="mt-0.5 text-[11px] text-slate-400">
-              {{ l.occurredOn }}
-              <!-- 方向汇总时会混进子项的日志，标出来才分得清 -->
-              <span v-if="l.nodeId !== node.id"> · {{ l.nodeTitle }}</span>
-            </p>
-          </div>
-          <button
-            data-alt="log-remove"
-            type="button"
-            :disabled="busy"
-            title="删掉这条"
-            aria-label="删掉这条"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:bg-white hover:text-rose-500 disabled:opacity-40 dark:hover:bg-slate-800 sm:h-6 sm:w-6"
-            @click="removeLog(l.id)"
-          >
-            <LifeIcon name="close" class="h-3 w-3" />
-          </button>
-        </li>
+              <LifeIcon name="close" class="h-3 w-3" />
+            </button>
+          </template>
+        </LifeNoteRow>
       </ul>
       <p
         v-else-if="!logsLoading"

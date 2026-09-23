@@ -60,8 +60,12 @@ const icon = computed(() => (props.busy ? 'flat' : 'send'));
 
 const ta = ref<HTMLTextAreaElement | null>(null);
 
-/** 两行起步，最多长到这么高，再多就自己滚 */
-const MAX_H = 180;
+/**
+ * 两行起步，最多长到这么高，再多就自己滚
+ * @description 从 180 提到 320，是因为日志可以是一整篇整理稿：粘一篇几千字的
+ * 东西进来，180px 只给看四五行，看不出粘进来的是不是自己要的那一段
+ */
+const MAX_H = 320;
 
 /** 先归零再读 scrollHeight，否则删字时高度只增不减 */
 function autoGrow() {
