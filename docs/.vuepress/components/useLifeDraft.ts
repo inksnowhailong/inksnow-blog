@@ -6,14 +6,12 @@
  */
 import { shortDate } from './lifeFormat';
 
-/** 会改动计划本身的草稿，比记一笔流水影响大，界面上要区别对待 */
-const PLAN_KINDS = [
-  'plan_update',
-  'plan_create',
-  'plan_drop',
-  'daily_rule',
-  'daily_schedule',
-];
+/**
+ * 会改动计划本身的草稿，比记一笔流水影响大，界面上要区别对待
+ * @description 改计划的活已经收到通用补丁那条路上去了，这里只剩新增一种；
+ * 补丁要不要提醒看它自己的 risk，不在这张表里
+ */
+const PLAN_KINDS = ['plan_create'];
 
 /**
  * 会删掉已有数据的草稿
@@ -22,7 +20,6 @@ const PLAN_KINDS = [
  */
 const DESTRUCTIVE_KINDS = [
   'undo',
-  'plan_drop',
   'idea_drop',
   'calendar',
   'rest_weekdays',
@@ -121,25 +118,8 @@ export function describeDraft(
     );
     return `改「${p.title}」：${parts.join('；')}`;
   }
-  if (p.kind === 'plan_update') {
-    const parts = [
-      p.title ? `标题改成「${p.title}」` : '',
-      p.description ? `说明改成「${p.description}」` : '',
-    ].filter(Boolean);
-    return `改「${p.nodeTitle}」：${parts.join('，')}`;
-  }
   if (p.kind === 'plan_create')
     return `在「${p.parentTitle}」下新增「${p.title}」`;
-  if (p.kind === 'plan_drop') return `砍掉「${p.nodeTitle}」：${p.reason}`;
-  if (p.kind === 'daily_rule') {
-    const parts = [
-      p.thresholdMinutes != null ? `达标改成 ${p.thresholdMinutes} 分钟` : '',
-      p.points != null ? `分值改成 ${p.points} 分` : '',
-    ].filter(Boolean);
-    return `改「${p.nodeTitle}」的计分规则：${parts.join('，')}`;
-  }
-  if (p.kind === 'daily_schedule')
-    return `改「${p.nodeTitle}」排哪些天：${p.summary?.before} → ${p.summary?.after}`;
   if (p.kind === 'calendar') {
     const days: any[] = p.days ?? [];
     if (!days.length) return '日历不动';
@@ -256,60 +236,11 @@ export function draftDetails(draft: any): DraftDetail[] {
     return out;
   }
 
-  if (p.kind === 'plan_update') {
-    const out: DraftDetail[] = [];
-    if (p.title)
-      out.push({ label: '标题', before: p.before?.title, after: p.title });
-    if (p.description)
-      out.push({
-        label: '说明',
-        before: p.before?.description || '（原本是空的）',
-        after: p.description,
-      });
-    return out;
-  }
-
   if (p.kind === 'undo') {
     return (p.events ?? []).map((e: any, i: number) => ({
       label: `第 ${i + 1} 条`,
       value: `${e.minutes} 分钟${e.note ? ` · ${e.note}` : ''}`,
     }));
-  }
-
-  if (p.kind === 'daily_rule') {
-    const out: DraftDetail[] = [];
-    if (p.thresholdMinutes != null)
-      out.push({
-        label: '达标时长',
-        before: `${p.before.thresholdMinutes} 分钟`,
-        after: `${p.thresholdMinutes} 分钟`,
-      });
-    if (p.points != null)
-      out.push({
-        label: '分值',
-        before: `${p.before.points} 分`,
-        after: `${p.points} 分`,
-      });
-    out.push({ label: '影响', value: '只改往后的计分，已经记过的分不动' });
-    return out;
-  }
-
-  if (p.kind === 'plan_drop') {
-    return [
-      { label: '砍掉', value: p.nodeTitle },
-      { label: '原因', value: p.reason },
-    ];
-  }
-
-  if (p.kind === 'daily_schedule') {
-    const out: DraftDetail[] = [
-      { label: '排期', before: p.summary?.before, after: p.summary?.after },
-    ];
-
-    out.push(...previewDetails(p.preview));
-
-    out.push({ label: '影响', value: '只改往后排哪些天，已经记过的分不动' });
-    return out;
   }
 
   if (p.kind === 'calendar') {
@@ -410,14 +341,6 @@ export async function applyDraft(
       method: p.apply.method,
       body: JSON.stringify(p.apply.body),
     });
-  } else if (p.kind === 'plan_update') {
-    await api(`/life/plan/${p.nodeId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        ...(p.title ? { title: p.title } : {}),
-        ...(p.description ? { description: p.description } : {}),
-      }),
-    });
   } else if (p.kind === 'plan_create') {
     await api('/life/plan', {
       method: 'POST',
@@ -426,30 +349,6 @@ export async function applyDraft(
         title: p.title,
         description: p.description,
         level: 'CHECKLIST',
-      }),
-    });
-  } else if (p.kind === 'daily_rule') {
-    await api(`/life/plan/${p.nodeId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        ...(p.thresholdMinutes != null
-          ? { thresholdMinutes: p.thresholdMinutes }
-          : {}),
-        ...(p.points != null ? { points: p.points } : {}),
-      }),
-    });
-  } else if (p.kind === 'daily_schedule') {
-    // 后端给的 schedule 是改后的完整排期，整份覆盖即可；
-    // 「哪些字段没提要保留原值」已经在出草稿那一步合并过了
-    const s = p.schedule ?? {};
-    await api(`/life/plan/${p.nodeId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        ...(s.weekdays != null ? { weekdays: s.weekdays } : {}),
-        ...(s.startOn ? { startOn: s.startOn } : {}),
-        ...(s.endOn ? { endOn: s.endOn } : {}),
-        ...(s.exceptDates != null ? { exceptDates: s.exceptDates } : {}),
-        ...(s.onlyDates != null ? { onlyDates: s.onlyDates } : {}),
       }),
     });
   } else if (p.kind === 'calendar') {
@@ -462,11 +361,6 @@ export async function applyDraft(
     await api('/life/settings/rest-weekdays', {
       method: 'PUT',
       body: JSON.stringify({ weekdays: p.weekdays }),
-    });
-  } else if (p.kind === 'plan_drop') {
-    await api(`/life/plan/${p.nodeId}/drop`, {
-      method: 'POST',
-      body: JSON.stringify({ reason: p.reason }),
     });
   } else {
     throw new Error(`还不认识这种草稿：${p.kind}`);
