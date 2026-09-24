@@ -88,11 +88,11 @@ function onKey(e: KeyboardEvent) {
     type="button"
     :disabled="disabled"
     :title="`点一下记 ${base} 分钟，按住左右拖改数`"
-    class="relative h-10 select-none touch-none rounded-lg px-3 text-sm tabular-nums transition disabled:opacity-40 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
+    class="relative inline-flex h-10 cursor-ew-resize select-none touch-none items-center gap-1 rounded-lg border border-dashed px-2.5 text-sm tabular-nums transition disabled:opacity-40 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
     :class="
       dragging
-        ? 'bg-brand-500 text-white dark:bg-brand-400 dark:text-slate-900'
-        : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700'
+        ? 'border-brand-500 bg-brand-500 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-slate-900'
+        : 'border-slate-300 text-slate-500 hover:border-brand-400 hover:text-brand-600 dark:border-slate-600 dark:text-slate-400 dark:hover:border-brand-300 dark:hover:text-brand-300'
     "
     @pointerdown="onDown"
     @pointermove="onMove"
@@ -100,7 +100,10 @@ function onKey(e: KeyboardEvent) {
     @pointercancel="onUp"
     @keydown="onKey"
   >
+    <!-- 两侧的小箭头是"能左右拖"的标记，不然它和普通按钮长得一样 -->
+    <span aria-hidden="true" class="text-[10px] opacity-60">◂</span>
     +{{ value }}
+    <span aria-hidden="true" class="text-[10px] opacity-60">▸</span>
     <!-- 拖的时候在钮上方浮一条提示，告诉人往哪边拖是加 -->
     <span
       v-if="dragging"
