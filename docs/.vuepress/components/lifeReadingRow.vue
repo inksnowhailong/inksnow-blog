@@ -17,6 +17,7 @@
  * 书目录、分钟、分数仍旧只有面板这一个来源，行自己不留副本。
  */
 import { ref, computed, nextTick } from 'vue';
+import LifeMinuteDial from './lifeMinuteDial.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeBookRow from './lifeBookRow.vue';
@@ -50,7 +51,6 @@ const emit = defineEmits<{
 }>();
 
 /** 打卡的快捷增量，分钟；与同一张卡上另外三项同一套 */
-const QUICK_MINUTES = [15, 30];
 
 /** 行里自己那几个请求的忙碌态，与面板的全局忙碌分开算 */
 const localBusy = ref(false);
@@ -253,17 +253,8 @@ const showDone = ref(false);
         ></span
       >
       <span class="flex gap-1">
-        <button
-          v-for="m in QUICK_MINUTES"
-          :key="m"
-          data-alt="reading-punch-quick"
-          type="button"
-          :disabled="anyBusy"
-          class="h-10 rounded-lg px-3 text-sm text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
-          @click="emit('punch', m)"
-        >
-          +{{ m }}
-        </button>
+        <!-- 与四项卡同一个钮：点一下记 15，按住左右拖改数 -->
+        <LifeMinuteDial :disabled="anyBusy" @commit="(m) => emit('punch', m)" />
         <button
           v-if="daily.minutes > 0"
           data-alt="reading-punch-clear"
