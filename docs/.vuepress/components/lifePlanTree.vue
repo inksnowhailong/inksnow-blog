@@ -27,33 +27,21 @@ const doneShown = ref<Record<string, boolean>>({});
 /** 路段与当前项的算法与打卡卡共用，见 usePlanSections */
 const sections = computed(() => planSections(props.plan));
 
-/**
- * 当前重点：各方向里标了 ★ 且还没做完的项，带面包屑
- * @description 这是路线图最上面那一块——几十项里现在先学谁。
- * 标记由 AI 按使用者的工作场景挑，使用者一句话就能改，页面只负责把它们提出来
- */
-const focusList = computed(() =>
-  sections.value.flatMap((s) =>
-    s.groups.flatMap((g) =>
-      g.items
-        .filter((i: any) => i.focused && i.status !== 'DONE')
-        .map((i: any) => ({
-          item: i,
-          section: s,
-          group: g,
-          path: [s.title, g.title].filter(Boolean).join(' › '),
-        })),
-    ),
-  ),
-);
+/** 组里标了 ★ 且还没做完的项 */
+function focusedIn(g: any) {
+  return g.items.filter((i: any) => i.focused && i.status !== 'DONE');
+}
 
 /**
  * 组是否展开
- * @description 默认只展开「在这」所在的那一组：其余组折成一行，
- * 组多了整棵树也只有一处是摊开的；点过的按点过的记
+ * @description 默认只展开「在这」所在的组和带 ★ 的组：其余组折成一行，
+ * 组多了也只有该看的几处是摊开的；点过的按点过的记
  */
 function isOpen(g: any, s: any): boolean {
-  return expanded.value[g.id] ?? g.items.some((i: any) => i.id === s.currentId);
+  return (
+    expanded.value[g.id] ??
+    (g.items.some((i: any) => i.id === s.currentId) || focusedIn(g).length > 0)
+  );
 }
 
 function toggle(g: any, s: any) {
@@ -94,45 +82,6 @@ function pick(item: any, section: any, group: any) {
     data-alt="plan-tree"
     class="grid gap-5 [&_li]:!my-0 [&_ul]:!m-0 [&_ul]:!list-none [&_ul]:!p-0"
   >
-    <!-- 当前重点：几十项里现在先学谁。空着就提示去问 AI，标记不靠手点 -->
-    <section
-      data-alt="focus-list"
-      class="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/30 dark:bg-amber-500/10"
-    >
-      <p class="mb-1.5 flex items-baseline justify-between gap-2">
-        <span class="text-sm font-semibold text-amber-800 dark:text-amber-200"
-          >当前重点</span
-        >
-        <span class="text-xs tabular-nums text-amber-700/70 dark:text-amber-300/70"
-          >{{ focusList.length }} 项</span
-        >
-      </p>
-      <ul v-if="focusList.length" class="grid gap-x-2 sm:grid-cols-2">
-        <li v-for="f in focusList" :key="f.item.id">
-          <button
-            data-alt="focus-item"
-            type="button"
-            class="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left transition hover:bg-amber-100/70 dark:hover:bg-amber-500/15"
-            @click="pick(f.item, f.section, f.group)"
-          >
-            <span class="mt-px text-amber-500 dark:text-amber-300">★</span>
-            <span class="min-w-0 flex-1">
-              <span class="block text-sm text-slate-800 dark:text-slate-100">{{
-                f.item.title
-              }}</span>
-              <span class="block truncate text-[11px] text-slate-500 dark:text-slate-400">{{
-                f.path
-              }}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-      <p v-else class="text-xs leading-relaxed text-amber-800/80 dark:text-amber-200/80">
-        还没定重点。点右上角问 AI：「按我平时的工作，帮我挑几项先学」，
-        或直接说「这周先学时序图」。
-      </p>
-    </section>
-
     <section
       v-for="s in sections"
       :key="s.id"
@@ -212,6 +161,12 @@ function pick(item: any, section: any, group: any) {
                 : 'text-slate-400 dark:text-slate-500'
             "
           >
+            <span
+              v-if="focusedIn(g).length"
+              data-alt="group-focus"
+              class="text-amber-500 dark:text-amber-300"
+              >★{{ focusedIn(g).length }}</span
+            >
             {{ g.done }}/{{ g.total }}
             <LifeIcon
               :name="isOpen(g, s) ? 'up' : 'down'"
