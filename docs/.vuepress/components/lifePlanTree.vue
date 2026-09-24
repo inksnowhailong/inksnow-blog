@@ -18,19 +18,59 @@ const emit = defineEmits<{
   (e: 'select', node: any, path: string): void;
 }>();
 
-/** 已完成的组默认折起，它们不再需要注意力 */
+/** 组的展开状态，键是组 id；没记录的按默认规则 */
 const expanded = ref<Record<string, boolean>>({});
+
+/** 组里"已完成 N 项"那一折是否摊开，键是组 id */
+const doneShown = ref<Record<string, boolean>>({});
 
 /** 路段与当前项的算法与打卡卡共用，见 usePlanSections */
 const sections = computed(() => planSections(props.plan));
 
-/** 组是否展开：做完的默认收起，其余默认展开 */
-function isOpen(g: any): boolean {
-  return expanded.value[g.id] ?? !g.allDone;
+/**
+ * 当前重点：各方向里标了 ★ 且还没做完的项，带面包屑
+ * @description 这是路线图最上面那一块——几十项里现在先学谁。
+ * 标记由 AI 按使用者的工作场景挑，使用者一句话就能改，页面只负责把它们提出来
+ */
+const focusList = computed(() =>
+  sections.value.flatMap((s) =>
+    s.groups.flatMap((g) =>
+      g.items
+        .filter((i: any) => i.focused && i.status !== 'DONE')
+        .map((i: any) => ({
+          item: i,
+          section: s,
+          group: g,
+          path: [s.title, g.title].filter(Boolean).join(' › '),
+        })),
+    ),
+  ),
+);
+
+/**
+ * 组是否展开
+ * @description 默认只展开「在这」所在的那一组：其余组折成一行，
+ * 组多了整棵树也只有一处是摊开的；点过的按点过的记
+ */
+function isOpen(g: any, s: any): boolean {
+  return expanded.value[g.id] ?? g.items.some((i: any) => i.id === s.currentId);
 }
 
-function toggle(g: any) {
-  expanded.value = { ...expanded.value, [g.id]: !isOpen(g) };
+function toggle(g: any, s: any) {
+  expanded.value = { ...expanded.value, [g.id]: !isOpen(g, s) };
+}
+
+/** 组内还没做完的项，做完的折进一行计数 */
+function pending(g: any) {
+  return g.items.filter((i: any) => i.status !== 'DONE');
+}
+
+function finished(g: any) {
+  return g.items.filter((i: any) => i.status === 'DONE');
+}
+
+function toggleDone(g: any) {
+  doneShown.value = { ...doneShown.value, [g.id]: !doneShown.value[g.id] };
 }
 
 /** 说明里剥掉那句所有条目共用的判定标准，列表里说一遍就够 */
@@ -54,6 +94,45 @@ function pick(item: any, section: any, group: any) {
     data-alt="plan-tree"
     class="grid gap-5 [&_li]:!my-0 [&_ul]:!m-0 [&_ul]:!list-none [&_ul]:!p-0"
   >
+    <!-- 当前重点：几十项里现在先学谁。空着就提示去问 AI，标记不靠手点 -->
+    <section
+      data-alt="focus-list"
+      class="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/30 dark:bg-amber-500/10"
+    >
+      <p class="mb-1.5 flex items-baseline justify-between gap-2">
+        <span class="text-sm font-semibold text-amber-800 dark:text-amber-200"
+          >当前重点</span
+        >
+        <span class="text-xs tabular-nums text-amber-700/70 dark:text-amber-300/70"
+          >{{ focusList.length }} 项</span
+        >
+      </p>
+      <ul v-if="focusList.length" class="grid gap-x-2 sm:grid-cols-2">
+        <li v-for="f in focusList" :key="f.item.id">
+          <button
+            data-alt="focus-item"
+            type="button"
+            class="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left transition hover:bg-amber-100/70 dark:hover:bg-amber-500/15"
+            @click="pick(f.item, f.section, f.group)"
+          >
+            <span class="mt-px text-amber-500 dark:text-amber-300">★</span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm text-slate-800 dark:text-slate-100">{{
+                f.item.title
+              }}</span>
+              <span class="block truncate text-[11px] text-slate-500 dark:text-slate-400">{{
+                f.path
+              }}</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+      <p v-else class="text-xs leading-relaxed text-amber-800/80 dark:text-amber-200/80">
+        还没定重点。点右上角问 AI：「按我平时的工作，帮我挑几项先学」，
+        或直接说「这周先学时序图」。
+      </p>
+    </section>
+
     <section
       v-for="s in sections"
       :key="s.id"
@@ -113,7 +192,7 @@ function pick(item: any, section: any, group: any) {
           data-alt="group-head"
           type="button"
           class="flex w-full items-baseline justify-between gap-3 py-1 text-left"
-          @click="toggle(g)"
+          @click="toggle(g, s)"
         >
           <span
             class="text-sm font-medium"
@@ -135,18 +214,22 @@ function pick(item: any, section: any, group: any) {
           >
             {{ g.done }}/{{ g.total }}
             <LifeIcon
-              :name="isOpen(g) ? 'up' : 'down'"
+              :name="isOpen(g, s) ? 'up' : 'down'"
               class="h-3.5 w-3.5 opacity-60"
             />
           </span>
         </button>
 
         <ul
-          v-if="isOpen(g)"
+          v-if="isOpen(g, s)"
           data-alt="group-items"
           class="grid gap-x-2 sm:grid-cols-2 xl:grid-cols-3"
         >
-          <li v-for="item in g.items" :key="item.id">
+          <!-- 没做完的照常列；做完的折成一行计数，点开才摊 -->
+          <li
+            v-for="item in doneShown[g.id] ? g.items : pending(g)"
+            :key="item.id"
+          >
             <button
               data-alt="tree-item"
               type="button"
@@ -181,6 +264,12 @@ function pick(item: any, section: any, group: any) {
                     {{ item.title }}
                   </span>
                   <span
+                    v-if="item.focused && item.status !== 'DONE'"
+                    data-alt="item-focus"
+                    class="text-xs text-amber-500 dark:text-amber-300"
+                    >★</span
+                  >
+                  <span
                     v-if="item.id === s.currentId"
                     class="rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                     >在这</span
@@ -199,6 +288,19 @@ function pick(item: any, section: any, group: any) {
                   {{ brief(item.description) }}
                 </span>
               </span>
+            </button>
+          </li>
+          <li
+            v-if="finished(g).length"
+            class="sm:col-span-2 xl:col-span-3"
+          >
+            <button
+              data-alt="done-fold"
+              type="button"
+              class="px-2 py-1 text-xs text-slate-400 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              @click="toggleDone(g)"
+            >
+              {{ doneShown[g.id] ? '收起已完成' : `已完成 ${finished(g).length} 项` }}
             </button>
           </li>
         </ul>
