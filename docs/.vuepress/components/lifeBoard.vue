@@ -16,6 +16,7 @@ import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
+import LifeMinuteDial from './lifeMinuteDial.vue';
 import { planSections } from './usePlanSections';
 import { today, shiftDays, weekdayOf } from './lifeFormat';
 import {
@@ -32,7 +33,6 @@ const KEY_STORE = 'life-key';
 /** 热力图回看的周数 */
 const HEATMAP_WEEKS = 9;
 /** 打卡的快捷增量，分钟 */
-const QUICK_MINUTES = [15, 30];
 
 const mounted = ref(false);
 const key = ref('');
@@ -1488,17 +1488,11 @@ onMounted(() => {
                     ></span
                   >
                   <span class="flex gap-1">
-                    <button
-                      v-for="m in QUICK_MINUTES"
-                      :key="m"
-                      data-alt="punch-quick"
-                      type="button"
+                    <!-- 点一下记 15，按住左右拖按 5 分钟一档改数，松手即记 -->
+                    <LifeMinuteDial
                       :disabled="busy"
-                      class="h-10 rounded-lg px-3 text-sm text-slate-500 transition hover:bg-slate-100 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-700 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
-                      @click="punch(it.nodeId, m)"
-                    >
-                      +{{ m }}
-                    </button>
+                      @commit="(m) => punch(it.nodeId, m)"
+                    />
                     <button
                       v-if="it.minutes > 0"
                       data-alt="punch-clear"
