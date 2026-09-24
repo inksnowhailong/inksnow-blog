@@ -323,6 +323,13 @@ function drop() {
       >
         {{ node.required ? '必修' : '选修' }}
       </span>
+      <span
+        v-if="isChecklist && node.focused"
+        data-alt="node-focus"
+        class="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+      >
+        ★ 当前重点
+      </span>
       <span v-if="node.doneOn" class="text-slate-400 dark:text-slate-500"
         >{{ node.doneOn }} 完成</span
       >
