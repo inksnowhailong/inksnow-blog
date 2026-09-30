@@ -95,7 +95,7 @@ function splitCells(row: string): string[] {
 /**
  * 拼一张表
  * @description 外面套一层 `note-table`：宽表在 375 的屏上会把整页顶出横向滚动条，
- * 得让它自己滚。这个类名不是 Tailwind 工具类，只是给 lifeNoteRow 的任意变体
+ * 得让它自己滚。这个类名不是 Tailwind 工具类，只是给 lifeLogViewer 的任意变体
  * 一个挂点——渲染器不认识 Tailwind，样式该留在组件那边
  */
 function renderTable(head: string[], body: string[][]): string {

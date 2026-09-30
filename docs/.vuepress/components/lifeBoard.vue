@@ -16,7 +16,7 @@ import LifeIcon from './lifeIcon.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeAskModal from './lifeAskModal.vue';
 import LifeAskBar from './lifeAskBar.vue';
-import LifeMinuteDial from './lifeMinuteDial.vue';
+import LifeMinuteBar from './lifeMinuteBar.vue';
 import { planSections } from './usePlanSections';
 import { today, shiftDays, weekdayOf } from './lifeFormat';
 import {
@@ -212,6 +212,40 @@ async function punch(nodeId: string, minutes: number) {
   }
 }
 
+/**
+ * 把某项当天分钟定到目标值（进度条拖动松手用）
+ * @description 一步调用后端接口，由服务端在一个事务里加减；
+ * 不管成败都重拉一遍，免得条停在拖出来的假值上
+ * @param nodeId 每日项ID
+ * @param current 当前已记分钟
+ * @param target 目标分钟
+ */
+async function setMinutes(nodeId: string, current: number, target: number) {
+  if (busy.value || target === current) return;
+  busy.value = true;
+  try {
+    await api(`/life/plan/${nodeId}/minutes`, {
+      method: 'PUT',
+      body: JSON.stringify({ date: activeDate.value, minutes: target }),
+    });
+  } catch (e: any) {
+    errorMsg.value = e.message;
+  } finally {
+    try {
+      await loadCore();
+    } catch (e: any) {
+      errorMsg.value = e.message || '刷新失败';
+    }
+    busy.value = false;
+  }
+}
+
+/** 读书行上把分钟定到目标值 */
+function setReadingMinutes(minutes: number) {
+  const d = readingDaily.value;
+  if (d) setMinutes(d.nodeId, d.minutes, minutes);
+}
+
 /** 一键补到刚好达标，省得自己算还差几分钟 */
 function punchToThreshold(item: any) {
   punch(item.nodeId, Math.max(0, item.thresholdMinutes - item.minutes));
@@ -264,7 +298,8 @@ const dailyTitle = computed(() => {
 const debtFreeProgress = computed(() => {
   const d = activeDay.value;
   if (!d?.debtFreeScore) return 0;
-  return Math.min(100, (d.score / d.debtFreeScore) * 100);
+  // 债按分钟折算的分算，没有该字段时退回得分
+  return Math.min(100, ((d.debtScore ?? d.score) / d.debtFreeScore) * 100);
 });
 
 /**
@@ -780,7 +815,9 @@ function heatTitle(cell: any): string {
       ? ` · 休息${cell.note ? `（${cell.note}）` : ''}`
       : '';
   if (!cell.planned) return `${cell.date} 未排计划${rest}`;
-  const pass = cell.debtFreeScore > 0 && cell.score >= cell.debtFreeScore;
+  const pass =
+    cell.debtFreeScore > 0 &&
+    (cell.debtScore ?? cell.score) >= cell.debtFreeScore;
   return `${cell.date} ${cell.score}/${cell.fullScore} 分${pass ? ' · 已过免债线' : ''}${rest}`;
 }
 
@@ -791,7 +828,8 @@ function heatTitle(cell: any): string {
  */
 const streak = computed(() => {
   const days = heat.value.filter((d: any) => d.planned);
-  const passed = (d: any) => d.debtFreeScore > 0 && d.score >= d.debtFreeScore;
+  const passed = (d: any) =>
+    d.debtFreeScore > 0 && (d.debtScore ?? d.score) >= d.debtFreeScore;
   let current = 0;
   for (let i = days.length - 1; i >= 0; i--) {
     if (passed(days[i])) current++;
@@ -1095,6 +1133,12 @@ onMounted(() => {
               <p class="mt-1 text-[11px] leading-snug text-slate-400">
                 免债线 {{ activeDay.debtFreeScore }} 分（满分的
                 {{ Math.round(diagnosis.rules.debtFreeRatio * 100) }}%）<span
+                  v-if="
+                    activeDay.debtScore != null &&
+                    activeDay.debtScore !== activeDay.score
+                  "
+                  >· 按分钟折算 {{ activeDay.debtScore }} 分</span
+                ><span
                   v-if="overMinutes > 0"
                   class="text-slate-500 dark:text-slate-400"
                 >
@@ -1419,6 +1463,7 @@ onMounted(() => {
                 class="sm:col-span-2"
                 @punch="punchReading"
                 @clear="clearReading"
+                @set="setReadingMinutes"
                 @changed="refresh(loadBooks)"
                 @ask="openBooksAsk"
                 @open="activeBook = $event"
@@ -1460,25 +1505,15 @@ onMounted(() => {
                     />
                   </span>
                 </div>
-                <div
-                  class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
-                >
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :class="
-                      it.reached
-                        ? 'bg-brand-500 dark:bg-brand-300'
-                        : 'bg-brand-500/50'
-                    "
-                    :style="{
-                      width:
-                        Math.min(
-                          100,
-                          (it.minutes / it.thresholdMinutes) * 100,
-                        ) + '%',
-                    }"
-                  />
-                </div>
+                <!-- 进度条可拖：按住左右拖定分钟，松手即定 -->
+                <LifeMinuteBar
+                  class="mt-1"
+                  :minutes="it.minutes"
+                  :threshold="it.thresholdMinutes"
+                  :reached="it.reached"
+                  :disabled="busy"
+                  @set="(m) => setMinutes(it.nodeId, it.minutes, m)"
+                />
                 <div class="mt-1.5 flex items-center justify-between gap-2">
                   <span class="text-xs tabular-nums text-slate-500"
                     >{{ it.minutes }}/{{ it.thresholdMinutes }} 分钟<span
@@ -1488,11 +1523,17 @@ onMounted(() => {
                     ></span
                   >
                   <span class="flex gap-1">
-                    <!-- 点一下记 15，按住左右拖按 5 分钟一档改数，松手即记 -->
-                    <LifeMinuteDial
+                    <!-- 点一下固定记 5 分钟 -->
+                    <button
+                      data-alt="punch-plus5"
+                      type="button"
                       :disabled="busy"
-                      @commit="(m) => punch(it.nodeId, m)"
-                    />
+                      title="记 5 分钟"
+                      class="inline-flex h-10 items-center rounded-lg border border-slate-300 px-2.5 text-sm tabular-nums text-slate-500 transition hover:border-brand-400 hover:text-brand-600 disabled:opacity-40 dark:border-slate-600 dark:text-slate-400 dark:hover:border-brand-300 dark:hover:text-brand-300 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
+                      @click="punch(it.nodeId, 5)"
+                    >
+                      +5
+                    </button>
                     <button
                       v-if="it.minutes > 0"
                       data-alt="punch-clear"

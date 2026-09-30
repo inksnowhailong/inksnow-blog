@@ -19,8 +19,8 @@ import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 import { shortDate } from './lifeFormat';
-import LifeNoteRow from './lifeNoteRow.vue';
-import { NOTE_MAX } from './lifeMarkdown';
+import LifeLogPreview from './lifeLogPreview.vue';
+import LifeLogViewer from './lifeLogViewer.vue';
 
 const props = defineProps<{
   /** 选中的研究线，为 null 时不显示 */
@@ -45,7 +45,6 @@ const errorMsg = ref('');
 /** 进展流 */
 const logs = ref<any[]>([]);
 const logsLoading = ref(false);
-const logDraft = ref('');
 
 /** 正在写结论 */
 const closing = ref(false);
@@ -114,23 +113,32 @@ async function loadLogs() {
   logsLoading.value = true;
   try {
     logs.value = await props.api(`/life/ideas/${props.idea.id}/logs`);
-  } catch {
-    logs.value = [];
+  } catch (e: any) {
+    // 拉失败时保留旧内容，只报错，别把已经看到的清成空
+    errorMsg.value = e.message || '加载失败';
   } finally {
     logsLoading.value = false;
   }
 }
 
+/** 大日志弹窗：开关与定位到哪一条（null 则选最新并聚焦输入框） */
+const viewerOpen = ref(false);
+const viewerId = ref<string | null>(null);
+
+/** 从预览块打开大弹窗 */
+function openViewer(id: string | null) {
+  viewerId.value = id;
+  viewerOpen.value = true;
+}
+
 /** 记一条进展 */
-function addLog() {
-  const text = logDraft.value.trim();
-  if (!text || busy.value) return;
+function addLog(text: string) {
+  if (busy.value) return;
   run(async () => {
     await props.api(`/life/ideas/${props.idea.id}/logs`, {
       method: 'POST',
       body: JSON.stringify({ text }),
     });
-    logDraft.value = '';
     await loadLogs();
   });
 }
@@ -189,7 +197,7 @@ watch(
   () => props.idea?.id,
   () => {
     errorMsg.value = '';
-    logDraft.value = '';
+    viewerOpen.value = false;
     conclusionDraft.value = '';
     closing.value = false;
     menuOpen.value = false;
@@ -301,49 +309,31 @@ watch(
       </p>
     </div>
 
-    <!-- 进展流：左栏日期对齐成一列，右栏是当时记的原话 -->
-    <ul
-      data-alt="idea-logs"
-      class="grid min-w-0 content-start gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-700"
-    >
-      <LifeNoteRow
-        v-for="l in logs"
-        :key="l.id"
-        alt="idea-log-row"
-        :text="l.text"
-        :date="l.occurredOn"
-      >
-        <template #actions>
-          <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
-          <button
-            v-if="!isDone"
-            data-alt="idea-log-remove"
-            type="button"
-            :disabled="busy"
-            title="删掉这条"
-            aria-label="删掉这条"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
-            @click="removeLog(l.id)"
-          >
-            <LifeIcon name="close" class="h-3 w-3" />
-          </button>
-        </template>
-      </LifeNoteRow>
-
-      <li v-if="logsLoading" data-alt="idea-logs-loading" class="px-1 py-1.5">
-        <span class="text-xs text-slate-400">读取中…</span>
-      </li>
-
-      <!-- 流的最后一行固定是它哪天冒出来的，那是这条线的起点 -->
-      <li data-alt="idea-log-origin" class="flex items-start gap-2 px-1 py-1.5">
-        <span
-          class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
-        >
-          {{ shortDate(idea.createdOn) }}
-        </span>
-        <p class="text-sm leading-snug text-slate-400 dark:text-slate-500">记下</p>
-      </li>
-    </ul>
+    <!-- 进展：只露最近几条，全文与书写在大弹窗里；已结的线只读 -->
+    <div class="border-t border-slate-100 pt-2 dark:border-slate-700">
+      <LifeLogPreview
+        label="进展"
+        :logs="logs"
+        :loading="logsLoading"
+        :can-write="!isDone"
+        @open="openViewer"
+      />
+    </div>
+    <LifeLogViewer
+      :open="viewerOpen"
+      :title="`进展 · ${idea.content}`"
+      :logs="logs"
+      :initial-id="viewerId"
+      :loading="logsLoading"
+      :can-write="!isDone"
+      :can-remove="!isDone"
+      :busy="busy"
+      :error="errorMsg"
+      placeholder="记一条进展，也可以粘一篇整理稿"
+      @create="addLog"
+      @remove="removeLog"
+      @close="viewerOpen = false"
+    />
 
     <p
       v-if="errorMsg"
@@ -355,8 +345,7 @@ watch(
 
     <!-- 底栏：已结的线不再往里写字，整窗转只读 -->
     <template v-if="!isDone" #foot>
-      <!-- 收尾与记进展共用同一条输入栏，只换底色、占位与按钮：
-           写的都是这条线的下一行字，换个框会让人以为换了地方 -->
+      <!-- 收尾的结论输入栏；记进展已挪进日志大弹窗 -->
       <LifeAskBar
         v-if="closing"
         v-model="conclusionDraft"
@@ -367,19 +356,6 @@ watch(
         :action-text="concludeText"
         @submit="conclude"
       />
-      <!-- 进展可以是一整篇整理稿，所以上限跟日志同一个数；上面那条写的是结论，
-           那是另一个字段，仍旧只要一句话 -->
-      <LifeAskBar
-        v-else
-        v-model="logDraft"
-        mode="note"
-        :busy="busy"
-        :maxlength="NOTE_MAX"
-        placeholder="记一条进展"
-        action-text="记进展"
-        @submit="addLog"
-      />
-
       <div class="flex items-center justify-between gap-2">
         <button
           data-alt="idea-conclude-toggle"
@@ -395,7 +371,7 @@ watch(
           {{
             closing
               ? '「不成」同样算结论——一次记录在案的失败比一次没记录的成功值钱'
-              : '一条只记一件事 · Ctrl+Enter 记下'
+              : ''
           }}
         </p>
       </div>
