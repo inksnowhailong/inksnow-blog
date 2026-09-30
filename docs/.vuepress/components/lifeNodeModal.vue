@@ -10,11 +10,10 @@
 import { ref, computed, watch } from 'vue';
 import LifeModal from './lifeModal.vue';
 import LifeIcon from './lifeIcon.vue';
-import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeKnowledgeMap from './lifeKnowledgeMap.vue';
-import LifeNoteRow from './lifeNoteRow.vue';
-import { NOTE_MAX } from './lifeMarkdown';
+import LifeLogPreview from './lifeLogPreview.vue';
+import LifeLogViewer from './lifeLogViewer.vue';
 
 const props = defineProps<{
   /** 选中的节点，为 null 时不显示 */
@@ -80,7 +79,6 @@ const ruleDirty = computed(
 );
 
 const logs = ref<any[]>([]);
-const logDraft = ref('');
 const logsLoading = ref(false);
 
 /** 拉这一项的学习日志。方向节点会汇总它下面所有清单项的 */
@@ -89,23 +87,41 @@ async function loadLogs() {
   logsLoading.value = true;
   try {
     logs.value = await props.api(`/life/plan/${props.node.id}/logs`);
-  } catch {
-    logs.value = [];
+  } catch (e: any) {
+    // 拉失败时保留旧内容，只报错，别把已经看到的清成空
+    errorMsg.value = e.message || '加载失败';
   } finally {
     logsLoading.value = false;
   }
 }
 
+/** 大日志弹窗：开关与定位到哪一条（null 则选最新并聚焦输入框） */
+const viewerOpen = ref(false);
+const viewerId = ref<string | null>(null);
+
+/** 从预览块打开大弹窗 */
+function openViewer(id: string | null) {
+  viewerId.value = id;
+  viewerOpen.value = true;
+}
+
+/** 喂给日志组件的列表；方向汇总时混进子项的日志，把子项标题放 meta 才分得清是谁的 */
+const viewLogs = computed(() =>
+  logs.value.map((l) => ({
+    id: l.id,
+    text: l.text,
+    occurredOn: l.occurredOn,
+    meta: l.nodeId !== props.node?.id ? l.nodeTitle : '',
+  })),
+);
+
 /** 记一条 */
-function addLog() {
-  const text = logDraft.value.trim();
-  if (!text) return;
+function addLog(text: string) {
   run(async () => {
     await props.api(`/life/plan/${props.node.id}/logs`, {
       method: 'POST',
       body: JSON.stringify({ text }),
     });
-    logDraft.value = '';
     await loadLogs();
     emit('changed');
   });
@@ -133,7 +149,7 @@ watch(
     dropping.value = false;
     dropReason.value = '';
     menuOpen.value = false;
-    logDraft.value = '';
+    viewerOpen.value = false;
     logs.value = [];
     if (props.node) loadLogs();
   },
@@ -408,62 +424,26 @@ function drop() {
       :api="api"
     />
 
-    <!-- 学习日志：这一项从开始到现在留下了什么 -->
-    <div data-alt="modal-logs" class="min-w-0">
-      <div class="mb-2 flex items-baseline justify-between gap-2">
-        <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
-          学习日志
-        </p>
-        <span class="text-[11px] text-slate-400">
-          {{ logsLoading ? '读取中…' : logs.length + ' 条' }}
-        </span>
-      </div>
-
-      <!-- 日志会写成几段，框随内容长高；换行给 Enter，提交给 Ctrl/Cmd+Enter -->
-      <LifeAskBar
-        v-model="logDraft"
-        mode="note"
-        :busy="busy"
-        :maxlength="NOTE_MAX"
-        placeholder="记一条，也可以粘一篇整理稿"
-        @submit="addLog"
-      />
-      <p class="mt-1 text-[11px] text-slate-400">
-        一句话或一篇整理稿 · Ctrl+Enter 记下
-      </p>
-
-      <ul v-if="logs.length" class="mt-2 grid min-w-0 content-start gap-0.5">
-        <!-- 方向汇总时会混进子项的日志，把子项标题放 meta 才分得清是谁的 -->
-        <LifeNoteRow
-          v-for="l in logs"
-          :key="l.id"
-          alt="log-row"
-          :text="l.text"
-          :date="l.occurredOn"
-          :meta="l.nodeId !== node.id ? l.nodeTitle : ''"
-        >
-          <template #actions>
-            <button
-              data-alt="log-remove"
-              type="button"
-              :disabled="busy"
-              title="删掉这条"
-              aria-label="删掉这条"
-              class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
-              @click="removeLog(l.id)"
-            >
-              <LifeIcon name="close" class="h-3 w-3" />
-            </button>
-          </template>
-        </LifeNoteRow>
-      </ul>
-      <p
-        v-else-if="!logsLoading"
-        class="mt-2 text-xs text-slate-400 dark:text-slate-500"
-      >
-        还没记过
-      </p>
-    </div>
+    <!-- 学习日志：只露最近几条，全文与书写在大弹窗里 -->
+    <LifeLogPreview
+      label="学习日志"
+      :logs="viewLogs"
+      :loading="logsLoading"
+      can-write
+      @open="openViewer"
+    />
+    <LifeLogViewer
+      :open="viewerOpen"
+      :title="`学习日志 · ${node.title}`"
+      :logs="viewLogs"
+      :initial-id="viewerId"
+      :loading="logsLoading"
+      :busy="busy"
+      :error="errorMsg"
+      @create="addLog"
+      @remove="removeLog"
+      @close="viewerOpen = false"
+    />
 
     <!--
       砍掉的原因输入摊在正文底部而不是底栏：底栏只放那一对常规动作，

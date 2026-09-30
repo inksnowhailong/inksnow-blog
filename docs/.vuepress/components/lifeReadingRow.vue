@@ -17,7 +17,7 @@
  * 书目录、分钟、分数仍旧只有面板这一个来源，行自己不留副本。
  */
 import { ref, computed, nextTick } from 'vue';
-import LifeMinuteDial from './lifeMinuteDial.vue';
+import LifeMinuteBar from './lifeMinuteBar.vue';
 import LifeAskBar from './lifeAskBar.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeBookRow from './lifeBookRow.vue';
@@ -42,6 +42,8 @@ const emit = defineEmits<{
   (e: 'punch', minutes: number): void;
   /** 清掉这一项当天的记录 */
   (e: 'clear'): void;
+  /** 拖进度条把当天分钟定到目标值，面板去补差或重记 */
+  (e: 'set', minutes: number): void;
   /** 书或笔记变了，面板重拉书目录 */
   (e: 'changed'): void;
   /** 就读书整摊问 AI */
@@ -225,21 +227,15 @@ const showDone = ref(false);
     </div>
 
     <!-- 进度条与分钟：这一项今天做了多久，与另外三项同一套记法 -->
-    <div
+    <LifeMinuteBar
       v-if="daily"
-      class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
-    >
-      <div
-        class="h-full rounded-full transition-all"
-        :class="
-          daily.reached ? 'bg-brand-500 dark:bg-brand-300' : 'bg-brand-500/50'
-        "
-        :style="{
-          width:
-            Math.min(100, (daily.minutes / daily.thresholdMinutes) * 100) + '%',
-        }"
-      />
-    </div>
+      class="mt-1"
+      :minutes="daily.minutes"
+      :threshold="daily.thresholdMinutes"
+      :reached="daily.reached"
+      :disabled="anyBusy"
+      @set="(m) => emit('set', m)"
+    />
     <div
       v-if="daily"
       data-alt="reading-punch"
@@ -253,8 +249,17 @@ const showDone = ref(false);
         ></span
       >
       <span class="flex gap-1">
-        <!-- 与四项卡同一个钮：点一下记 15，按住左右拖改数 -->
-        <LifeMinuteDial :disabled="anyBusy" @commit="(m) => emit('punch', m)" />
+        <!-- 与四项卡同一个钮：点一下固定记 5 分钟 -->
+        <button
+          data-alt="reading-punch-plus5"
+          type="button"
+          :disabled="anyBusy"
+          title="记 5 分钟"
+          class="inline-flex h-10 items-center rounded-lg border border-slate-300 px-2.5 text-sm tabular-nums text-slate-500 transition hover:border-brand-400 hover:text-brand-600 disabled:opacity-40 dark:border-slate-600 dark:text-slate-400 dark:hover:border-brand-300 dark:hover:text-brand-300 sm:h-auto sm:rounded sm:px-1.5 sm:py-0.5 sm:text-xs"
+          @click="emit('punch', 5)"
+        >
+          +5
+        </button>
         <button
           v-if="daily.minutes > 0"
           data-alt="reading-punch-clear"

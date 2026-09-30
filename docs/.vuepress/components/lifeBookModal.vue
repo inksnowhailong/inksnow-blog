@@ -17,7 +17,8 @@ import LifeModal from './lifeModal.vue';
 import LifeAskButton from './lifeAskButton.vue';
 import LifeIcon from './lifeIcon.vue';
 import { shortDate } from './lifeFormat';
-import LifeNoteRow from './lifeNoteRow.vue';
+import LifeLogPreview from './lifeLogPreview.vue';
+import LifeLogViewer from './lifeLogViewer.vue';
 
 const props = defineProps<{
   /** 选中的书，为 null 时不显示 */
@@ -40,6 +41,16 @@ const errorMsg = ref('');
 /** 笔记时间线 */
 const logs = ref<any[]>([]);
 const logsLoading = ref(false);
+
+/** 大日志弹窗：开关与定位到哪一条（null 则选最新一条） */
+const viewerOpen = ref(false);
+const viewerId = ref<string | null>(null);
+
+/** 从预览块打开大弹窗 */
+function openViewer(id: string | null) {
+  viewerId.value = id;
+  viewerOpen.value = true;
+}
 
 /** 更多菜单，删除藏在里面 */
 const menuOpen = ref(false);
@@ -93,8 +104,9 @@ async function loadLogs() {
   logsLoading.value = true;
   try {
     logs.value = await props.api(`/life/books/${props.book.id}/logs`);
-  } catch {
-    logs.value = [];
+  } catch (e: any) {
+    // 拉失败时保留旧内容，只报错，别把已经看到的清成空
+    errorMsg.value = e.message || '加载失败';
   } finally {
     logsLoading.value = false;
   }
@@ -181,6 +193,7 @@ watch(
   () => props.book?.id,
   () => {
     errorMsg.value = '';
+    viewerOpen.value = false;
     menuOpen.value = false;
     dropping.value = false;
     disarmFinish();
@@ -276,46 +289,32 @@ watch(
       </div>
     </template>
 
-    <!-- 笔记时间线：左栏日期对齐成一列，右栏是当时记的原话 -->
-    <ul data-alt="book-logs" class="grid min-w-0 content-start gap-0.5">
-      <LifeNoteRow
-        v-for="l in logs"
-        :key="l.id"
-        alt="book-log-row"
-        :text="l.text"
-        :date="l.occurredOn"
-      >
-        <template #actions>
-          <!-- 手机上没有 hover，窄屏一直露着；宽屏才收起来等指针过来 -->
-          <button
-            v-if="!isDone"
-            data-alt="book-log-remove"
-            type="button"
-            :disabled="busy"
-            title="删掉这条"
-            aria-label="删掉这条"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded text-slate-300 transition hover:text-rose-500 disabled:opacity-40 sm:h-6 sm:w-6 sm:opacity-0 sm:group-hover:opacity-100"
-            @click="removeLog(l.id)"
-          >
-            <LifeIcon name="close" class="h-3 w-3" />
-          </button>
-        </template>
-      </LifeNoteRow>
-
-      <li v-if="logsLoading" data-alt="book-logs-loading" class="px-1 py-1.5">
-        <span class="text-xs text-slate-400">读取中…</span>
-      </li>
-
-      <!-- 流的最后一行固定是哪天开读的，那是这本书的起点 -->
-      <li data-alt="book-log-origin" class="flex items-start gap-2 px-1 py-1.5">
-        <span
-          class="w-14 shrink-0 pt-px text-xs tabular-nums text-slate-400 dark:text-slate-500"
-        >
-          {{ shortDate(book.startedOn) }}
-        </span>
-        <p class="text-sm leading-snug text-slate-400 dark:text-slate-500">开读</p>
-      </li>
-    </ul>
+    <!-- 笔记：只露最近几条，全文在大弹窗里读；写笔记仍只在那行读书上做，这里不给输入框 -->
+    <LifeLogPreview
+      label="读书笔记"
+      :logs="logs"
+      :loading="logsLoading"
+      @open="openViewer"
+    />
+    <p
+      data-alt="book-log-origin"
+      class="text-xs text-slate-400 dark:text-slate-500"
+    >
+      {{ shortDate(book.startedOn) }} 开读
+    </p>
+    <LifeLogViewer
+      :open="viewerOpen"
+      :title="`读书笔记 · ${book.title}`"
+      :logs="logs"
+      :initial-id="viewerId"
+      :loading="logsLoading"
+      :can-write="false"
+      :can-remove="!isDone"
+      :busy="busy"
+      :error="errorMsg"
+      @remove="removeLog"
+      @close="viewerOpen = false"
+    />
 
     <p
       v-if="errorMsg"
