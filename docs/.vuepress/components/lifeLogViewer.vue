@@ -8,7 +8,8 @@
  * 把 create / remove 抛回去。三处出处不同、字段相同（id、text、occurredOn，
  * 可选 meta），于是一个组件够用。
  *
- * 电脑端左列表右正文；手机端全屏，先列表、点一条进正文，左右滑切上下条。
+ * 写日志时是紧凑单栏：输入在前、最近记录在后；点历史后才展开阅读器。
+ * 阅读器电脑端左列表右正文；手机端全屏，先列表、点一条进正文，左右滑切上下条。
  * 键盘：↑/↓ 或 j/k 切条，Esc 关闭（输入框里打字时不抢键）。
  */
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
@@ -65,6 +66,9 @@ const mounted = ref(false);
 /** 当前选中的日志 id */
 const selectedId = ref<string | null>(null);
 
+/** 当前是否在紧凑记录态；阅读历史时切回原有双栏 */
+const writing = ref(false);
+
 /** 手机端当前是不是在正文页；电脑端两栏并排，这个值无关 */
 const mobileDetail = ref(false);
 
@@ -103,6 +107,21 @@ function select(id: string, toDetail = true) {
   });
 }
 
+/** 从记录态或列表进入一条日志的阅读态 */
+function read(id: string) {
+  writing.value = false;
+  select(id);
+}
+
+/** 回到紧凑记录态并把光标放进输入框 */
+function openWriter() {
+  if (!props.canWrite) return;
+  writing.value = true;
+  mobileDetail.value = false;
+  removing.value = false;
+  nextTick(() => bar.value?.focus());
+}
+
 /** 按偏移切条，越界不动 */
 function step(delta: number) {
   const next = props.logs[index.value + delta];
@@ -122,6 +141,7 @@ watch(
     pending.value = false;
     removing.value = false;
     selectedId.value = props.initialId ?? props.logs[0]?.id ?? null;
+    writing.value = !props.initialId && props.canWrite;
     mobileDetail.value = !!props.initialId;
     if (!props.initialId && props.canWrite) nextTick(() => bar.value?.focus());
   },
@@ -198,6 +218,7 @@ function onKeydown(e: KeyboardEvent) {
     emit('close');
     return;
   }
+  if (writing.value) return;
   if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'ArrowDown' || e.key === 'j') {
     e.preventDefault();
@@ -275,7 +296,12 @@ const PROSE =
         data-alt="log-viewer-panel"
         role="dialog"
         aria-modal="true"
-        class="flex h-full w-full min-w-0 flex-col overflow-hidden bg-white shadow-xl dark:bg-slate-800 sm:h-[85vh] sm:max-w-6xl sm:rounded-2xl"
+        class="flex w-full min-w-0 flex-col overflow-hidden bg-white shadow-xl dark:bg-slate-800"
+        :class="
+          writing
+            ? 'mt-auto max-h-[92dvh] rounded-t-2xl sm:mt-0 sm:h-auto sm:max-h-[85vh] sm:max-w-2xl sm:rounded-2xl'
+            : 'h-full sm:h-[85vh] sm:max-w-6xl sm:rounded-2xl'
+        "
       >
         <!-- 头部：手机在正文页时左上角是返回列表 -->
         <header
@@ -293,7 +319,7 @@ const PROSE =
           >
             <LifeIcon name="left" class="h-4 w-4" />
           </button>
-          <h2
+          <p
             data-alt="log-viewer-title"
             class="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-100"
           >
@@ -301,7 +327,16 @@ const PROSE =
             <span class="ml-1 text-xs font-normal text-slate-400">
               {{ loading ? '读取中…' : logs.length + ' 条' }}
             </span>
-          </h2>
+          </p>
+          <button
+            v-if="canWrite && !writing"
+            data-alt="log-viewer-write"
+            type="button"
+            class="min-h-9 shrink-0 rounded-lg px-3 text-xs text-brand-600 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10 sm:min-h-8"
+            @click="openWriter"
+          >
+            记日志
+          </button>
           <button
             data-alt="log-viewer-close"
             type="button"
@@ -314,7 +349,113 @@ const PROSE =
           </button>
         </header>
 
-        <div class="flex min-h-0 flex-1">
+        <!-- 记录态：输入是主角，最近日志只作上下文，不再撑开一个双栏大画布 -->
+        <div
+          v-if="writing"
+          data-alt="log-writer"
+          class="flex min-h-0 flex-col overflow-y-auto"
+        >
+          <section
+            data-alt="log-writer-composer"
+            class="shrink-0 px-4 pb-4 pt-4 sm:px-5 sm:pb-5"
+          >
+            <p class="mb-2 text-sm text-slate-500 dark:text-slate-400">
+              写下这次做到哪、想明白了什么，或卡在哪里
+            </p>
+            <LifeAskBar
+              ref="bar"
+              v-model="draft"
+              mode="note"
+              :busy="busy"
+              :maxlength="NOTE_MAX"
+              :placeholder="placeholder"
+              action-text="记下"
+              @submit="submit"
+            />
+            <div
+              class="mt-2 flex min-h-5 items-start justify-between gap-3 text-[11px]"
+            >
+              <p
+                v-if="error"
+                data-alt="log-writer-error"
+                class="text-rose-600 dark:text-rose-400"
+              >
+                {{ error }}
+              </p>
+              <p v-else class="text-slate-400">
+                Ctrl+Enter 记下，草稿关闭后仍会保留
+              </p>
+              <span
+                v-if="draft.length"
+                class="shrink-0 tabular-nums text-slate-400"
+              >
+                {{ draft.length }}/{{ NOTE_MAX }}
+              </span>
+            </div>
+          </section>
+
+          <section
+            data-alt="log-writer-recent"
+            class="flex min-h-0 flex-col border-t border-slate-100 px-3 py-3 dark:border-slate-700 sm:px-4"
+          >
+            <div class="mb-1.5 flex items-center justify-between gap-3 px-1">
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                最近记录
+              </p>
+              <button
+                v-if="logs.length"
+                data-alt="log-writer-read-latest"
+                type="button"
+                class="min-h-9 rounded-lg px-2 text-xs text-brand-600 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10 sm:min-h-7"
+                @click="read(logs[0].id)"
+              >
+                打开阅读器
+              </button>
+            </div>
+            <ul
+              v-if="logs.length"
+              data-alt="log-writer-items"
+              class="!m-0 max-h-64 min-h-0 !list-none overflow-y-auto !p-0"
+            >
+              <li v-for="l in logs.slice(0, 6)" :key="l.id">
+                <button
+                  data-alt="log-writer-item"
+                  type="button"
+                  class="grid min-h-12 w-full min-w-0 grid-cols-[4rem_minmax(0,1fr)] items-start gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  @click="read(l.id)"
+                >
+                  <span
+                    class="pt-0.5 text-xs tabular-nums text-slate-400 dark:text-slate-500"
+                  >
+                    {{ shortDate(l.occurredOn) }}
+                  </span>
+                  <span class="min-w-0">
+                    <span
+                      class="line-clamp-2 block break-words text-sm leading-snug text-slate-700 dark:text-slate-200"
+                    >
+                      {{ firstParagraph(l.text, 100) }}
+                    </span>
+                    <span
+                      v-if="l.meta"
+                      class="mt-0.5 block truncate text-[11px] text-slate-400 dark:text-slate-500"
+                    >
+                      {{ l.meta }}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+            <p
+              v-else-if="!loading"
+              data-alt="log-writer-empty"
+              class="px-2 py-3 text-sm text-slate-400 dark:text-slate-500"
+            >
+              还没有记录，写下第一条就从这里开始。
+            </p>
+          </section>
+        </div>
+
+        <div v-else class="flex min-h-0 flex-1">
           <!-- 左栏：列表 + 输入框。手机在正文页时整栏收起 -->
           <aside
             data-alt="log-viewer-list"
@@ -323,7 +464,7 @@ const PROSE =
           >
             <ul
               data-alt="log-viewer-items"
-              class="min-h-0 flex-1 overflow-y-auto p-2"
+              class="!m-0 min-h-0 flex-1 !list-none overflow-y-auto !p-2"
             >
               <li v-for="l in logs" :key="l.id" :data-log-id="l.id">
                 <button
@@ -335,7 +476,7 @@ const PROSE =
                       ? 'bg-brand-50 dark:bg-brand-500/10'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'
                   "
-                  @click="select(l.id)"
+                  @click="read(l.id)"
                 >
                   <span class="text-xs tabular-nums text-slate-400 dark:text-slate-500">
                     {{ shortDate(l.occurredOn) }}
@@ -362,33 +503,6 @@ const PROSE =
                 还没记过
               </li>
             </ul>
-
-            <!-- 输入框沿用 LifeAskBar：Enter 换行、Ctrl/Cmd+Enter 提交、自动长高 -->
-            <div
-              v-if="canWrite"
-              data-alt="log-viewer-composer"
-              class="shrink-0 border-t border-slate-100 p-2 dark:border-slate-700"
-            >
-              <LifeAskBar
-                ref="bar"
-                v-model="draft"
-                mode="note"
-                :busy="busy"
-                :maxlength="NOTE_MAX"
-                :placeholder="placeholder"
-                @submit="submit"
-              />
-              <p
-                v-if="error"
-                data-alt="log-viewer-error"
-                class="mt-1 text-xs text-rose-600 dark:text-rose-400"
-              >
-                {{ error }}
-              </p>
-              <p v-else class="mt-1 text-[11px] text-slate-400">
-                Ctrl+Enter 记下 · ↑↓ / j k 切条 · Esc 关闭
-              </p>
-            </div>
           </aside>
 
           <!-- 右栏：正文。手机在列表页时收起 -->
