@@ -27,6 +27,8 @@ const props = withDefaults(
     mode?: 'ask' | 'note';
     busy?: boolean;
     placeholder?: string;
+    /** 初始可见行数；普通输入条默认 2，长日志可按场景放大 */
+    rows?: number;
     /** 字数上限，要和后端保持一致，否则多打的字会被悄悄吃掉 */
     maxlength?: number;
     /** 按钮的 title 与 aria-label，不给则按 mode 取默认文案 */
@@ -40,6 +42,7 @@ const props = withDefaults(
     mode: 'ask',
     busy: false,
     placeholder: '说点什么',
+    rows: 2,
   }
 );
 
@@ -61,7 +64,7 @@ const icon = computed(() => (props.busy ? 'flat' : 'send'));
 const ta = ref<HTMLTextAreaElement | null>(null);
 
 /**
- * 两行起步，最多长到这么高，再多就自己滚
+ * 按调用方给的行数起步，最多长到这么高，再多就自己滚
  * @description 从 180 提到 320，是因为日志可以是一整篇整理稿：粘一篇几千字的
  * 东西进来，180px 只给看四五行，看不出粘进来的是不是自己要的那一段
  */
@@ -167,7 +170,7 @@ function onEnter(e: KeyboardEvent) {
       ref="ta"
       data-alt="ask-bar-input"
       :value="modelValue"
-      rows="2"
+      :rows="rows"
       :placeholder="placeholder"
       :maxlength="maxlength"
       class="block w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-base leading-relaxed outline-none dark:text-slate-100 sm:px-2.5 sm:py-2 sm:text-sm"
