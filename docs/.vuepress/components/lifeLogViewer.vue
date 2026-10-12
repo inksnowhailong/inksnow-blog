@@ -87,21 +87,15 @@ const index = computed(() =>
 );
 
 /**
- * 面板尺寸随信息量分档
- * @description 少量日志若也占 76vh，正文下面只剩大片空白；日志多时再逐档放大。
- * 手机始终全屏，分档只作用于 sm 以上视口。
+ * 面板尺寸
+ * @description 有日志时阅读和输入都需要稳定空间，统一给约 72vh；
+ * 没有日志时不渲染阅读栏，面板仍按内容收高。
  */
 const panelSizeClass = computed(() => {
   if (!props.logs.length) {
-    return 'mt-auto max-h-[92dvh] rounded-t-2xl sm:mt-0 sm:h-auto sm:max-w-xl sm:rounded-2xl';
+    return 'mt-auto max-h-[92dvh] rounded-t-2xl sm:mt-0 sm:h-auto sm:max-w-2xl sm:rounded-2xl';
   }
-  if (props.logs.length <= 2) {
-    return 'h-full sm:h-96 sm:max-w-5xl sm:rounded-2xl';
-  }
-  if (props.logs.length <= 5) {
-    return 'h-full sm:h-[30rem] sm:max-w-5xl sm:rounded-2xl';
-  }
-  return 'h-full sm:h-[min(68vh,40rem)] sm:max-w-6xl sm:rounded-2xl';
+  return 'h-full sm:h-[min(72vh,44rem)] sm:max-w-6xl sm:rounded-2xl';
 });
 
 /** 正文 HTML，v-html 只接这一个来源 */
@@ -398,8 +392,10 @@ const PROSE =
               <LifeAskBar
                 ref="bar"
                 v-model="draft"
+                class="sm:[&_textarea]:min-h-36"
                 mode="note"
                 :busy="busy"
+                :rows="5"
                 :maxlength="NOTE_MAX"
                 :placeholder="placeholder"
                 @submit="submit"
