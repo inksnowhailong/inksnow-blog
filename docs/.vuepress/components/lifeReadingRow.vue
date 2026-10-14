@@ -221,7 +221,12 @@ const showDone = ref(false);
         {{ daily?.title ?? '读书' }}
       </p>
       <span class="flex shrink-0 items-center gap-1 text-xs text-slate-400">
-        <template v-if="daily">{{ daily.points }} 分</template>
+        <template v-if="daily"
+          >{{ daily.earnedPoints ?? (daily.reached ? daily.points : 0) }}/{{
+            daily.points
+          }}
+          分</template
+        >
         <LifeAskButton title="就读书问 AI" @click="emit('ask')" />
       </span>
     </div>
