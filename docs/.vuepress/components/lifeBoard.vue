@@ -298,7 +298,7 @@ const dailyTitle = computed(() => {
 const debtFreeProgress = computed(() => {
   const d = activeDay.value;
   if (!d?.debtFreeScore) return 0;
-  // 债按分钟折算的分算，没有该字段时退回得分
+  // 欠债只看计划内得分，休息日白赚的分不能抵常驻项
   return Math.min(100, ((d.debtScore ?? d.score) / d.debtFreeScore) * 100);
 });
 
@@ -1137,7 +1137,7 @@ onMounted(() => {
                     activeDay.debtScore != null &&
                     activeDay.debtScore !== activeDay.score
                   "
-                  >· 按分钟折算 {{ activeDay.debtScore }} 分</span
+                  >· 计划内 {{ activeDay.debtScore }} 分</span
                 ><span
                   v-if="overMinutes > 0"
                   class="text-slate-500 dark:text-slate-400"
@@ -1385,7 +1385,7 @@ onMounted(() => {
           1 分 = {{ diagnosis.rules.yuanPerPoint }} 元，每月最多兑
           {{ diagnosis.rules.monthlyPointCap }} 分 · 日历格子越深表示当天得分越高
           · 虚线格是休息日或没排计划的日子 · 点格子可以问那天
-          · 阈值制：达标即得固定分，多做只记录不加分
+          · 每项按投入比例向下取整，1 分起，达标后封顶
         </p>
       </section>
 
@@ -1498,7 +1498,10 @@ onMounted(() => {
                       v-if="it.isMainline"
                       class="rounded bg-amber-100 px-1 py-px text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                       >主线</span
-                    >{{ it.points }} 分
+                    >{{ it.earnedPoints ?? (it.reached ? it.points : 0) }}/{{
+                      it.points
+                    }}
+                    分
                     <LifeAskButton
                       :title="'说一句来补记「' + it.title + '」'"
                       @click="openDailyAsk(it)"
